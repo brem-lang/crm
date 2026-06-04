@@ -1,0 +1,1 @@
+ALTER TABLE public.affiliates ADD COLUMN IF NOT EXISTS test_mode BOOLEAN NOT NULL DEFAULT false;

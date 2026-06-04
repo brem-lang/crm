@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:,"  />
+    <title>Alpha Leadz</title>
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('crm-settings') || '{}');
+        var n = s.crmName;
+        if (n) {
+          document.title = n;
+          document.querySelector('meta[property="og:title"]').setAttribute('content', n);
+          document.querySelector('meta[property="og:description"]').setAttribute('content', n + ' - Lead Management System');
+          document.querySelector('meta[name="description"]').setAttribute('content', n + ' - Lead Management System');
+          document.querySelector('meta[name="author"]').setAttribute('content', n);
+        }
+      } catch(e) {}
+    </script>
+    <meta name="description" content="Alpha Leadz - Lead Management System" />
+    <meta name="author" content="Alpha Leadz" />
+
+    <meta property="og:title" content="Alpha Leadz" />
+    <meta property="og:description" content="Alpha Leadz - Lead Management System" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://backend.marketlinkco.live/crm.jpg" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://backend.marketlinkco.live/crm.jpg" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
