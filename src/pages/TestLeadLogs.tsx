@@ -1,48 +1,90 @@
-import { useState, useMemo } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useTestLeadLogs, useDeleteTestLeadLogs } from "@/hooks/useTestLeadLogs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns";
-import { TestTube2, CheckCircle2, XCircle, Copy, Trash2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { DateFilterBar } from "@/components/filters/DateFilterBar";
-import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import {
+  useDeleteTestLeadLogs,
+  useTestLeadLogs,
+} from "@/hooks/useTestLeadLogs";
+import { format } from "date-fns";
+import { CheckCircle2, Copy, TestTube2, Trash2, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export default function TestLeadLogs() {
   const { data: logs, isLoading, error } = useTestLeadLogs();
+
   const deleteTestLogs = useDeleteTestLeadLogs();
-  const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+  const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } =
+    useCRMSettings();
   const { isSuperAdmin } = useAuth();
 
   // Use timezone-aware helpers for initial state
-  const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
+  const [fromDate, setFromDate] = useState<Date>(() =>
+    getStartOfMonth(getNow()),
+  );
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filteredLogs = useMemo(() => {
-    return logs?.filter((log) => {
-      const logDate = new Date(log.created_at);
-      const fromStart = getStartOfDay(fromDate);
-      const toEnd = getEndOfDay(toDate);
-      return logDate >= fromStart && logDate <= toEnd;
-    }) || [];
+    return (
+      logs?.filter((log) => {
+        const logDate = new Date(log.created_at);
+        const fromStart = getStartOfDay(fromDate);
+        const toEnd = getEndOfDay(toDate);
+        return logDate >= fromStart && logDate <= toEnd;
+      }) || []
+    );
   }, [logs, fromDate, toDate]);
 
-  const allSelected = filteredLogs.length > 0 && filteredLogs.every(log => selectedIds.has(log.id));
-  const someSelected = filteredLogs.some(log => selectedIds.has(log.id)) && !allSelected;
+  const allSelected =
+    filteredLogs.length > 0 &&
+    filteredLogs.every((log) => selectedIds.has(log.id));
+  const someSelected =
+    filteredLogs.some((log) => selectedIds.has(log.id)) && !allSelected;
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(filteredLogs.map(log => log.id)));
+      setSelectedIds(new Set(filteredLogs.map((log) => log.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -90,13 +132,14 @@ export default function TestLeadLogs() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Test Logs</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete {selectedIds.size} test log{selectedIds.size > 1 ? 's' : ''}? 
-                      This action cannot be undone.
+                      Are you sure you want to delete {selectedIds.size} test
+                      log{selectedIds.size > 1 ? "s" : ""}? This action cannot
+                      be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
+                    <AlertDialogAction
                       onClick={handleBulkDelete}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
@@ -108,7 +151,9 @@ export default function TestLeadLogs() {
             )}
             <div className="flex items-center gap-2 text-muted-foreground">
               <TestTube2 className="h-4 w-4" />
-              <span className="text-sm">{filteredLogs.length} test attempts</span>
+              <span className="text-sm">
+                {filteredLogs.length} test attempts
+              </span>
             </div>
           </div>
         </div>
@@ -159,9 +204,13 @@ export default function TestLeadLogs() {
                     <TableRow>
                       {isSuperAdmin && (
                         <TableHead className="w-12">
-                          <Checkbox 
-                            checked={someSelected ? "indeterminate" : allSelected}
-                            onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                          <Checkbox
+                            checked={
+                              someSelected ? "indeterminate" : allSelected
+                            }
+                            onCheckedChange={(checked) =>
+                              handleSelectAll(!!checked)
+                            }
                           />
                         </TableHead>
                       )}
@@ -177,17 +226,21 @@ export default function TestLeadLogs() {
                     {filteredLogs.map((log) => {
                       const advertiser = log.advertisers as any;
                       const testData = log.test_data as any;
-                      
+
                       return (
-                        <TableRow 
+                        <TableRow
                           key={log.id}
-                          className={selectedIds.has(log.id) ? "bg-muted/50" : ""}
+                          className={
+                            selectedIds.has(log.id) ? "bg-muted/50" : ""
+                          }
                         >
                           {isSuperAdmin && (
                             <TableCell>
-                              <Checkbox 
+                              <Checkbox
                                 checked={selectedIds.has(log.id)}
-                                onCheckedChange={(checked) => handleSelectChange(log.id, !!checked)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectChange(log.id, !!checked)
+                                }
                               />
                             </TableCell>
                           )}
@@ -205,7 +258,9 @@ export default function TestLeadLogs() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="font-medium">{advertiser?.name || 'Unknown'}</span>
+                            <span className="font-medium">
+                              {advertiser?.name || "Unknown"}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
@@ -222,8 +277,12 @@ export default function TestLeadLogs() {
                                     size="icon"
                                     className="h-5 w-5 text-muted-foreground hover:text-foreground"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(testData.email);
-                                      toast.success("Email copied to clipboard");
+                                      navigator.clipboard.writeText(
+                                        testData.email,
+                                      );
+                                      toast.success(
+                                        "Email copied to clipboard",
+                                      );
                                     }}
                                   >
                                     <Copy className="h-3 w-3" />
@@ -234,103 +293,138 @@ export default function TestLeadLogs() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary">
-                              {testData?.country_code || '-'}
+                              {testData?.country_code || "-"}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[250px]">
                             <div className="flex gap-2">
-{/* View Request Button */}
-                                              <Dialog>
-                                                <DialogTrigger asChild>
-                                                  <Button 
-                                                    variant="outline" 
-                                                    size="sm"
-                                                    className="text-xs"
-                                                  >
-                                                    Request
-                                                  </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-2xl max-h-[90vh]">
-                                                  <DialogHeader>
-                                                    <DialogTitle>Full Request Details</DialogTitle>
-                                                    <DialogDescription>
-                                                      Complete request sent to {advertiser?.name}
-                                                    </DialogDescription>
-                                                  </DialogHeader>
-                                                  <div className="relative">
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      className="absolute top-2 right-2 h-8 w-8 z-10"
-                                                      onClick={() => {
-                                                        const fullRequest = {
-                                                          url: log.request_url,
-                                                          headers: log.request_headers,
-                                                          payload: log.request_payload ? (() => {
-                                                            try { return JSON.parse(log.request_payload); } catch { return log.request_payload; }
-                                                          })() : null,
-                                                          lead_data: testData,
-                                                        };
-                                                        navigator.clipboard.writeText(JSON.stringify(fullRequest, null, 2));
-                                                        toast.success("Full request copied to clipboard");
-                                                      }}
-                                                    >
-                                                      <Copy className="h-4 w-4" />
-                                                    </Button>
-                                                    <ScrollArea className="max-h-[60vh] border rounded-lg bg-muted/50">
-                                                      <div className="p-4 space-y-4 text-sm">
-                                                        {/* URL */}
-                                                        <div>
-                                                          <p className="text-xs text-muted-foreground font-medium mb-1">Target URL</p>
-                                                          <code className="text-xs bg-background p-2 rounded block break-all">
-                                                            {log.request_url || 'Not recorded'}
-                                                          </code>
-                                                        </div>
-                                                        
-                                                        {/* Headers */}
-                                                        <div>
-                                                          <p className="text-xs text-muted-foreground font-medium mb-1">Headers</p>
-                                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
-                                                            {log.request_headers 
-                                                              ? JSON.stringify(log.request_headers, null, 2)
-                                                              : 'Not recorded'}
-                                                          </pre>
-                                                        </div>
-                                                        
-                                                        {/* Payload */}
-                                                        <div>
-                                                          <p className="text-xs text-muted-foreground font-medium mb-1">Request Payload</p>
-                                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
-                                                            {log.request_payload 
-                                                              ? (() => {
-                                                                  try {
-                                                                    return JSON.stringify(JSON.parse(log.request_payload), null, 2);
-                                                                  } catch {
-                                                                    return log.request_payload;
-                                                                  }
-                                                                })()
-                                                              : 'Not recorded'}
-                                                          </pre>
-                                                        </div>
-                                                        
-                                                        {/* Lead Data */}
-                                                        <div>
-                                                          <p className="text-xs text-muted-foreground font-medium mb-1">Lead Data</p>
-                                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
-                                                            {JSON.stringify(testData, null, 2)}
-                                                          </pre>
-                                                        </div>
-                                                      </div>
-                                                    </ScrollArea>
-                                                  </div>
-                                                </DialogContent>
-                                              </Dialog>
-                              
+                              {/* View Request Button */}
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                  >
+                                    Request
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl max-h-[90vh]">
+                                  <DialogHeader>
+                                    <DialogTitle>
+                                      Full Request Details
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                      Complete request sent to{" "}
+                                      {advertiser?.name}
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="relative">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute top-2 right-2 h-8 w-8 z-10"
+                                      onClick={() => {
+                                        const fullRequest = {
+                                          url: log.request_url,
+                                          headers: log.request_headers,
+                                          payload: log.request_payload
+                                            ? (() => {
+                                                try {
+                                                  return JSON.parse(
+                                                    log.request_payload,
+                                                  );
+                                                } catch {
+                                                  return log.request_payload;
+                                                }
+                                              })()
+                                            : null,
+                                          lead_data: testData,
+                                        };
+                                        navigator.clipboard.writeText(
+                                          JSON.stringify(fullRequest, null, 2),
+                                        );
+                                        toast.success(
+                                          "Full request copied to clipboard",
+                                        );
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <ScrollArea className="max-h-[60vh] border rounded-lg bg-muted/50">
+                                      <div className="p-4 space-y-4 text-sm">
+                                        {/* URL */}
+                                        <div>
+                                          <p className="text-xs text-muted-foreground font-medium mb-1">
+                                            Target URL
+                                          </p>
+                                          <code className="text-xs bg-background p-2 rounded block break-all">
+                                            {log.request_url || "Not recorded"}
+                                          </code>
+                                        </div>
+
+                                        {/* Headers */}
+                                        <div>
+                                          <p className="text-xs text-muted-foreground font-medium mb-1">
+                                            Headers
+                                          </p>
+                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
+                                            {log.request_headers
+                                              ? JSON.stringify(
+                                                  log.request_headers,
+                                                  null,
+                                                  2,
+                                                )
+                                              : "Not recorded"}
+                                          </pre>
+                                        </div>
+
+                                        {/* Payload */}
+                                        <div>
+                                          <p className="text-xs text-muted-foreground font-medium mb-1">
+                                            Request Payload
+                                          </p>
+                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
+                                            {log.request_payload
+                                              ? (() => {
+                                                  try {
+                                                    return JSON.stringify(
+                                                      JSON.parse(
+                                                        log.request_payload,
+                                                      ),
+                                                      null,
+                                                      2,
+                                                    );
+                                                  } catch {
+                                                    return log.request_payload;
+                                                  }
+                                                })()
+                                              : "Not recorded"}
+                                          </pre>
+                                        </div>
+
+                                        {/* Lead Data */}
+                                        <div>
+                                          <p className="text-xs text-muted-foreground font-medium mb-1">
+                                            Lead Data
+                                          </p>
+                                          <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">
+                                            {JSON.stringify(testData, null, 2)}
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    </ScrollArea>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+
                               {/* View Response Button */}
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button 
-                                    variant={log.success ? "outline" : "destructive"}
+                                  <Button
+                                    variant={
+                                      log.success ? "outline" : "destructive"
+                                    }
                                     size="sm"
                                     className="text-xs"
                                   >
@@ -339,7 +433,9 @@ export default function TestLeadLogs() {
                                 </DialogTrigger>
                                 <DialogContent className="max-w-lg">
                                   <DialogHeader>
-                                    <DialogTitle>Advertiser Response</DialogTitle>
+                                    <DialogTitle>
+                                      Advertiser Response
+                                    </DialogTitle>
                                     <DialogDescription>
                                       Response from {advertiser?.name}
                                     </DialogDescription>
@@ -350,33 +446,42 @@ export default function TestLeadLogs() {
                                       size="icon"
                                       className="absolute top-2 right-2 h-8 w-8 z-10"
                                       onClick={() => {
-                                        const content = log.response ? 
-                                          (() => {
-                                            try {
-                                              return JSON.stringify(JSON.parse(log.response), null, 2);
-                                            } catch {
-                                              return log.response;
-                                            }
-                                          })() 
-                                          : '';
+                                        const content = log.response
+                                          ? (() => {
+                                              try {
+                                                return JSON.stringify(
+                                                  JSON.parse(log.response),
+                                                  null,
+                                                  2,
+                                                );
+                                              } catch {
+                                                return log.response;
+                                              }
+                                            })()
+                                          : "";
                                         navigator.clipboard.writeText(content);
-                                        toast.success("Response copied to clipboard");
+                                        toast.success(
+                                          "Response copied to clipboard",
+                                        );
                                       }}
                                     >
                                       <Copy className="h-4 w-4" />
                                     </Button>
                                     <ScrollArea className="max-h-[400px] border rounded-lg bg-muted/50">
                                       <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                                        {log.response ? 
-                                          (() => {
-                                            try {
-                                              return JSON.stringify(JSON.parse(log.response), null, 2);
-                                            } catch {
-                                              return log.response;
-                                            }
-                                          })() 
-                                          : 'No response'
-                                        }
+                                        {log.response
+                                          ? (() => {
+                                              try {
+                                                return JSON.stringify(
+                                                  JSON.parse(log.response),
+                                                  null,
+                                                  2,
+                                                );
+                                              } catch {
+                                                return log.response;
+                                              }
+                                            })()
+                                          : "No response"}
                                       </pre>
                                     </ScrollArea>
                                   </div>

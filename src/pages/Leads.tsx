@@ -1,25 +1,47 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useLeads, useLeadsRealtime, useUpdateLead, useDeleteLead, useBulkDeleteLeads } from "@/hooks/useLeads";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { TablePagination } from "@/components/ui/table-pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useMemo } from "react";
-import { Trash2, Download, Send } from "lucide-react";
-import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { useAuth } from "@/hooks/useAuth";
-import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { LeadColumnSelector, ColumnConfig } from "@/components/leads/LeadColumnSelector";
-import { LeadsTable } from "@/components/leads/LeadsTable";
+import {
+  ColumnConfig,
+  LeadColumnSelector,
+} from "@/components/leads/LeadColumnSelector";
 import { LeadsFilterBar } from "@/components/leads/LeadsFilterBar";
+import { LeadsTable } from "@/components/leads/LeadsTable";
 import { ResendLeadsDialog } from "@/components/leads/ResendLeadsDialog";
-import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { useAuth } from "@/hooks/useAuth";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import {
+  useBulkAddToTest,
+  useBulkDeleteLeads,
+  useDeleteLead,
+  useLeads,
+  useLeadsRealtime,
+  useUpdateLead,
+} from "@/hooks/useLeads";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { supabase } from "@/integrations/supabase/client";
-
+import { useQuery } from "@tanstack/react-query";
+import { Download, FlaskConical, Send, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 const STORAGE_KEY = "leads-column-visibility";
 
@@ -49,21 +71,38 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 
 export default function Leads() {
   useLeadsRealtime(); // Subscribe to realtime updates
-  const { defaultPageSize, showLeadId, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+  const {
+    defaultPageSize,
+    showLeadId,
+    getStartOfMonth,
+    getEndOfMonth,
+    getNow,
+    getStartOfDay,
+    getEndOfDay,
+  } = useCRMSettings();
   const { data: leads, isLoading, error } = useLeads();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
   const bulkDeleteLeads = useBulkDeleteLeads();
+  const bulkAddToTest = useBulkAddToTest();
   const { isSuperAdmin } = useAuth();
-  const { canViewPhone, canViewEmail, canExportLeads, canDeleteLeads, canEditLeads } = useCurrentUserPermissions();
-  
+  const {
+    canViewPhone,
+    canViewEmail,
+    canExportLeads,
+    canDeleteLeads,
+    canEditLeads,
+  } = useCurrentUserPermissions();
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [sortConfig, setSortConfig] = useState<{ column: string; direction: "asc" | "desc" | null }>({
+  const [sortConfig, setSortConfig] = useState<{
+    column: string;
+    direction: "asc" | "desc" | null;
+  }>({
     column: "created_at",
     direction: "desc",
   });
-  
-  
+
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [saleStatusFilter, setSaleStatusFilter] = useState<string[]>([]);
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -81,13 +120,13 @@ export default function Leads() {
 
   // Fetch advertisers for filter dropdown
   const { data: advertisers } = useQuery({
-    queryKey: ['advertisers-list'],
+    queryKey: ["advertisers-list"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('advertisers')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
+        .from("advertisers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -95,13 +134,13 @@ export default function Leads() {
 
   // Fetch affiliates for filter dropdown
   const { data: affiliates } = useQuery({
-    queryKey: ['affiliates-list'],
+    queryKey: ["affiliates-list"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('affiliates')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
+        .from("affiliates")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -109,16 +148,20 @@ export default function Leads() {
 
   // Extract unique countries from leads
   const countries = useMemo(() => {
-    const codes = new Set(leads?.map(l => l.country_code).filter(Boolean) || []);
+    const codes = new Set(
+      leads?.map((l) => l.country_code).filter(Boolean) || [],
+    );
     return Array.from(codes).sort();
   }, [leads]);
 
   // Extract unique sale statuses from leads
   const saleStatuses = useMemo(() => {
-    const statuses = new Set(leads?.map(l => l.sale_status).filter(Boolean) || []);
+    const statuses = new Set(
+      leads?.map((l) => l.sale_status).filter(Boolean) || [],
+    );
     return Array.from(statuses).sort();
   }, [leads]);
-  
+
   // Pagination state - use settings default
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
@@ -141,12 +184,12 @@ export default function Leads() {
         });
       } catch {
         return DEFAULT_COLUMNS.map((col) =>
-          col.id === "request_id" ? { ...col, visible: showLeadId } : col
+          col.id === "request_id" ? { ...col, visible: showLeadId } : col,
         );
       }
     }
     return DEFAULT_COLUMNS.map((col) =>
-      col.id === "request_id" ? { ...col, visible: showLeadId } : col
+      col.id === "request_id" ? { ...col, visible: showLeadId } : col,
     );
   });
 
@@ -157,64 +200,100 @@ export default function Leads() {
   const handleToggleColumn = (columnId: string) => {
     setColumns((prev) =>
       prev.map((col) =>
-        col.id === columnId ? { ...col, visible: !col.visible } : col
-      )
+        col.id === columnId ? { ...col, visible: !col.visible } : col,
+      ),
     );
   };
 
   const filteredLeads = useMemo(() => {
-    return leads?.filter((lead) => {
-      // Internal status filter (sent to affiliates)
-      const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
+    return (
+      leads?.filter((lead) => {
+        // Internal status filter (sent to affiliates)
+        const matchesStatus =
+          statusFilter === "all" || lead.status === statusFilter;
 
-      // Sale status filter (from advertiser CRM) - multi-select
-      const matchesSaleStatus = saleStatusFilter.length === 0 || (lead.sale_status && saleStatusFilter.includes(lead.sale_status));
+        // Sale status filter (from advertiser CRM) - multi-select
+        const matchesSaleStatus =
+          saleStatusFilter.length === 0 ||
+          (lead.sale_status && saleStatusFilter.includes(lead.sale_status));
 
-      // Date range filter - use timezone-aware day boundaries
-      // Also match leads injected within the range (injection_sent_at), even if created earlier
-      const fromStart = getStartOfDay(fromDate);
-      const toEnd = getEndOfDay(toDate);
-      const createdDate = new Date(lead.created_at);
-      const injectedDate = (lead as any).injection_sent_at ? new Date((lead as any).injection_sent_at) : null;
-      const matchesDate = (createdDate >= fromStart && createdDate <= toEnd) ||
-        (injectedDate !== null && injectedDate >= fromStart && injectedDate <= toEnd);
+        // Date range filter - use timezone-aware day boundaries
+        // Also match leads injected within the range (injection_sent_at), even if created earlier
+        const fromStart = getStartOfDay(fromDate);
+        const toEnd = getEndOfDay(toDate);
+        const createdDate = new Date(lead.created_at);
+        const injectedDate = (lead as any).injection_sent_at
+          ? new Date((lead as any).injection_sent_at)
+          : null;
+        const matchesDate =
+          (createdDate >= fromStart && createdDate <= toEnd) ||
+          (injectedDate !== null &&
+            injectedDate >= fromStart &&
+            injectedDate <= toEnd);
 
-      // Advertiser filter - check lead_distributions
-      const matchesAdvertiser = advertiserFilter === "all" || 
-        (lead as any).lead_distributions?.some((d: any) => d.advertiser_id === advertiserFilter);
+        // Advertiser filter - check lead_distributions
+        const matchesAdvertiser =
+          advertiserFilter === "all" ||
+          (lead as any).lead_distributions?.some(
+            (d: any) => d.advertiser_id === advertiserFilter,
+          );
 
-      // Country filter
-      const matchesCountry = countryFilter === "all" || lead.country_code === countryFilter;
+        // Country filter
+        const matchesCountry =
+          countryFilter === "all" || lead.country_code === countryFilter;
 
-      // Affiliate filter by ID
-      const matchesAffiliate = affiliateFilter === "all" || lead.affiliate_id === affiliateFilter;
+        // Affiliate filter by ID
+        const matchesAffiliate =
+          affiliateFilter === "all" || lead.affiliate_id === affiliateFilter;
 
-      // Free search across ID, email, phone, IP (case-insensitive contains)
-      let matchesFreeSearch = true;
-      if (freeSearch.trim()) {
-        const searchLower = freeSearch.toLowerCase().trim();
-        const leadId = (lead.request_id || lead.id || '').toLowerCase();
-        const email = (lead.email || '').toLowerCase();
-        const phone = (lead.mobile || '').toLowerCase();
-        const ip = (lead.ip_address || '').toLowerCase();
-        matchesFreeSearch = leadId.includes(searchLower) || 
-                            email.includes(searchLower) || 
-                            phone.includes(searchLower) || 
-                            ip.includes(searchLower);
-      }
-      
-      return matchesStatus && matchesSaleStatus && matchesDate && matchesAdvertiser && matchesCountry && matchesAffiliate && matchesFreeSearch;
-    }) || [];
-  }, [leads, statusFilter, saleStatusFilter, fromDate, toDate, advertiserFilter, countryFilter, affiliateFilter, freeSearch, getStartOfDay, getEndOfDay]);
+        // Free search across ID, email, phone, IP (case-insensitive contains)
+        let matchesFreeSearch = true;
+        if (freeSearch.trim()) {
+          const searchLower = freeSearch.toLowerCase().trim();
+          const leadId = (lead.request_id || lead.id || "").toLowerCase();
+          const email = (lead.email || "").toLowerCase();
+          const phone = (lead.mobile || "").toLowerCase();
+          const ip = (lead.ip_address || "").toLowerCase();
+          matchesFreeSearch =
+            leadId.includes(searchLower) ||
+            email.includes(searchLower) ||
+            phone.includes(searchLower) ||
+            ip.includes(searchLower);
+        }
+
+        return (
+          matchesStatus &&
+          matchesSaleStatus &&
+          matchesDate &&
+          matchesAdvertiser &&
+          matchesCountry &&
+          matchesAffiliate &&
+          matchesFreeSearch
+        );
+      }) || []
+    );
+  }, [
+    leads,
+    statusFilter,
+    saleStatusFilter,
+    fromDate,
+    toDate,
+    advertiserFilter,
+    countryFilter,
+    affiliateFilter,
+    freeSearch,
+    getStartOfDay,
+    getEndOfDay,
+  ]);
 
   // Sorted leads
   const sortedLeads = useMemo(() => {
     if (!sortConfig.direction) return filteredLeads;
-    
+
     return [...filteredLeads].sort((a, b) => {
       let aVal: any;
       let bVal: any;
-      
+
       switch (sortConfig.column) {
         case "firstname":
         case "lastname":
@@ -231,15 +310,23 @@ export default function Leads() {
           break;
         case "created_at": {
           // Sort by the most recent activity: injection_sent_at if present, otherwise created_at
-          const aInj = (a as any).injection_sent_at ? new Date((a as any).injection_sent_at).getTime() : 0;
-          const bInj = (b as any).injection_sent_at ? new Date((b as any).injection_sent_at).getTime() : 0;
+          const aInj = (a as any).injection_sent_at
+            ? new Date((a as any).injection_sent_at).getTime()
+            : 0;
+          const bInj = (b as any).injection_sent_at
+            ? new Date((b as any).injection_sent_at).getTime()
+            : 0;
           aVal = Math.max(new Date(a.created_at).getTime(), aInj);
           bVal = Math.max(new Date(b.created_at).getTime(), bInj);
           return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
         }
         case "ftd_date":
-          aVal = a[sortConfig.column] ? new Date(a[sortConfig.column]).getTime() : 0;
-          bVal = b[sortConfig.column] ? new Date(b[sortConfig.column]).getTime() : 0;
+          aVal = a[sortConfig.column]
+            ? new Date(a[sortConfig.column]).getTime()
+            : 0;
+          bVal = b[sortConfig.column]
+            ? new Date(b[sortConfig.column]).getTime()
+            : 0;
           return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
         case "is_ftd":
           aVal = a.is_ftd ? 1 : 0;
@@ -249,7 +336,7 @@ export default function Leads() {
           aVal = a[sortConfig.column] || "";
           bVal = b[sortConfig.column] || "";
       }
-      
+
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortConfig.direction === "asc"
           ? aVal.localeCompare(bVal)
@@ -269,13 +356,24 @@ export default function Leads() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, saleStatusFilter, pageSize, fromDate, toDate, advertiserFilter, countryFilter, affiliateFilter, freeSearch]);
+  }, [
+    statusFilter,
+    saleStatusFilter,
+    pageSize,
+    fromDate,
+    toDate,
+    advertiserFilter,
+    countryFilter,
+    affiliateFilter,
+    freeSearch,
+  ]);
 
   const handleSort = (columnId: string) => {
     setSortConfig((prev) => {
       if (prev.column === columnId) {
         // Cycle: asc -> desc -> null
-        if (prev.direction === "asc") return { column: columnId, direction: "desc" };
+        if (prev.direction === "asc")
+          return { column: columnId, direction: "desc" };
         if (prev.direction === "desc") return { column: "", direction: null };
       }
       return { column: columnId, direction: "asc" };
@@ -294,7 +392,10 @@ export default function Leads() {
         id: selectedLead.id,
         status: editForm.status as any,
         is_ftd: editForm.is_ftd,
-        ftd_date: editForm.is_ftd && !selectedLead.is_ftd ? new Date().toISOString() : selectedLead.ftd_date,
+        ftd_date:
+          editForm.is_ftd && !selectedLead.is_ftd
+            ? new Date().toISOString()
+            : selectedLead.ftd_date,
       });
       setIsEditOpen(false);
     }
@@ -307,7 +408,11 @@ export default function Leads() {
   };
 
   const handleReleaseFtd = (id: string) => {
-    if (confirm("Release this FTD to the affiliate? They will see is_ftd=1 in the API.")) {
+    if (
+      confirm(
+        "Release this FTD to the affiliate? They will see is_ftd=1 in the API.",
+      )
+    ) {
       updateLead.mutate({
         id,
         ftd_released: true,
@@ -317,7 +422,7 @@ export default function Leads() {
   };
 
   const handleSelectChange = (id: string, checked: boolean) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (checked) {
         next.add(id);
@@ -330,7 +435,7 @@ export default function Leads() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked && paginatedLeads) {
-      setSelectedIds(new Set(paginatedLeads.map(l => l.id)));
+      setSelectedIds(new Set(paginatedLeads.map((l) => l.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -347,19 +452,31 @@ export default function Leads() {
 
   const handleBulkExport = () => {
     if (!filteredLeads) return;
-    
-    const leadsToExport = selectedIds.size > 0 
-      ? filteredLeads.filter(l => selectedIds.has(l.id))
-      : filteredLeads;
-    
+
+    const leadsToExport =
+      selectedIds.size > 0
+        ? filteredLeads.filter((l) => selectedIds.has(l.id))
+        : filteredLeads;
+
     if (leadsToExport.length === 0) {
       toast.error("No leads to export");
       return;
     }
 
     // Build CSV
-    const headers = ["Lead ID", "First Name", "Last Name", "Email", "Phone", "Country", "Status", "FTD", "Affiliate", "Created"];
-    const rows = leadsToExport.map(lead => [
+    const headers = [
+      "Lead ID",
+      "First Name",
+      "Last Name",
+      "Email",
+      "Phone",
+      "Country",
+      "Status",
+      "FTD",
+      "Affiliate",
+      "Created",
+    ];
+    const rows = leadsToExport.map((lead) => [
       lead.request_id || "",
       lead.firstname,
       lead.lastname,
@@ -371,12 +488,14 @@ export default function Leads() {
       (lead as any).affiliates?.name || "",
       new Date(lead.created_at).toISOString(),
     ]);
-    
+
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      ),
     ].join("\n");
-    
+
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -384,7 +503,7 @@ export default function Leads() {
     a.download = `leads-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     toast.success(`Exported ${leadsToExport.length} leads`);
   };
 
@@ -432,7 +551,10 @@ export default function Leads() {
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
           >
-            <LeadColumnSelector columns={columns} onToggle={handleToggleColumn} />
+            <LeadColumnSelector
+              columns={columns}
+              onToggle={handleToggleColumn}
+            />
             {canExportLeads && (
               <Button variant="outline" size="sm" onClick={handleBulkExport}>
                 <Download className="h-4 w-4 mr-2" />
@@ -440,13 +562,37 @@ export default function Leads() {
               </Button>
             )}
             {canEditLeads && selectedIds.size > 0 && (
-              <Button variant="secondary" size="sm" onClick={() => setIsResendOpen(true)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsResendOpen(true)}
+              >
                 <Send className="h-4 w-4 mr-2" />
                 Resend ({selectedIds.size})
               </Button>
             )}
+            {canEditLeads && selectedIds.size > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  bulkAddToTest.mutate(Array.from(selectedIds), {
+                    onSuccess: () => setSelectedIds(new Set()),
+                  });
+                }}
+                disabled={bulkAddToTest.isPending}
+              >
+                <FlaskConical className="h-4 w-4 mr-2" />
+                Add to Test ({selectedIds.size})
+              </Button>
+            )}
             {canDeleteLeads && selectedIds.size > 0 && (
-              <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteLeads.isPending}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteLeads.isPending}
+              >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete ({selectedIds.size})
               </Button>
@@ -454,8 +600,15 @@ export default function Leads() {
           </LeadsFilterBar>
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3 pt-3 border-t">
-              <span>{selectedIds.size} lead{selectedIds.size !== 1 ? "s" : ""} selected</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              <span>
+                {selectedIds.size} lead{selectedIds.size !== 1 ? "s" : ""}{" "}
+                selected
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+              >
                 Clear selection
               </Button>
             </div>
@@ -487,6 +640,7 @@ export default function Leads() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onReleaseFtd={handleReleaseFtd}
+                  onAddToTest={(id) => bulkAddToTest.mutate([id])}
                   selectedIds={selectedIds}
                   onSelectChange={handleSelectChange}
                   onSelectAll={handleSelectAll}
@@ -528,8 +682,8 @@ export default function Leads() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select 
-                  value={editForm.status} 
+                <Select
+                  value={editForm.status}
                   onValueChange={(v) => setEditForm({ ...editForm, status: v })}
                 >
                   <SelectTrigger>
@@ -549,7 +703,9 @@ export default function Leads() {
                   type="checkbox"
                   id="is_ftd"
                   checked={editForm.is_ftd}
-                  onChange={(e) => setEditForm({ ...editForm, is_ftd: e.target.checked })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, is_ftd: e.target.checked })
+                  }
                   className="h-4 w-4"
                 />
                 <Label htmlFor="is_ftd">Mark as FTD (First Time Deposit)</Label>
@@ -570,10 +726,11 @@ export default function Leads() {
         <ResendLeadsDialog
           open={isResendOpen}
           onOpenChange={setIsResendOpen}
-          selectedLeads={sortedLeads.filter(l => selectedIds.has(l.id))}
+          selectedLeads={sortedLeads.filter((l) => selectedIds.has(l.id))}
           advertisers={advertisers || []}
           onSuccess={() => setSelectedIds(new Set())}
         />
+
       </div>
     </DashboardLayout>
   );

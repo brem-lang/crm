@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Pencil, Trash2, Send, Copy, History } from "lucide-react";
+import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ interface LeadsTableProps {
   onEdit: (lead: any) => void;
   onDelete: (id: string) => void;
   onReleaseFtd: (id: string) => void;
+  onAddToTest: (id: string) => void;
   selectedIds: Set<string>;
   onSelectChange: (id: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
@@ -38,15 +39,16 @@ interface LeadsTableProps {
   onSort: (columnId: string) => void;
 }
 
-export function LeadsTable({ 
-  leads, 
-  columns, 
-  isSuperAdmin, 
-  onEdit, 
-  onDelete, 
-  onReleaseFtd, 
-  selectedIds, 
-  onSelectChange, 
+export function LeadsTable({
+  leads,
+  columns,
+  isSuperAdmin,
+  onEdit,
+  onDelete,
+  onReleaseFtd,
+  onAddToTest,
+  selectedIds,
+  onSelectChange,
   onSelectAll,
   canViewPhone = false,
   canViewEmail = false,
@@ -238,6 +240,12 @@ export function LeadsTable({
                       <DropdownMenuItem onClick={() => onReleaseFtd(lead.id)} className="text-green-600">
                         <Send className="h-4 w-4 mr-2" />
                         Release FTD
+                      </DropdownMenuItem>
+                    )}
+                    {canEditLeads && (
+                      <DropdownMenuItem onClick={() => onAddToTest(lead.id)}>
+                        <FlaskConical className="h-4 w-4 mr-2" />
+                        Add to Test
                       </DropdownMenuItem>
                     )}
                     {canDeleteLeads && (

@@ -157,19 +157,66 @@ export function useDeleteLead() {
 
 export function useBulkDeleteLeads() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (ids: string[]) => {
       const { error } = await supabase
         .from('leads')
         .delete()
         .in('id', ids);
-      
+
       if (error) throw error;
     },
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast.success(`${ids.length} leads deleted successfully`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useBulkAddToTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Fetch the leads first
+      const { data: leads, error: fetchError } = await supabase
+        .from('leads')
+        .select('*')
+        .in('id', ids);
+
+      if (fetchError) throw fetchError;
+      if (!leads || leads.length === 0) return;
+
+      // Insert each lead into test_lead_logs as test_data
+      const logs = leads.map((lead) => ({
+        advertiser_id: null,
+        test_data: lead as any,
+        success: true,
+        response: 'Moved from leads table',
+      }));
+
+      const { error: insertError } = await supabase
+        .from('test_lead_logs')
+        .insert(logs as any);
+
+      if (insertError) throw insertError;
+
+      // Delete from leads table
+      const { error: deleteError } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', ids);
+
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['test-lead-logs'] });
+      toast.success(`${ids.length} lead${ids.length !== 1 ? 's' : ''} moved to test logs`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
