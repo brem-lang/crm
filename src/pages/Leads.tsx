@@ -111,6 +111,7 @@ export default function Leads() {
   const [editForm, setEditForm] = useState({ status: "", is_ftd: false });
 
   // Date and advanced filters - use timezone-aware helpers (default to Today)
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfDay(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfDay(getNow()));
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
@@ -226,6 +227,7 @@ export default function Leads() {
           ? new Date((lead as any).injection_sent_at)
           : null;
         const matchesDate =
+          showAllDates ||
           (createdDate >= fromStart && createdDate <= toEnd) ||
           (injectedDate !== null &&
             injectedDate >= fromStart &&
@@ -276,6 +278,7 @@ export default function Leads() {
     leads,
     statusFilter,
     saleStatusFilter,
+    showAllDates,
     fromDate,
     toDate,
     advertiserFilter,
@@ -359,6 +362,7 @@ export default function Leads() {
   }, [
     statusFilter,
     saleStatusFilter,
+    showAllDates,
     pageSize,
     fromDate,
     toDate,
@@ -524,8 +528,9 @@ export default function Leads() {
           <LeadsFilterBar
             fromDate={fromDate}
             toDate={toDate}
-            onFromDateChange={setFromDate}
-            onToDateChange={setToDate}
+            onFromDateChange={(d) => { setShowAllDates(false); setFromDate(d); }}
+            onToDateChange={(d) => { setShowAllDates(false); setToDate(d); }}
+            onShowAllDates={() => setShowAllDates(true)}
             advertiserFilter={advertiserFilter}
             onAdvertiserFilterChange={setAdvertiserFilter}
             countryFilter={countryFilter}
@@ -730,7 +735,6 @@ export default function Leads() {
           advertisers={advertisers || []}
           onSuccess={() => setSelectedIds(new Set())}
         />
-
       </div>
     </DashboardLayout>
   );

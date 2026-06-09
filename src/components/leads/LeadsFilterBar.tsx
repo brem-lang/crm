@@ -1,17 +1,29 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { cn } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 import { CalendarIcon, ChevronLeft, ChevronRight, Filter } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { TablePagination } from "@/components/ui/table-pagination";
-import { MultiSelect } from "@/components/ui/multi-select";
+import { useState } from "react";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset =
+  | "today"
+  | "yesterday"
+  | "thisWeek"
+  | "lastWeek"
+  | "thisMonth"
+  | "lastMonth"
+  | "all"
+  | "custom";
 
 interface LeadsFilterBarProps {
   fromDate: Date;
@@ -43,6 +55,7 @@ interface LeadsFilterBarProps {
   totalItems?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  onShowAllDates?: () => void;
 }
 
 const datePresets: { key: DatePreset; label: string }[] = [
@@ -52,6 +65,7 @@ const datePresets: { key: DatePreset; label: string }[] = [
   { key: "lastWeek", label: "Last Week" },
   { key: "thisMonth", label: "This Month" },
   { key: "lastMonth", label: "Last Month" },
+  { key: "all", label: "All" },
   { key: "custom", label: "Custom" },
 ];
 
@@ -85,9 +99,10 @@ export function LeadsFilterBar({
   totalItems = 0,
   onPageChange,
   onPageSizeChange,
+  onShowAllDates,
 }: LeadsFilterBarProps) {
   const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const { 
+  const {
     formatDate,
     getNow,
     getStartOfDay,
@@ -104,7 +119,7 @@ export function LeadsFilterBar({
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
     const now = getNow();
-    
+
     switch (preset) {
       case "today":
         onFromDateChange(getStartOfDay(now));
@@ -136,6 +151,9 @@ export function LeadsFilterBar({
         onToDateChange(getEndOfMonth(lastMonth));
         break;
       }
+      case "all":
+        onShowAllDates?.();
+        break;
     }
   };
 
@@ -154,7 +172,7 @@ export function LeadsFilterBar({
   const daysDiff = differenceInDays(toDate, fromDate) + 1;
 
   // Convert sale statuses to options format
-  const saleStatusOptions = saleStatuses.map(status => ({
+  const saleStatusOptions = saleStatuses.map((status) => ({
     value: status,
     label: status,
   }));
@@ -171,14 +189,14 @@ export function LeadsFilterBar({
             onClick={() => handlePresetChange(preset.key)}
             className={cn(
               "text-sm px-3 py-1 h-8",
-              datePreset === preset.key && "border-b-2 border-primary rounded-none font-medium"
+              datePreset === preset.key &&
+                "border-b-2 border-primary rounded-none font-medium",
             )}
           >
             {preset.label}
           </Button>
         ))}
-        
-        
+
         <div className="ml-auto flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -201,7 +219,7 @@ export function LeadsFilterBar({
               />
             </PopoverContent>
           </Popover>
-          
+
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
@@ -224,11 +242,23 @@ export function LeadsFilterBar({
             </PopoverContent>
           </Popover>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("prev")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => shiftDates("prev")}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs text-muted-foreground min-w-[40px] text-center">{daysDiff}d</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("next")}>
+          <span className="text-xs text-muted-foreground min-w-[40px] text-center">
+            {daysDiff}d
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => shiftDates("next")}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -236,47 +266,41 @@ export function LeadsFilterBar({
 
       {/* Filters Row */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={advertiserFilter} onValueChange={onAdvertiserFilterChange}>
-          <SelectTrigger className="w-[160px] h-9 bg-background">
-            <SelectValue placeholder="All Advertisers" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            <SelectItem value="all">All Advertisers</SelectItem>
-            {advertisers.map((adv) => (
-              <SelectItem key={adv.id} value={adv.id}>
-                {adv.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={advertiserFilter}
+          onValueChange={onAdvertiserFilterChange}
+          options={advertisers.map((adv) => ({
+            value: adv.id,
+            label: adv.name,
+          }))}
+          placeholder="All Advertisers"
+          searchPlaceholder="Search advertiser..."
+          emptyMessage="No advertisers found"
+          className="w-[160px]"
+        />
 
-        <Select value={countryFilter} onValueChange={onCountryFilterChange}>
-          <SelectTrigger className="w-[140px] h-9 bg-background">
-            <SelectValue placeholder="All Countries" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            <SelectItem value="all">All Countries</SelectItem>
-            {countries.map((code) => (
-              <SelectItem key={code} value={code}>
-                {code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={countryFilter}
+          onValueChange={onCountryFilterChange}
+          options={countries.map((code) => ({ value: code, label: code }))}
+          placeholder="All Countries"
+          searchPlaceholder="Search country..."
+          emptyMessage="No countries found"
+          className="w-[140px]"
+        />
 
-        <Select value={affiliateFilter} onValueChange={onAffiliateFilterChange}>
-          <SelectTrigger className="w-[160px] h-9 bg-background">
-            <SelectValue placeholder="All Affiliates" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            <SelectItem value="all">All Affiliates</SelectItem>
-            {affiliates.map((aff) => (
-              <SelectItem key={aff.id} value={aff.id}>
-                {aff.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={affiliateFilter}
+          onValueChange={onAffiliateFilterChange}
+          options={affiliates.map((aff) => ({
+            value: aff.id,
+            label: aff.name,
+          }))}
+          placeholder="All Affiliates"
+          searchPlaceholder="Search affiliate..."
+          emptyMessage="No affiliates found"
+          className="w-[160px]"
+        />
 
         <Input
           placeholder="Search ID, email, phone, IP..."
@@ -285,19 +309,21 @@ export function LeadsFilterBar({
           className="w-[220px] h-9"
         />
 
-        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-          <SelectTrigger className="w-[130px] h-9 bg-background">
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
-            <SelectItem value="lost">Lost</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={statusFilter}
+          onValueChange={onStatusFilterChange}
+          options={[
+            { value: "new", label: "New" },
+            { value: "contacted", label: "Contacted" },
+            { value: "qualified", label: "Qualified" },
+            { value: "converted", label: "Converted" },
+            { value: "lost", label: "Lost" },
+          ]}
+          placeholder="All Status"
+          searchPlaceholder="Search status..."
+          emptyMessage="No statuses found"
+          className="w-[130px]"
+        />
 
         <MultiSelect
           options={saleStatusOptions}
