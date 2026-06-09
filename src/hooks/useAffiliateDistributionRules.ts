@@ -225,9 +225,6 @@ export function useBulkCreateDistributionRules() {
       affiliate_id: string;
       country_code: string;
       advertiser_id: string;
-      weight: number;
-      daily_cap?: number | null;
-      hourly_cap?: number | null;
       is_active?: boolean;
     }[]) => {
       // Insert all rules, on conflict do nothing (skip duplicates)

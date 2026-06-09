@@ -15,14 +15,11 @@ import { useRecentDistributionStats } from "@/hooks/useRecentDistributionStats";
 import { BulkAddRuleDialog } from "@/components/distribution/BulkAddRuleDialog";
 import { AdvertiserSidebar } from "@/components/distribution/AdvertiserSidebar";
 import { AdvertiserConfigPanel } from "@/components/distribution/AdvertiserConfigPanel";
-import { SimulationPanel } from "@/components/distribution/SimulationPanel";
 import { ConflictLinterBadge, ConflictLinterSheet } from "@/components/distribution/ConflictLinterSheet";
-import { SnapshotHistorySheet } from "@/components/distribution/SnapshotHistorySheet";
-import { DryRunSheet } from "@/components/distribution/DryRunSheet";
 import { TelemetryStrip } from "@/components/distribution/TelemetryStrip";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,9 +27,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Users, Plus, Trash2, Save, List, AlertTriangle, Columns3, History, FlaskConical, CheckSquare, X, PauseCircle, PlayCircle } from "lucide-react";
+import { Settings, Users, Plus, Trash2, List, AlertTriangle, Columns3, CheckSquare, X, PauseCircle, PlayCircle } from "lucide-react";
 import { countryData } from "@/components/advertisers/countryData";
-import { RuleScheduleSelector } from "@/components/distribution/RuleScheduleSelector";
 
 type ViewMode = 'config' | 'rules';
 
@@ -40,22 +36,16 @@ export default function DistributionSettings() {
   const [viewMode, setViewMode] = useState<ViewMode>('config');
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string | null>(null);
 
-  // Phase 4: global tools state
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
   const [linterOpen, setLinterOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [dryRunOpen, setDryRunOpen] = useState(false);
 
   // Rules-view state (preserved from old page)
   const [activeRulesTab, setActiveRulesTab] = useState("all-rules");
   const [selectedAffiliateId, setSelectedAffiliateId] = useState<string>("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set());
-  const [editedRules, setEditedRules] = useState<Map<string, {
-    weight: number; is_active: boolean; daily_cap: number | null;
-    hourly_cap: number | null; priority_type: 'primary' | 'fallback';
-  }>>(new Map());
+  const [filterAdvertiserId, setFilterAdvertiserId] = useState("all");
 
   const { data: advertisers, isLoading: loadingAdvertisers } = useAdvertisers();
   const { data: affiliates, isLoading: loadingAffiliates } = useAffiliates();
@@ -75,6 +65,15 @@ export default function DistributionSettings() {
   const bulkDeleteRules = useBulkDeleteDistributionRules();
 
   // Must be before any early return — hooks cannot be called conditionally
+  const advertiserFilterOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return (allRules || [])
+      .filter(r => r.advertiser_is_active !== false && r.advertiser_id && r.advertiser_name)
+      .filter(r => { if (seen.has(r.advertiser_id)) return false; seen.add(r.advertiser_id); return true; })
+      .map(r => ({ value: r.advertiser_id, label: r.advertiser_name! }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allRules]);
+
   const bulkAdvertiserIds = useMemo(
     () => [...bulkSelectedIds]
       .map(id => ({
@@ -105,40 +104,18 @@ export default function DistributionSettings() {
     } as any);
   };
 
-  const handleUpdateRule = (id: string) => {
-    const edits = editedRules.get(id);
-    if (!edits) return;
-    updateRule.mutate({ id, ...edits }, {
-      onSuccess: () => {
-        setEditedRules(prev => { const n = new Map(prev); n.delete(id); return n; });
-      },
-    });
-  };
-
   const handleDeleteRule = (id: string) => {
     if (confirm('Delete this distribution rule?')) deleteRule.mutate(id);
-  };
-
-  const updateAllRulesLocal = (
-    id: string,
-    field: 'weight' | 'is_active' | 'daily_cap' | 'hourly_cap' | 'priority_type',
-    value: number | boolean | null | string,
-    rule: { weight: number; is_active: boolean; daily_cap: number | null; hourly_cap: number | null; priority_type: 'primary' | 'fallback' }
-  ) => {
-    setEditedRules(prev => {
-      const current = prev.get(id) ?? {
-        weight: rule.weight, is_active: rule.is_active,
-        daily_cap: rule.daily_cap, hourly_cap: rule.hourly_cap, priority_type: rule.priority_type,
-      };
-      return new Map(prev).set(id, { ...current, [field]: value });
-    });
   };
 
   const handleBulkDelete = () => {
     if (!selectedRuleIds.size) return;
     if (confirm(`Delete ${selectedRuleIds.size} distribution rules?`)) {
       bulkDeleteRules.mutate(Array.from(selectedRuleIds), {
-        onSuccess: () => setSelectedRuleIds(new Set()),
+        onSuccess: () => {
+          setSelectedRuleIds(new Set());
+          setFilterAdvertiserId("all");
+        },
       });
     }
   };
@@ -154,7 +131,10 @@ export default function DistributionSettings() {
     );
   }
 
-  const filteredAllRules = (allRules || []).filter(r => r.advertiser_is_active !== false);
+  const filteredAllRules = (allRules || [])
+    .filter(r => r.advertiser_is_active !== false)
+    .filter(r => filterAdvertiserId === "all" || r.advertiser_id === filterAdvertiserId);
+
   const allRulesSelected = filteredAllRules.length > 0 && filteredAllRules.every(r => selectedRuleIds.has(r.id));
   const someRulesSelected = filteredAllRules.some(r => selectedRuleIds.has(r.id)) && !allRulesSelected;
 
@@ -176,10 +156,7 @@ export default function DistributionSettings() {
 
   return (
     <DashboardLayout>
-      {/* Sheets */}
       <ConflictLinterSheet open={linterOpen} onOpenChange={setLinterOpen} />
-      <SnapshotHistorySheet open={historyOpen} onOpenChange={setHistoryOpen} />
-      <DryRunSheet open={dryRunOpen} onOpenChange={setDryRunOpen} />
 
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Top bar */}
@@ -205,14 +182,6 @@ export default function DistributionSettings() {
                 {bulkSelectMode ? 'Cancel select' : 'Select'}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-              <History className="h-4 w-4 mr-1.5" />
-              History
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setDryRunOpen(true)}>
-              <FlaskConical className="h-4 w-4 mr-1.5" />
-              Dry Run
-            </Button>
             <Button
               variant={viewMode === 'config' ? 'default' : 'outline'}
               size="sm"
@@ -278,7 +247,7 @@ export default function DistributionSettings() {
           />
         )}
 
-        {/* Three-pane layout */}
+        {/* Two-pane layout */}
         {viewMode === 'config' && (
           <div className="flex flex-1 overflow-hidden">
             {/* Left pane */}
@@ -354,10 +323,6 @@ export default function DistributionSettings() {
               )}
             </div>
 
-            {/* Right pane */}
-            <div className="w-72 shrink-0 overflow-hidden">
-              <SimulationPanel />
-            </div>
           </div>
         )}
 
@@ -379,19 +344,29 @@ export default function DistributionSettings() {
               {/* All Rules */}
               <TabsContent value="all-rules" className="mt-6">
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
+                  <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                     <div>
                       <CardTitle>All Distribution Rules</CardTitle>
                       <CardDescription>
                         View and edit all affiliate distribution rules. Only active advertisers are shown.
                       </CardDescription>
                     </div>
-                    {selectedRuleIds.size > 0 && (
-                      <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteRules.isPending}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete {selectedRuleIds.size} Selected
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <SearchableSelect
+                        value={filterAdvertiserId}
+                        onValueChange={setFilterAdvertiserId}
+                        options={advertiserFilterOptions}
+                        placeholder="All Advertisers"
+                        searchPlaceholder="Search advertiser..."
+                        className="w-48"
+                      />
+                      {selectedRuleIds.size > 0 && (
+                        <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteRules.isPending}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete {selectedRuleIds.size} Selected
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {loadingAllRules ? (
@@ -419,26 +394,14 @@ export default function DistributionSettings() {
                               <TableHead>Affiliate</TableHead>
                               <TableHead>Country</TableHead>
                               <TableHead>Advertiser</TableHead>
-                              <TableHead className="w-28">Priority</TableHead>
                               <TableHead className="w-24 text-center">Active</TableHead>
-                              <TableHead className="w-24">Weight</TableHead>
-                              <TableHead className="w-28">Daily Cap</TableHead>
-                              <TableHead className="w-28">Hourly Cap</TableHead>
-                              <TableHead className="w-28">Schedule</TableHead>
-                              <TableHead className="w-20">Actions</TableHead>
+                              <TableHead className="w-16">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {filteredAllRules.map(rule => {
-                              const edits = editedRules.get(rule.id);
-                              const currentWeight = edits?.weight ?? rule.weight;
-                              const currentActive = edits?.is_active ?? rule.is_active;
-                              const currentDailyCap = edits?.daily_cap ?? rule.daily_cap;
-                              const currentHourlyCap = edits?.hourly_cap ?? rule.hourly_cap;
-                              const currentPriority = edits?.priority_type ?? rule.priority_type ?? 'primary';
-                              const hasEdits = editedRules.has(rule.id);
                               const affiliateInactive = rule.affiliate_is_active === false;
-                              const effectivelyInactive = affiliateInactive || !currentActive;
+                              const effectivelyInactive = affiliateInactive || !rule.is_active;
 
                               return (
                                 <TableRow key={rule.id} className={effectivelyInactive ? 'opacity-60 bg-muted/30' : ''}>
@@ -472,77 +435,22 @@ export default function DistributionSettings() {
                                     </span>
                                   </TableCell>
                                   <TableCell>{rule.advertiser_name}</TableCell>
-                                  <TableCell>
-                                    <Select
-                                      value={currentPriority}
-                                      onValueChange={v => updateAllRulesLocal(rule.id, 'priority_type', v as 'primary' | 'fallback', rule)}
-                                    >
-                                      <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="primary">
-                                          <span className="flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-green-500" /> Primary
-                                          </span>
-                                        </SelectItem>
-                                        <SelectItem value="fallback">
-                                          <span className="flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-yellow-500" /> Fallback
-                                          </span>
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </TableCell>
                                   <TableCell className="text-center">
                                     <Switch
-                                      checked={currentActive}
-                                      onCheckedChange={v => updateAllRulesLocal(rule.id, 'is_active', v, rule)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input
-                                      type="number" min={1} max={1000} className="w-20 h-8"
-                                      value={currentWeight}
-                                      onChange={e => updateAllRulesLocal(rule.id, 'weight', parseInt(e.target.value) || 100, rule)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input
-                                      type="number" min={0} className="w-24 h-8" placeholder="∞"
-                                      value={currentDailyCap ?? ''}
-                                      onChange={e => updateAllRulesLocal(rule.id, 'daily_cap', e.target.value ? parseInt(e.target.value) : null, rule)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input
-                                      type="number" min={0} className="w-24 h-8" placeholder="∞"
-                                      value={currentHourlyCap ?? ''}
-                                      onChange={e => updateAllRulesLocal(rule.id, 'hourly_cap', e.target.value ? parseInt(e.target.value) : null, rule)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <RuleScheduleSelector
-                                      startTime={rule.start_time}
-                                      endTime={rule.end_time}
-                                      weeklySchedule={rule.weekly_schedule}
-                                      timezone={rule.timezone || 'UTC'}
-                                      onSave={schedule => {
-                                        updateRule.mutate({
-                                          id: rule.id,
-                                          start_time: schedule.start_time,
-                                          end_time: schedule.end_time,
-                                          weekly_schedule: schedule.weekly_schedule,
-                                          timezone: schedule.timezone,
-                                        });
-                                      }}
+                                      checked={rule.is_active}
+                                      onCheckedChange={v => updateRule.mutate({ id: rule.id, is_active: v })}
                                       disabled={updateRule.isPending}
                                     />
                                   </TableCell>
                                   <TableCell>
-                                    {hasEdits && (
-                                      <Button size="sm" onClick={() => handleUpdateRule(rule.id)} disabled={updateRule.isPending}>
-                                        <Save className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteRule(rule.id)}
+                                      disabled={deleteRule.isPending}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -627,25 +535,17 @@ export default function DistributionSettings() {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>Advertiser</TableHead>
-                                    <TableHead className="w-24">Active</TableHead>
-                                    <TableHead className="w-24">Weight</TableHead>
-                                    <TableHead className="w-24">Daily Cap</TableHead>
-                                    <TableHead className="w-24">Hourly Cap</TableHead>
-                                    <TableHead className="w-24">Actions</TableHead>
+                                    <TableHead className="w-24 text-center">Active</TableHead>
+                                    <TableHead className="w-16">Actions</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {countryRules?.map(rule => {
-                                    const edits = editedRules.get(rule.id);
-                                    const currentWeight = edits?.weight ?? rule.weight;
-                                    const currentActive = edits?.is_active ?? rule.is_active;
-                                    const changed = editedRules.has(rule.id);
                                     const advertiserInactive = rule.advertiser_is_active === false;
-
                                     return (
                                       <TableRow
                                         key={rule.id}
-                                        className={`${changed ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''} ${advertiserInactive ? 'opacity-60 bg-muted/30' : ''}`}
+                                        className={advertiserInactive ? 'opacity-60 bg-muted/30' : ''}
                                       >
                                         <TableCell className="font-medium">
                                           <div className="flex items-center gap-2">
@@ -658,42 +558,17 @@ export default function DistributionSettings() {
                                             )}
                                           </div>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-center">
                                           <Switch
-                                            checked={advertiserInactive ? false : currentActive}
-                                            onCheckedChange={v =>
-                                              updateAllRulesLocal(rule.id, 'is_active', v, rule)
-                                            }
-                                            disabled={advertiserInactive}
+                                            checked={advertiserInactive ? false : rule.is_active}
+                                            onCheckedChange={v => updateRule.mutate({ id: rule.id, is_active: v })}
+                                            disabled={advertiserInactive || updateRule.isPending}
                                           />
                                         </TableCell>
                                         <TableCell>
-                                          <Input
-                                            type="number" min={1} max={1000} className="w-20 h-8"
-                                            value={currentWeight}
-                                            onChange={e =>
-                                              updateAllRulesLocal(rule.id, 'weight', parseInt(e.target.value) || 100, rule)
-                                            }
-                                            disabled={advertiserInactive}
-                                          />
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                          {rule.daily_cap ?? '∞'}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                          {rule.hourly_cap ?? '∞'}
-                                        </TableCell>
-                                        <TableCell>
-                                          <div className="flex gap-1">
-                                            {changed && (
-                                              <Button size="sm" variant="default" onClick={() => handleUpdateRule(rule.id)} disabled={updateRule.isPending}>
-                                                <Save className="h-4 w-4" />
-                                              </Button>
-                                            )}
-                                            <Button size="sm" variant="ghost" onClick={() => handleDeleteRule(rule.id)} disabled={deleteRule.isPending}>
-                                              <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                          </div>
+                                          <Button size="sm" variant="ghost" onClick={() => handleDeleteRule(rule.id)} disabled={deleteRule.isPending}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                          </Button>
                                         </TableCell>
                                       </TableRow>
                                     );

@@ -12,6 +12,9 @@ export interface HeatmapSchedule {
   smart_pacing?: boolean;
   soft_cap_pct?: number | null;
   country_caps?: Record<string, number>;
+  custom_days?: boolean[];
+  from_hour?: number;
+  to_hour?: number;
 }
 
 function timeToMinutes(t: string): number {
@@ -83,5 +86,12 @@ export function emptyMatrix(): boolean[][] {
 export function businessHoursMatrix(): boolean[][] {
   return Array.from({ length: 7 }, (_, day) =>
     Array.from({ length: 24 }, (_, h) => day < 5 && h >= 9 && h < 17)
+  );
+}
+
+// days[0]=Mon … days[6]=Sun, toHour is exclusive (9–17 = hours 9..16 active)
+export function customPatternMatrix(days: boolean[], fromHour: number, toHour: number): boolean[][] {
+  return Array.from({ length: 7 }, (_, d) =>
+    Array.from({ length: 24 }, (_, h) => days[d] && h >= fromHour && h < toHour)
   );
 }

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Globe, Zap, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { businessHoursMatrix, emptyMatrix } from "@/lib/scheduleUtils";
+import { customPatternMatrix, emptyMatrix } from "@/lib/scheduleUtils";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -39,6 +39,9 @@ export interface HeatmapConfig {
   timezone: string;
   smart_pacing: boolean;
   soft_cap_pct: number | null;
+  custom_days?: boolean[];
+  from_hour?: number;
+  to_hour?: number;
 }
 
 interface ScheduleHeatmapProps {
@@ -52,6 +55,13 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
 
   const isPainting = useRef(false);
   const paintValue = useRef(false);
+
+  // Custom pattern state — seeded from saved config, falls back to Mon–Fri 09–17
+  const [customDays, setCustomDays] = useState<boolean[]>(
+    config.custom_days ?? [true, true, true, true, true, false, false]
+  );
+  const [fromHour, setFromHour] = useState(config.from_hour ?? 9);
+  const [toHour, setToHour] = useState(config.to_hour ?? 17);
 
   const update = useCallback(
     (partial: Partial<HeatmapConfig>) => onChange({ ...config, ...partial }),
@@ -80,20 +90,20 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
 
   const handleMouseUp = () => { isPainting.current = false; };
 
-  // Preset helpers
   const setAll = (val: boolean) =>
-    update({ matrix: Array.from({ length: 7 }, () => Array(24).fill(val)) });
+    update({ matrix: Array.from({ length: 7 }, () => Array(24).fill(val) as boolean[]) });
 
-  const setWeekdays = () =>
+  const applyPattern = () =>
     update({
-      matrix: Array.from({ length: 7 }, (_, d) =>
-        Array.from({ length: 24 }, (_, h) => d < 5 && matrix[d][h])
-      ),
+      matrix: customPatternMatrix(customDays, fromHour, toHour),
+      custom_days: customDays,
+      from_hour: fromHour,
+      to_hour: toHour,
     });
 
-  const setBusinessHours = () => update({ matrix: businessHoursMatrix() });
+  const toggleDay = (i: number) =>
+    setCustomDays(prev => prev.map((v, idx) => (idx === i ? !v : v)));
 
-  // Active cell count
   const activeCount = matrix.flat().filter(Boolean).length;
   const hasVolume = !!volumeData;
 
@@ -103,11 +113,12 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
     return acc;
   }, {} as Record<string, typeof TIMEZONE_OPTIONS>);
 
+  const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0–24 for toHour
+
   return (
     <div className="space-y-4" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-      {/* Controls row */}
+      {/* Row 1: Timezone + All on / Clear + active count */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Timezone */}
         <div className="flex items-center gap-1.5">
           <Globe className="h-3.5 w-3.5 text-muted-foreground" />
           <Select value={timezone} onValueChange={v => update({ timezone: v })}>
@@ -136,17 +147,73 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAll(false)}>
             Clear
           </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={setWeekdays}>
-            Weekdays
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={setBusinessHours}>
-            9–17
-          </Button>
         </div>
 
         <Badge variant="secondary" className="text-xs">
           {activeCount} / 168 hrs
         </Badge>
+      </div>
+
+      {/* Row 2: Custom pattern — day toggles + hour range + Apply */}
+      <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-muted/40 border">
+        <span className="text-xs text-muted-foreground shrink-0">Pattern:</span>
+
+        {/* Day toggle pills */}
+        <div className="flex gap-1">
+          {DAYS.map((day, i) => (
+            <button
+              key={day}
+              onClick={() => toggleDay(i)}
+              className={cn(
+                "h-6 w-8 rounded text-[11px] font-medium border transition-colors",
+                customDays[i]
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/50"
+              )}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-4 w-px bg-border shrink-0" />
+
+        {/* Hour range */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground">From</span>
+          <select
+            value={fromHour}
+            onChange={e => setFromHour(Number(e.target.value))}
+            className="h-6 rounded border bg-background px-1 text-xs"
+          >
+            {HOUR_OPTIONS.slice(0, 24).map(h => (
+              <option key={h} value={h} disabled={h >= toHour}>
+                {String(h).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
+          <span className="text-muted-foreground">To</span>
+          <select
+            value={toHour}
+            onChange={e => setToHour(Number(e.target.value))}
+            className="h-6 rounded border bg-background px-1 text-xs"
+          >
+            {HOUR_OPTIONS.slice(1).map(h => (
+              <option key={h} value={h} disabled={h <= fromHour}>
+                {String(h).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <Button
+          size="sm"
+          className="h-6 text-xs px-3 ml-auto"
+          onClick={applyPattern}
+          disabled={!customDays.some(Boolean) || fromHour >= toHour}
+        >
+          Apply
+        </Button>
       </div>
 
       {/* Heatmap grid */}

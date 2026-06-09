@@ -41,9 +41,6 @@ export function BulkAddRuleDialog({
   const [selectedAdvertisers, setSelectedAdvertisers] = useState<Set<string>>(new Set());
   const [countrySearch, setCountrySearch] = useState("");
   const [advertiserSearch, setAdvertiserSearch] = useState("");
-  const [weight, setWeight] = useState(100);
-  const [dailyCap, setDailyCap] = useState("");
-  const [hourlyCap, setHourlyCap] = useState("");
 
   const bulkCreate = useBulkCreateDistributionRules();
 
@@ -149,9 +146,6 @@ export function BulkAddRuleDialog({
       affiliate_id: string;
       country_code: string;
       advertiser_id: string;
-      weight: number;
-      daily_cap: number | null;
-      hourly_cap: number | null;
       is_active: boolean;
     }> = [];
 
@@ -163,9 +157,6 @@ export function BulkAddRuleDialog({
             affiliate_id: affiliateId,
             country_code: country,
             advertiser_id: advertiser,
-            weight,
-            daily_cap: dailyCap ? parseInt(dailyCap) : null,
-            hourly_cap: hourlyCap ? parseInt(hourlyCap) : null,
             is_active: true,
           });
         }
@@ -185,9 +176,6 @@ export function BulkAddRuleDialog({
     setSelectedAdvertisers(new Set());
     setCountrySearch("");
     setAdvertiserSearch("");
-    setWeight(100);
-    setDailyCap("");
-    setHourlyCap("");
   };
 
   return (
@@ -310,43 +298,6 @@ export function BulkAddRuleDialog({
                 )}
               </div>
             </ScrollArea>
-          </div>
-        </div>
-
-        {/* Shared Settings */}
-        <div className="border-t pt-4 space-y-4">
-          <Label className="font-semibold">Shared Settings</Label>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Weight</Label>
-              <Input
-                type="number"
-                min={1}
-                max={1000}
-                value={weight}
-                onChange={(e) => setWeight(parseInt(e.target.value) || 100)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Daily Cap (optional)</Label>
-              <Input
-                type="number"
-                min={0}
-                placeholder="Unlimited"
-                value={dailyCap}
-                onChange={(e) => setDailyCap(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Hourly Cap (optional)</Label>
-              <Input
-                type="number"
-                min={0}
-                placeholder="Unlimited"
-                value={hourlyCap}
-                onChange={(e) => setHourlyCap(e.target.value)}
-              />
-            </div>
           </div>
         </div>
 

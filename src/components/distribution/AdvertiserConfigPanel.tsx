@@ -73,6 +73,9 @@ function initHeatmapConfig(ws: unknown): HeatmapConfig {
       timezone: ws.timezone ?? "UTC",
       smart_pacing: ws.smart_pacing ?? false,
       soft_cap_pct: ws.soft_cap_pct ?? null,
+      custom_days: ws.custom_days,
+      from_hour: ws.from_hour,
+      to_hour: ws.to_hour,
     };
   }
   // Migrate legacy WeeklySchedule → heatmap matrix
