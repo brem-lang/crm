@@ -136,6 +136,53 @@ export function useUpsertDistributionSetting() {
   });
 }
 
+export function useBulkUpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: { id: string; [key: string]: unknown }[]) => {
+      await Promise.all(
+        updates.map(async ({ id, ...rest }) => {
+          const { error } = await supabase
+            .from('advertiser_distribution_settings')
+            .update(rest as any)
+            .eq('id', id);
+          if (error) throw error;
+        })
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['distribution-settings'] });
+      toast.success('Settings updated');
+    },
+    onError: (error: Error) => { toast.error(error.message); },
+  });
+}
+
+export function useBatchUpdatePriorities() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (updates: { id: string; priority: number }[]) => {
+      await Promise.all(
+        updates.map(async ({ id, priority }) => {
+          const { error } = await supabase
+            .from('advertiser_distribution_settings')
+            .update({ priority })
+            .eq('id', id);
+          if (error) throw error;
+        })
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['distribution-settings'] });
+      toast.success('Priority order saved');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useDeleteDistributionSetting() {
   const queryClient = useQueryClient();
   
