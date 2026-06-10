@@ -29,7 +29,8 @@ import AffiliatePerformance from "./pages/AffiliatePerformance";
 import Advertisers from "./pages/Advertisers";
 import AdvertiserPerformance from "./pages/AdvertiserPerformance";
 import Distributions from "./pages/Distributions";
-import DistributionSettings from "./pages/DistributionSettings";
+import AdvertiserConfig from "./pages/AdvertiserConfig";
+import DistributionRules from "./pages/DistributionRules";
 import RejectedLeads from "./pages/RejectedLeads";
 import TestLeadLogs from "./pages/TestLeadLogs";
 import Reports from "./pages/Reports";
@@ -75,7 +76,8 @@ const App = () => (
                 <Route path="/advertisers" element={<Advertisers />} />
                 <Route path="/advertiser-performance" element={<AdvertiserPerformance />} />
                 <Route path="/distributions" element={<Distributions />} />
-                <Route path="/distribution-settings" element={<DistributionSettings />} />
+                <Route path="/advertiser-config" element={<AdvertiserConfig />} />
+                <Route path="/distribution-rules" element={<DistributionRules />} />
                 <Route path="/rejected-leads" element={<RejectedLeads />} />
                 <Route path="/test-logs" element={<TestLeadLogs />} />
                 <Route path="/reports" element={<Reports />} />

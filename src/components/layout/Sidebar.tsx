@@ -31,6 +31,8 @@ import {
   Box,
   Clock,
   ScrollText,
+  GitMerge,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -63,8 +65,17 @@ const navItems: NavItem[] = [
       { title: "Performance", href: "/advertiser-performance", icon: TrendingUp, roles: ["super_admin", "manager"] },
     ]
   },
-  { title: "Distribution Settings", href: "/distribution-settings", icon: Sliders, roles: ["super_admin", "manager"] },
-  { title: "Distributions", href: "/distributions", icon: Send, roles: ["super_admin", "manager"] },
+  {
+    title: "Distribution",
+    href: "/advertiser-config",
+    icon: Network,
+    roles: ["super_admin", "manager"],
+    children: [
+      { title: "Advertiser Config", href: "/advertiser-config", icon: Sliders, roles: ["super_admin", "manager"] },
+      { title: "Distribution Rules", href: "/distribution-rules", icon: GitMerge, roles: ["super_admin", "manager"] },
+      { title: "History", href: "/distributions", icon: Send, roles: ["super_admin", "manager"] },
+    ],
+  },
   { 
     title: "Rejected Leads", 
     href: "/rejected-leads", 

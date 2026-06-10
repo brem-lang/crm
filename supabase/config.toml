@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.parse-document]
 verify_jwt = false
+
+[functions.route-lead]
+verify_jwt = false

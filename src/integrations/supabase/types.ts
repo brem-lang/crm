@@ -64,8 +64,10 @@ export type Database = {
           end_time: string | null
           id: string
           is_active: boolean
+          overflow_option: string
           priority: number
           start_time: string | null
+          timezone: string
           updated_at: string
           weekly_schedule: Json | null
         }
@@ -80,8 +82,10 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_active?: boolean
+          overflow_option?: string
           priority?: number
           start_time?: string | null
+          timezone?: string
           updated_at?: string
           weekly_schedule?: Json | null
         }
@@ -96,8 +100,10 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_active?: boolean
+          overflow_option?: string
           priority?: number
           start_time?: string | null
+          timezone?: string
           updated_at?: string
           weekly_schedule?: Json | null
         }
@@ -110,6 +116,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      distribution_rule_targets: {
+        Row: {
+          advertiser_id: string
+          id: string
+          is_fallback: boolean
+          priority_order: number
+          rule_id: string
+          weight: number
+        }
+        Insert: {
+          advertiser_id: string
+          id?: string
+          is_fallback?: boolean
+          priority_order?: number
+          rule_id: string
+          weight?: number
+        }
+        Update: {
+          advertiser_id?: string
+          id?: string
+          is_fallback?: boolean
+          priority_order?: number
+          rule_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distribution_rule_targets_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distribution_rule_targets_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distribution_rules: {
+        Row: {
+          conditions: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          rule_type: string
+          updated_at: string
+        }
+        Insert: {
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          rule_type: string
+          updated_at?: string
+        }
+        Update: {
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          rule_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       advertiser_email_rejections: {
         Row: {
