@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { GripVertical, Plus, Trash2, ArrowDown } from "lucide-react";
-import { countryData } from "@/components/advertisers/countryData";
+import { getCountryList } from "@/components/advertisers/countryData";
 import type { DistributionRule, RuleConditions, RuleTarget, RuleType } from "@/hooks/useDistributionRules";
 
 interface Advertiser {
@@ -59,67 +59,6 @@ const RULE_TYPE_LABELS: Record<RuleType, string> = {
   geo: "GEO-Based Routing",
 };
 
-const DEVICE_TYPES = ["mobile", "desktop", "tablet"];
-
-const COMMON_LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "ar", name: "Arabic" },
-  { code: "es", name: "Spanish" },
-  { code: "fr", name: "French" },
-  { code: "de", name: "German" },
-  { code: "pt", name: "Portuguese" },
-  { code: "it", name: "Italian" },
-  { code: "ru", name: "Russian" },
-  { code: "zh", name: "Chinese" },
-  { code: "tr", name: "Turkish" },
-];
-
-function countryOptions() {
-  return Object.entries(countryData)
-    .map(([code, info]) => ({ code, name: info.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function MultiToggle({
-  label,
-  options,
-  selected,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  selected: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const toggle = (val: string) => {
-    if (selected.includes(val)) onChange(selected.filter((x) => x !== val));
-    else onChange([...selected, val]);
-  };
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => toggle(opt.value)}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-              selected.includes(opt.value)
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background border-border text-muted-foreground hover:border-primary/50"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 interface TargetRow extends RuleTarget {
   _key: string;
@@ -221,7 +160,10 @@ export function RuleBuilderSheet({
 
   const usedAdvertiserIds = new Set(targets.map((t) => t.advertiser_id).filter(Boolean));
 
-  const countries = countryOptions();
+  const countryOptions = getCountryList().map((c) => ({
+    value: c.code,
+    label: `${c.code} – ${c.name}`,
+  }));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -285,52 +227,13 @@ export function RuleBuilderSheet({
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Countries (GEO)
                 </Label>
-                <div className="grid grid-cols-3 gap-1 max-h-40 overflow-y-auto border rounded-md p-2">
-                  {countries.slice(0, 60).map((c) => {
-                    const sel = conditions.country_codes?.includes(c.code) ?? false;
-                    return (
-                      <button
-                        key={c.code}
-                        type="button"
-                        onClick={() => {
-                          const curr = conditions.country_codes || [];
-                          updateCondition(
-                            "country_codes",
-                            sel ? curr.filter((x) => x !== c.code) : [...curr, c.code]
-                          );
-                        }}
-                        className={`text-left px-2 py-1 rounded text-xs transition-colors ${
-                          sel
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {c.code} – {c.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                {(conditions.country_codes?.length ?? 0) > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {conditions.country_codes!.map((code) => (
-                      <Badge key={code} variant="secondary" className="text-xs gap-1">
-                        {code}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateCondition(
-                              "country_codes",
-                              conditions.country_codes!.filter((x) => x !== code)
-                            )
-                          }
-                          className="ml-0.5 hover:text-destructive"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                <MultiSelect
+                  options={countryOptions}
+                  selected={conditions.country_codes || []}
+                  onChange={(v) => updateCondition("country_codes", v)}
+                  placeholder="Select countries…"
+                  searchPlaceholder="Search country or code…"
+                />
               </div>
 
               {/* Affiliates */}
@@ -365,21 +268,7 @@ export function RuleBuilderSheet({
                 </div>
               </div>
 
-              {/* Device types */}
-              <MultiToggle
-                label="Device Type"
-                options={DEVICE_TYPES.map((d) => ({ value: d, label: d.charAt(0).toUpperCase() + d.slice(1) }))}
-                selected={conditions.device_types || []}
-                onChange={(v) => updateCondition("device_types", v)}
-              />
 
-              {/* Language */}
-              <MultiToggle
-                label="Language"
-                options={COMMON_LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
-                selected={conditions.language_codes || []}
-                onChange={(v) => updateCondition("language_codes", v)}
-              />
             </div>
 
             <Separator />

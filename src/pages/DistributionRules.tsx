@@ -1,38 +1,5 @@
-import { useState } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useAdvertisers } from "@/hooks/useAdvertisers";
-import { useAffiliates } from "@/hooks/useAffiliates";
-import {
-  useDistributionRules,
-  useCreateDistributionRule,
-  useUpdateDistributionRule,
-  useDeleteDistributionRule,
-  useToggleDistributionRule,
-  type DistributionRule,
-  type RuleConditions,
-  type RuleTarget,
-  type RuleType,
-} from "@/hooks/useDistributionRules";
 import { RuleBuilderSheet } from "@/components/distribution/RuleBuilderSheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,16 +10,61 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { GitMerge, Plus, Pencil, Trash2, GripVertical } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useAdvertisers } from "@/hooks/useAdvertisers";
+import { useAffiliates } from "@/hooks/useAffiliates";
+import {
+  useCreateDistributionRule,
+  useDeleteDistributionRule,
+  useDistributionRules,
+  useToggleDistributionRule,
+  useUpdateDistributionRule,
+  type DistributionRule,
+  type RuleConditions,
+  type RuleTarget,
+  type RuleType,
+} from "@/hooks/useDistributionRules";
+import { GitMerge, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
-const RULE_TYPE_META: Record<
-  RuleType,
-  { label: string; color: string }
-> = {
-  priority: { label: "Priority", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  weighted: { label: "Weighted", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
-  affiliate: { label: "Affiliate", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-  geo: { label: "GEO", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+const RULE_TYPE_META: Record<RuleType, { label: string; color: string }> = {
+  priority: {
+    label: "Priority",
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  },
+  weighted: {
+    label: "Weighted",
+    color:
+      "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  },
+  affiliate: {
+    label: "Affiliate",
+    color:
+      "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  geo: {
+    label: "GEO",
+    color:
+      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
 };
 
 function conditionsSummary(conditions: RuleConditions): string {
@@ -61,11 +73,13 @@ function conditionsSummary(conditions: RuleConditions): string {
     parts.push(
       conditions.country_codes.length <= 3
         ? conditions.country_codes.join(", ")
-        : `${conditions.country_codes.slice(0, 3).join(", ")} +${conditions.country_codes.length - 3}`
+        : `${conditions.country_codes.slice(0, 3).join(", ")} +${conditions.country_codes.length - 3}`,
     );
   }
   if (conditions.affiliate_ids?.length) {
-    parts.push(`${conditions.affiliate_ids.length} affiliate${conditions.affiliate_ids.length !== 1 ? "s" : ""}`);
+    parts.push(
+      `${conditions.affiliate_ids.length} affiliate${conditions.affiliate_ids.length !== 1 ? "s" : ""}`,
+    );
   }
   if (conditions.device_types?.length) {
     parts.push(conditions.device_types.join(", "));
@@ -110,12 +124,12 @@ export default function DistributionRules() {
     if (editingRule) {
       updateRule.mutate(
         { id: editingRule.id, rule: data, targets: data.targets },
-        { onSuccess: () => setSheetOpen(false) }
+        { onSuccess: () => setSheetOpen(false) },
       );
     } else {
       createRule.mutate(
         { rule: data, targets: data.targets },
-        { onSuccess: () => setSheetOpen(false) }
+        { onSuccess: () => setSheetOpen(false) },
       );
     }
   };
@@ -150,8 +164,13 @@ export default function DistributionRules() {
         {/* Legend */}
         <div className="flex items-center gap-3 flex-wrap">
           {(Object.keys(RULE_TYPE_META) as RuleType[]).map((t) => (
-            <div key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RULE_TYPE_META[t].color}`}>
+            <div
+              key={t}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${RULE_TYPE_META[t].color}`}
+              >
                 {RULE_TYPE_META[t].label}
               </span>
               <span>
@@ -169,8 +188,8 @@ export default function DistributionRules() {
           <CardHeader>
             <CardTitle>Active Rules</CardTitle>
             <CardDescription>
-              Rules are evaluated in priority order (lowest number first). The first matching rule
-              routes the lead.
+              Rules are evaluated in priority order (lowest number first). The
+              first matching rule routes the lead.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -210,13 +229,19 @@ export default function DistributionRules() {
                   <TableBody>
                     {rules.map((rule) => {
                       const meta = RULE_TYPE_META[rule.rule_type as RuleType];
-                      const primaryTargets = rule.targets?.filter((t) => !t.is_fallback) || [];
-                      const fallbackTargets = rule.targets?.filter((t) => t.is_fallback) || [];
+                      const primaryTargets =
+                        rule.targets?.filter((t) => !t.is_fallback) || [];
+                      const fallbackTargets =
+                        rule.targets?.filter((t) => t.is_fallback) || [];
 
                       return (
                         <TableRow
                           key={rule.id}
-                          className={!rule.is_active ? "opacity-50 bg-muted/20" : undefined}
+                          className={
+                            !rule.is_active
+                              ? "opacity-50 bg-muted/20"
+                              : undefined
+                          }
                         >
                           <TableCell>
                             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
@@ -226,9 +251,13 @@ export default function DistributionRules() {
                               {rule.priority}
                             </span>
                           </TableCell>
-                          <TableCell className="font-medium">{rule.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {rule.name}
+                          </TableCell>
                           <TableCell>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}
+                            >
                               {meta.label}
                             </span>
                           </TableCell>
@@ -239,7 +268,11 @@ export default function DistributionRules() {
                             <div className="space-y-1">
                               <div className="flex flex-wrap gap-1">
                                 {primaryTargets.slice(0, 3).map((t, i) => (
-                                  <Badge key={t.advertiser_id} variant="secondary" className="text-xs">
+                                  <Badge
+                                    key={t.advertiser_id}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
                                     {rule.rule_type === "weighted"
                                       ? `${t.advertiser_name} (${t.weight}wt)`
                                       : `${i + 1}. ${t.advertiser_name}`}
@@ -253,9 +286,15 @@ export default function DistributionRules() {
                               </div>
                               {fallbackTargets.length > 0 && (
                                 <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">↳ fallback:</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ↳ fallback:
+                                  </span>
                                   {fallbackTargets.slice(0, 2).map((t) => (
-                                    <Badge key={t.advertiser_id} variant="outline" className="text-xs opacity-70">
+                                    <Badge
+                                      key={t.advertiser_id}
+                                      variant="outline"
+                                      className="text-xs opacity-70"
+                                    >
                                       {t.advertiser_name}
                                     </Badge>
                                   ))}
@@ -306,7 +345,7 @@ export default function DistributionRules() {
         </Card>
 
         {/* Routing flow info card */}
-        <Card className="bg-muted/30">
+        {/* <Card className="bg-muted/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Routing Flow</CardTitle>
           </CardHeader>
@@ -331,7 +370,7 @@ export default function DistributionRules() {
               ))}
             </ol>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Rule Builder Sheet */}
@@ -354,7 +393,8 @@ export default function DistributionRules() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. Leads will no longer be routed by this rule.
+              This action cannot be undone. Leads will no longer be routed by
+              this rule.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
