@@ -18,6 +18,8 @@ interface AdvertiserCardGridProps {
   onDelete: (id: string) => void;
   onTestLead: (advertiser: Advertiser) => void;
   canManage: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   isSuperAdmin: boolean;
 }
 
@@ -30,6 +32,8 @@ export function AdvertiserCardGrid({
   onDelete,
   onTestLead,
   canManage,
+  canEdit = canManage,
+  canDelete = canManage,
   isSuperAdmin,
 }: AdvertiserCardGridProps) {
   return (
@@ -56,7 +60,7 @@ export function AdvertiserCardGrid({
                 </div>
               </div>
               
-              {canManage && (
+              {(canEdit || canDelete) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-1">
@@ -68,13 +72,17 @@ export function AdvertiserCardGrid({
                       <Send className="h-4 w-4 mr-2" />
                       Send Test Lead
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onEdit(advertiser)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    {isSuperAdmin && (
-                      <DropdownMenuItem 
+                    {canEdit && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onEdit(advertiser)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem
                         onClick={() => onDelete(advertiser.id)}
                         className="text-destructive"
                       >
@@ -105,11 +113,11 @@ export function AdvertiserCardGrid({
                 <Switch
                   checked={advertiser.is_active}
                   onCheckedChange={(checked) => {
-                    if (canManage) {
+                    if (canEdit) {
                       onStatusChange(advertiser.id, checked);
                     }
                   }}
-                  disabled={!canManage}
+                  disabled={!canEdit}
                 />
                 <span className={`text-sm font-medium ${advertiser.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
                   {advertiser.is_active ? "Active" : "Inactive"}

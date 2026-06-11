@@ -1865,6 +1865,89 @@ export type Database = {
           },
         ]
       }
+      role_permission_mappings: {
+        Row: {
+          id: string
+          role_slug: string
+          permission_key: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          role_slug: string
+          permission_key: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          role_slug?: string
+          permission_key?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          description: string | null
+          color: string
+          is_system: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          description?: string | null
+          color?: string
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          description?: string | null
+          color?: string
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_custom_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_custom_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string

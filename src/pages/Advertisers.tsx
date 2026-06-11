@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { TestLeadDialog } from "@/components/advertisers/TestLeadDialog";
 import { AdvertiserFilterBar } from "@/components/advertisers/AdvertiserFilterBar";
 import { AdvertiserBulkActions } from "@/components/advertisers/AdvertiserBulkActions";
@@ -96,7 +97,12 @@ export default function Advertisers() {
   const updateAdvertiser = useUpdateAdvertiser();
   const deleteAdvertiser = useDeleteAdvertiser();
   const { isSuperAdmin, isManager } = useAuth();
-  
+  const {
+    canCreateAdvertisers,
+    canEditAdvertisers,
+    canDeleteAdvertisers,
+  } = useCurrentUserPermissions();
+
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -310,7 +316,7 @@ export default function Advertisers() {
               Configure advertiser integrations for lead distribution
             </p>
           </div>
-          {canManage && (
+          {canCreateAdvertisers && (
             <Button onClick={handleCreate}>
               <Plus className="h-4 w-4 mr-2" />
               Add Advertiser
@@ -334,7 +340,7 @@ export default function Advertisers() {
               totalCount={filteredAdvertisers.length}
             />
 
-            {selectedIds.size > 0 && canManage && (
+            {selectedIds.size > 0 && (canEditAdvertisers || canDeleteAdvertisers) && (
               <AdvertiserBulkActions
                 selectedIds={selectedIds}
                 onBulkStatusChange={handleBulkStatusChange}
@@ -368,7 +374,9 @@ export default function Advertisers() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onTestLead={handleTestLead}
-                canManage={canManage}
+                canManage={canEditAdvertisers || canDeleteAdvertisers}
+                canEdit={canEditAdvertisers}
+                canDelete={canDeleteAdvertisers}
                 isSuperAdmin={isSuperAdmin}
               />
             )}

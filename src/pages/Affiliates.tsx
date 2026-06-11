@@ -11,6 +11,7 @@ import { useState } from "react";
 import { MoreHorizontal, Plus, Copy, Pencil, Trash2, Power, PowerOff, FlaskConical } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -23,7 +24,12 @@ export default function Affiliates() {
   const updateAffiliate = useUpdateAffiliate();
   const deleteAffiliate = useDeleteAffiliate();
   const { isSuperAdmin } = useAuth();
-  
+  const {
+    canCreateAffiliates,
+    canEditAffiliates,
+    canDeleteAffiliates,
+  } = useCurrentUserPermissions();
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedAffiliate, setSelectedAffiliate] = useState<any>(null);

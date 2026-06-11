@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,13 +16,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useRoles, useSyncUserCustomRoles } from "@/hooks/useRoles";
 
-const AVAILABLE_ROLES = [
-  { id: "super_admin", label: "Super Admin", description: "Full access to all features" },
-  { id: "manager", label: "Manager", description: "Manage leads, affiliates, advertisers" },
-  { id: "agent", label: "Agent", description: "Work with assigned leads" },
-  { id: "affiliate", label: "Affiliate", description: "External partner access" },
-] as const;
+const SYSTEM_ROLE_SLUGS = new Set(["super_admin", "manager", "agent", "affiliate"]);
 
 export function CreateUserDialog() {
   const [open, setOpen] = useState(false);
@@ -33,59 +29,60 @@ export function CreateUserDialog() {
     email: "",
     password: "",
     fullName: "",
-    roles: [] as string[],
+    roleSlug: "",
   });
   const queryClient = useQueryClient();
+  const syncCustomRoles = useSyncUserCustomRoles();
 
-  const handleRoleToggle = (roleId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      roles: prev.roles.includes(roleId)
-        ? prev.roles.filter((r) => r !== roleId)
-        : [...prev.roles, roleId],
-    }));
-  };
+  const { data: allRoles, isLoading: rolesLoading } = useRoles();
+
+  const roleOptions = (allRoles ?? []).map(r => ({ value: r.slug, label: r.name }));
+
+  const reset = () =>
+    setFormData({ username: "", email: "", password: "", fullName: "", roleSlug: "" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.username || !formData.email || !formData.password) {
       toast.error("Please fill in all required fields");
       return;
     }
-
-    if (formData.roles.length === 0) {
-      toast.error("Please select at least one role");
+    if (!formData.roleSlug) {
+      toast.error("Please select a role");
       return;
     }
 
-    setIsLoading(true);
+    const isSystem = SYSTEM_ROLE_SLUGS.has(formData.roleSlug);
 
+    setIsLoading(true);
     try {
-      // Call edge function to create user (uses admin API, won't log us out)
       const { data, error } = await supabase.functions.invoke("create-user", {
         body: {
           email: formData.email,
           password: formData.password,
           username: formData.username,
           fullName: formData.fullName,
-          roles: formData.roles,
+          // Pass the system role if applicable, otherwise empty array
+          roles: isSystem ? [formData.roleSlug] : [],
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      // Assign custom role if one was selected
+      if (!isSystem && data?.userId) {
+        const customRole = (allRoles ?? []).find(r => r.slug === formData.roleSlug);
+        if (customRole) {
+          await syncCustomRoles.mutateAsync({ userId: data.userId, roleIds: [customRole.id] });
+        }
+      }
+
       toast.success("User created successfully");
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
       setOpen(false);
-      setFormData({
-        username: "",
-        email: "",
-        password: "",
-        fullName: "",
-        roles: [],
-      });
+      reset();
     } catch (error: any) {
       toast.error(error.message || "Failed to create user");
     } finally {
@@ -94,12 +91,8 @@ export function CreateUserDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        {/*
-          Use a plain <button> here (instead of our <Button>) to avoid rare ref-composition loops
-          when Radix `asChild` composes refs through Slot.
-        */}
         <button type="button" className={cn(buttonVariants())}>
           <UserPlus className="h-4 w-4 mr-2" />
           Create User
@@ -109,7 +102,7 @@ export function CreateUserDialog() {
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            Add a new worker with their credentials and assign roles.
+            Add a new user with their credentials and assign a role.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -121,7 +114,7 @@ export function CreateUserDialog() {
                   id="username"
                   placeholder="e.g. 1001"
                   value={formData.username}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
+                  onChange={e => setFormData(p => ({ ...p, username: e.target.value }))}
                   required
                 />
               </div>
@@ -131,7 +124,7 @@ export function CreateUserDialog() {
                   id="fullName"
                   placeholder="John Doe"
                   value={formData.fullName}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
+                  onChange={e => setFormData(p => ({ ...p, fullName: e.target.value }))}
                 />
               </div>
             </div>
@@ -142,7 +135,7 @@ export function CreateUserDialog() {
                 type="email"
                 placeholder="user@example.com"
                 value={formData.email}
-                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
                 required
               />
             </div>
@@ -153,40 +146,26 @@ export function CreateUserDialog() {
                 type="password"
                 placeholder="••••••••"
                 value={formData.password}
-                onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
                 required
                 minLength={6}
               />
             </div>
-            <div className="space-y-3">
-              <Label>Roles *</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {AVAILABLE_ROLES.map((role) => (
-                  <label
-                    key={role.id}
-                    htmlFor={role.id}
-                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      formData.roles.includes(role.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <Checkbox
-                      id={role.id}
-                      checked={formData.roles.includes(role.id)}
-                      onCheckedChange={() => handleRoleToggle(role.id)}
-                    />
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium">{role.label}</span>
-                      <p className="text-xs text-muted-foreground">{role.description}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
+            <div className="space-y-2">
+              <Label>Role *</Label>
+              <SearchableSelect
+                value={formData.roleSlug}
+                onValueChange={v => setFormData(p => ({ ...p, roleSlug: v === "all" ? "" : v }))}
+                options={roleOptions}
+                placeholder={rolesLoading ? "Loading roles…" : "Select a role…"}
+                searchPlaceholder="Search roles…"
+                emptyMessage="No roles found."
+                className="w-full"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => { setOpen(false); reset(); }}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

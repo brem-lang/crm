@@ -51,6 +51,7 @@ import SendHistory from "./pages/SendHistory";
 import AffiliateRejectedLeads from "./pages/AffiliateRejectedLeads";
 
 import AuditLogs from "./pages/AuditLogs";
+import RolesPermissions from "./pages/RolesPermissions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -96,6 +97,7 @@ const App = () => (
                 <Route path="/affiliate-rejected" element={<AffiliateRejectedLeads />} />
                 
                 <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/roles" element={<RolesPermissions />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="*" element={<NotFound />} />

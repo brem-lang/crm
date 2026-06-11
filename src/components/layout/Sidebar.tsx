@@ -33,6 +33,7 @@ import {
   ScrollText,
   GitMerge,
   Network,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -114,6 +115,7 @@ const navItems: NavItem[] = [
   { title: "Monitoring", href: "/monitoring", icon: Activity, roles: ["super_admin"] },
   { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"] },
   { title: "Users", href: "/users", icon: UsersRound, roles: ["super_admin"] },
+  { title: "Roles & Permissions", href: "/roles", icon: ShieldCheck, roles: ["super_admin"] },
   { title: "Settings", href: "/settings", icon: Settings, roles: ["super_admin"] },
 ];
 
