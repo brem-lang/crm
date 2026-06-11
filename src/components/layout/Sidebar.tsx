@@ -121,7 +121,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { signOut, roles, user, username } = useAuth();
+  const { signOut, roles, customRoleNames, user, username } = useAuth();
   const { isCollapsed, toggleCollapsed } = useSidebarState();
   const { formatDate, crmName } = useCRMSettings();
   const crmInitials = crmName
@@ -290,7 +290,10 @@ export function Sidebar() {
           <div className="mb-4 px-3">
             <p className="text-sm font-medium truncate">{username || user?.email}</p>
             <p className="text-xs text-muted-foreground capitalize">
-              {roles.map(r => r.replace('_', ' ')).join(", ") || "No role assigned"}
+              {[
+                ...roles.map(r => r.replace(/_/g, ' ')),
+                ...customRoleNames,
+              ].join(", ") || "No role assigned"}
             </p>
           </div>
         )}

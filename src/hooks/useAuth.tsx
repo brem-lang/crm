@@ -10,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   roles: AppRole[];
+  customRoleNames: string[];
   loading: boolean;
   username: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -28,33 +29,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [customRoleNames, setCustomRoleNames] = useState<string[]>([]);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-      
-      if (rolesError) throw rolesError;
-      setRoles((rolesData?.map(r => r.role) || []) as AppRole[]);
+      const [rolesRes, customRolesRes, profileRes] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId),
+        supabase
+          .from('user_custom_roles')
+          .select('roles(name)')
+          .eq('user_id', userId),
+        supabase.from('profiles').select('username').eq('id', userId).maybeSingle(),
+      ]);
 
-      // Fetch username from profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (profileError) throw profileError;
-      setUsername(profile?.username || null);
+      if (rolesRes.error) throw rolesRes.error;
+      setRoles((rolesRes.data?.map(r => r.role) || []) as AppRole[]);
+
+      const names = ((customRolesRes.data || []) as any[])
+        .map(r => r.roles?.name)
+        .filter(Boolean) as string[];
+      setCustomRoleNames(names);
+
+      if (profileRes.error) throw profileRes.error;
+      setUsername(profileRes.data?.username || null);
     } catch (error) {
       console.error('Error fetching user data:', error);
       setRoles([]);
+      setCustomRoleNames([]);
       setUsername(null);
     }
   };
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => fetchUserData(session.user.id), 0);
         } else {
           setRoles([]);
+          setCustomRoleNames([]);
           setUsername(null);
         }
         setLoading(false);
@@ -160,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setRoles([]);
+    setCustomRoleNames([]);
     setUsername(null);
     toast.success("Signed out successfully");
     navigate("/login");
@@ -175,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       session,
       roles,
+      customRoleNames,
       username,
       loading,
       signIn,
