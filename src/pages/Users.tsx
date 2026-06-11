@@ -4,7 +4,6 @@ import { useUsers } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
-import { UserPermissionsDialog } from "@/components/users/UserPermissionsDialog";
 import {
   Table,
   TableBody,
@@ -23,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users as UsersIcon, Shield, Edit, MoreHorizontal, Key, LogIn, Loader2 } from "lucide-react";
+import { Users as UsersIcon, Shield, Edit, MoreHorizontal, LogIn, Loader2 } from "lucide-react";
+import { getRoleColor } from "@/hooks/useRoles";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -48,8 +48,6 @@ export default function Users() {
   const { isSuperAdmin, user: currentUser } = useAuth();
   const [editingUser, setEditingUser] = useState<UserToEdit | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [permissionsUser, setPermissionsUser] = useState<UserToEdit | null>(null);
-  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
 
   const handleEditUser = (userToEdit: typeof users extends (infer T)[] | undefined ? T : never) => {
@@ -61,11 +59,6 @@ export default function Users() {
       roles: userToEdit.roles,
     });
     setEditDialogOpen(true);
-  };
-
-  const handleManagePermissions = (userToEdit: UserToEdit) => {
-    setPermissionsUser(userToEdit);
-    setPermissionsDialogOpen(true);
   };
 
   const handleLoginAsUser = async (userId: string) => {
@@ -188,17 +181,20 @@ export default function Users() {
                       <TableCell>{tableUser.full_name || "-"}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {tableUser.roles.length > 0 ? (
-                            tableUser.roles.map((role) => (
-                              <Badge
-                                key={role}
-                                variant="outline"
-                                className={roleColors[role] || ""}
-                              >
-                                {role.replace("_", " ")}
+                          {tableUser.roles.map((role) => (
+                            <Badge key={role} variant="outline" className={roleColors[role] || ""}>
+                              {role.replace(/_/g, " ")}
+                            </Badge>
+                          ))}
+                          {tableUser.customRoles?.map((role) => {
+                            const c = getRoleColor(role.color);
+                            return (
+                              <Badge key={role.slug} variant="outline" className={`${c.bg} ${c.text} ${c.border}`}>
+                                {role.name}
                               </Badge>
-                            ))
-                          ) : (
+                            );
+                          })}
+                          {tableUser.roles.length === 0 && (!tableUser.customRoles || tableUser.customRoles.length === 0) && (
                             <span className="text-muted-foreground text-sm">No roles</span>
                           )}
                         </div>
@@ -219,12 +215,8 @@ export default function Users() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit User
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleManagePermissions(tableUser)}>
-                                <Key className="h-4 w-4 mr-2" />
-                                Permissions
-                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleLoginAsUser(tableUser.id)}
                                 disabled={impersonatingId === tableUser.id}
                                 className="text-blue-600"
@@ -253,12 +245,6 @@ export default function Users() {
         user={editingUser}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
-      />
-
-      <UserPermissionsDialog
-        user={permissionsUser}
-        open={permissionsDialogOpen}
-        onOpenChange={setPermissionsDialogOpen}
       />
     </DashboardLayout>
   );

@@ -9,6 +9,7 @@ interface UserWithRoles {
   username: string | null;
   created_at: string;
   roles: string[];
+  customRoles: { name: string; color: string; slug: string }[];
 }
 
 export function useUsers() {
@@ -17,28 +18,32 @@ export function useUsers() {
   const { data: users, isLoading, error } = useQuery({
     queryKey: ["users-with-roles"],
     queryFn: async () => {
-      // Fetch all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, username, created_at")
-        .order("created_at", { ascending: false });
+      const [profilesRes, systemRolesRes, customRolesRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, email, full_name, username, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase
+          .from("user_custom_roles")
+          .select("user_id, roles(name, color, slug)"),
+      ]);
 
-      if (profilesError) throw profilesError;
+      if (profilesRes.error) throw profilesRes.error;
+      if (systemRolesRes.error) throw systemRolesRes.error;
 
-      // Fetch all roles
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-
-      if (rolesError) throw rolesError;
-
-      // Map roles to users
-      const usersWithRoles: UserWithRoles[] = (profiles || []).map((profile) => ({
-        ...profile,
-        roles: (roles || [])
+      const usersWithRoles: UserWithRoles[] = (profilesRes.data || []).map((profile) => {
+        const systemRoles = (systemRolesRes.data || [])
           .filter((r) => r.user_id === profile.id)
-          .map((r) => r.role),
-      }));
+          .map((r) => r.role);
+
+        const customRoles = ((customRolesRes.data || []) as any[])
+          .filter((r) => r.user_id === profile.id)
+          .map((r) => r.roles)
+          .filter(Boolean);
+
+        return { ...profile, roles: systemRoles, customRoles };
+      });
 
       return usersWithRoles;
     },
