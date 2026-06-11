@@ -138,9 +138,16 @@ export function useUpdateDistributionRule() {
       rule: Partial<{ name: string; rule_type: RuleType; priority: number; conditions: RuleConditions; is_active: boolean }>;
       targets?: RuleTarget[];
     }) => {
+      const updatePayload: Record<string, unknown> = {};
+      if (rule.name !== undefined) updatePayload.name = rule.name;
+      if (rule.rule_type !== undefined) updatePayload.rule_type = rule.rule_type;
+      if (rule.priority !== undefined) updatePayload.priority = rule.priority;
+      if (rule.conditions !== undefined) updatePayload.conditions = rule.conditions as any;
+      if (rule.is_active !== undefined) updatePayload.is_active = rule.is_active;
+
       const { error } = await supabase
         .from("distribution_rules")
-        .update({ ...rule, conditions: rule.conditions as any })
+        .update(updatePayload)
         .eq("id", id);
 
       if (error) throw error;
