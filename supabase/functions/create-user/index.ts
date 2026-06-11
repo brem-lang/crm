@@ -76,9 +76,9 @@ Deno.serve(async (req) => {
     // Extract fields from already-parsed body
     const { email, password, username, fullName, roles } = body;
 
-    if (!email || !password || !roles || roles.length === 0) {
+    if (!email || !password) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: email, password, roles" }),
+        JSON.stringify({ error: "Missing required fields: email, password" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
