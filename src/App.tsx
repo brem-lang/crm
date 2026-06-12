@@ -20,41 +20,60 @@ const TitleManager = () => {
   }, [crmName]);
   return null;
 };
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Leads from "./pages/Leads";
-import Affiliates from "./pages/Affiliates";
-import AffiliatePerformance from "./pages/AffiliatePerformance";
-import Advertisers from "./pages/Advertisers";
-import AdvertiserPerformance from "./pages/AdvertiserPerformance";
-import Distributions from "./pages/Distributions";
-import AdvertiserConfig from "./pages/AdvertiserConfig";
-import DistributionRules from "./pages/DistributionRules";
-import RejectedLeads from "./pages/RejectedLeads";
-import TestLeadLogs from "./pages/TestLeadLogs";
-import Reports from "./pages/Reports";
-import Conversions from "./pages/Conversions";
-import CountryPerformance from "./pages/CountryPerformance";
-import Monitoring from "./pages/Monitoring";
-import Settings from "./pages/Settings";
-import ApiDocs from "./pages/ApiDocs";
-import Users from "./pages/Users";
-import LeadPools from "./pages/LeadPools";
-import LeadPoolDetail from "./pages/LeadPoolDetail";
-import InjectionDashboard from "./pages/InjectionDashboard";
-import InjectionJobs from "./pages/InjectionJobs";
-import InjectionDetail from "./pages/InjectionDetail";
-import InjectionLeads from "./pages/InjectionLeads";
-import InjectionFailedLeads from "./pages/InjectionFailedLeads";
-import SendHistory from "./pages/SendHistory";
-import AffiliateRejectedLeads from "./pages/AffiliateRejectedLeads";
+import { lazy, Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import AuditLogs from "./pages/AuditLogs";
-import RolesPermissions from "./pages/RolesPermissions";
-import NotFound from "./pages/NotFound";
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Leads = lazy(() => import("./pages/Leads"));
+const Affiliates = lazy(() => import("./pages/Affiliates"));
+const AffiliatePerformance = lazy(() => import("./pages/AffiliatePerformance"));
+const Advertisers = lazy(() => import("./pages/Advertisers"));
+const AdvertiserPerformance = lazy(() => import("./pages/AdvertiserPerformance"));
+const Distributions = lazy(() => import("./pages/Distributions"));
+const AdvertiserConfig = lazy(() => import("./pages/AdvertiserConfig"));
+const DistributionRules = lazy(() => import("./pages/DistributionRules"));
+const RejectedLeads = lazy(() => import("./pages/RejectedLeads"));
+const TestLeadLogs = lazy(() => import("./pages/TestLeadLogs"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Conversions = lazy(() => import("./pages/Conversions"));
+const CountryPerformance = lazy(() => import("./pages/CountryPerformance"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
+const Settings = lazy(() => import("./pages/Settings"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
+const Users = lazy(() => import("./pages/Users"));
+const LeadPools = lazy(() => import("./pages/LeadPools"));
+const LeadPoolDetail = lazy(() => import("./pages/LeadPoolDetail"));
+const InjectionDashboard = lazy(() => import("./pages/InjectionDashboard"));
+const InjectionJobs = lazy(() => import("./pages/InjectionJobs"));
+const InjectionDetail = lazy(() => import("./pages/InjectionDetail"));
+const InjectionLeads = lazy(() => import("./pages/InjectionLeads"));
+const InjectionFailedLeads = lazy(() => import("./pages/InjectionFailedLeads"));
+const SendHistory = lazy(() => import("./pages/SendHistory"));
+const AffiliateRejectedLeads = lazy(() => import("./pages/AffiliateRejectedLeads"));
+const AuditLogs = lazy(() => import("./pages/AuditLogs"));
+const RolesPermissions = lazy(() => import("./pages/RolesPermissions"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+const PageLoader = () => (
+  <div className="p-8 space-y-4">
+    <Skeleton className="h-8 w-48" />
+    <Skeleton className="h-4 w-full" />
+    <Skeleton className="h-4 w-3/4" />
+  </div>
+);
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -66,6 +85,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <SidebarStateProvider>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/login" element={<Login />} />
@@ -102,6 +122,7 @@ const App = () => (
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </SidebarStateProvider>
           </AuthProvider>
         </BrowserRouter>

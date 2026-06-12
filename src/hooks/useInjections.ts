@@ -146,7 +146,7 @@ export function useInjection(id: string) {
       return data as unknown as Injection;
     },
     enabled: !!id,
-    refetchInterval: 10000, // Also poll every 10 seconds as backup
+    staleTime: 10 * 1000,
   });
 }
 
@@ -196,7 +196,7 @@ export function useInjectionLeads(injectionId: string) {
       return data as unknown as InjectionLead[];
     },
     enabled: !!injectionId,
-    refetchInterval: 5000, // Also poll every 5 seconds as backup
+    staleTime: 10 * 1000,
   });
 }
 

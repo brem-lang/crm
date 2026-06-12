@@ -61,8 +61,8 @@ export function useLeads() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 15000, // auto-refresh every 15s (Realtime WebSocket not available via Apache)
-    refetchIntervalInBackground: true, // keep polling even when window is not focused
+    staleTime: 30 * 1000,
+    refetchInterval: 30000,
   });
 }
 

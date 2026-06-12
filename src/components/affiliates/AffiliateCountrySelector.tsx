@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -6,6 +6,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Settings2, Search } from "lucide-react";
 import { countryData } from "@/components/advertisers/countryData";
+
+// Hoisted outside component — computed once at module load, never again
+const ALL_COUNTRY_ENTRIES = Object.entries(countryData);
+const ALL_COUNTRY_CODES = Object.keys(countryData);
 
 interface AffiliateCountrySelectorProps {
   selected: string[] | null;
@@ -21,48 +25,38 @@ export function AffiliateCountrySelector({ selected, onChange, compact = false }
   const isAllCountries = selected === null;
   const selectedCodes = selected || [];
 
+  // O(1) lookup instead of O(n) includes()
+  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+
   const filteredCountries = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return Object.entries(countryData);
-    return Object.entries(countryData).filter(([code, country]) =>
+    if (!query) return ALL_COUNTRY_ENTRIES;
+    return ALL_COUNTRY_ENTRIES.filter(([code, country]) =>
       code.toLowerCase().includes(query) ||
       country.name.toLowerCase().includes(query)
     );
   }, [searchQuery]);
 
-  const toggle = (code: string) => {
+  const toggle = useCallback((code: string) => {
     if (isAllCountries) {
-      // Switching from "all" to specific - select all except this one
-      const allCodes = Object.keys(countryData);
-      onChange(allCodes.filter(c => c !== code));
-    } else if (selectedCodes.includes(code)) {
-      const newSelection = selectedCodes.filter(c => c !== code);
-      // If empty after removal, keep as empty array (no countries)
-      onChange(newSelection);
+      onChange(ALL_COUNTRY_CODES.filter(c => c !== code));
+    } else if (selectedSet.has(code)) {
+      onChange(selectedCodes.filter(c => c !== code));
     } else {
       onChange([...selectedCodes, code]);
     }
-  };
+  }, [isAllCountries, selectedSet, selectedCodes, onChange]);
 
-  const selectAllFiltered = () => {
+  const selectAllFiltered = useCallback(() => {
+    if (isAllCountries) return;
     const filteredCodes = filteredCountries.map(([code]) => code);
-    if (isAllCountries) {
-      // Already all selected
-      return;
-    }
     const newSelected = [...new Set([...selectedCodes, ...filteredCodes])];
     onChange(newSelected);
-  };
+  }, [isAllCountries, filteredCountries, selectedCodes, onChange]);
 
-  const clearAll = () => {
-    // Clear all = empty array = no countries allowed
-    onChange([]);
-  };
+  const clearAll = useCallback(() => onChange([]), [onChange]);
 
-  const setAllCountries = () => {
-    // All countries = null
-    onChange(null);
-  };
+  const setAllCountries = useCallback(() => onChange(null), [onChange]);
 
   const displayText = isAllCountries
     ? "All Countries"
@@ -124,21 +118,15 @@ export function AffiliateCountrySelector({ selected, onChange, compact = false }
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 overflow-y-auto flex-1 max-h-[50vh]">
-          {filteredCountries.map(([code, country]) => {
-            const isChecked = isAllCountries || selectedCodes.includes(code);
-            return (
-              <div
-                key={code}
-                className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
-                onClick={() => toggle(code)}
-              >
-                {/* Checkbox is visual-only; click handling is on the row to prevent double-toggle issues */}
-                <Checkbox checked={isChecked} className="pointer-events-none" />
-                <span className="text-sm font-medium">{code}</span>
-                <span className="text-sm text-muted-foreground truncate">{country.name}</span>
-              </div>
-            );
-          })}
+          {filteredCountries.map(([code, country]) => (
+            <CountryRow
+              key={code}
+              code={code}
+              name={country.name}
+              isChecked={isAllCountries || selectedSet.has(code)}
+              onToggle={toggle}
+            />
+          ))}
           {filteredCountries.length === 0 && (
             <div className="col-span-full text-center py-8 text-muted-foreground">
               No countries found matching "{searchQuery}"
@@ -152,6 +140,22 @@ export function AffiliateCountrySelector({ selected, onChange, compact = false }
     </Dialog>
   );
 }
+
+const CountryRow = memo(({ code, name, isChecked, onToggle }: {
+  code: string;
+  name: string;
+  isChecked: boolean;
+  onToggle: (code: string) => void;
+}) => (
+  <div
+    className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
+    onClick={() => onToggle(code)}
+  >
+    <Checkbox checked={isChecked} className="pointer-events-none" />
+    <span className="text-sm font-medium">{code}</span>
+    <span className="text-sm text-muted-foreground truncate">{name}</span>
+  </div>
+));
 
 export function CountryBadges({ countries }: { countries: string[] | null }) {
   if (countries === null) {

@@ -57,29 +57,26 @@ export function useLeadPools() {
 
       if (error) throw error;
 
-      // Get lead counts per pool (excluding hidden leads)
-      const poolsWithCounts = await Promise.all(
-        pools.map(async (pool) => {
-          const { data: leads } = await supabase
-            .from('lead_pool_leads')
-            .select('country_code')
-            .eq('pool_id', pool.id)
-            .eq('is_hidden', false);
+      // Single query for all pool leads instead of N+1
+      const { data: allLeads } = await supabase
+        .from('lead_pool_leads')
+        .select('pool_id, country_code')
+        .in('pool_id', pools.map(p => p.id))
+        .eq('is_hidden', false);
 
-          const country_counts: Record<string, number> = {};
-          leads?.forEach(lead => {
-            country_counts[lead.country_code] = (country_counts[lead.country_code] || 0) + 1;
-          });
+      const countsByPool: Record<string, { lead_count: number; country_counts: Record<string, number> }> = {};
+      allLeads?.forEach(lead => {
+        if (!countsByPool[lead.pool_id]) countsByPool[lead.pool_id] = { lead_count: 0, country_counts: {} };
+        countsByPool[lead.pool_id].lead_count++;
+        const cc = countsByPool[lead.pool_id].country_counts;
+        cc[lead.country_code] = (cc[lead.country_code] || 0) + 1;
+      });
 
-          return {
-            ...pool,
-            lead_count: leads?.length || 0,
-            country_counts,
-          };
-        })
-      );
-
-      return poolsWithCounts as LeadPool[];
+      return pools.map(pool => ({
+        ...pool,
+        lead_count: countsByPool[pool.id]?.lead_count || 0,
+        country_counts: countsByPool[pool.id]?.country_counts || {},
+      })) as LeadPool[];
     },
   });
 }
@@ -134,9 +131,7 @@ export function useLeadPoolLeads(poolId: string) {
           schema: 'public',
           table: 'injection_leads',
         },
-        (payload) => {
-          console.log('Injection lead changed:', payload);
-          // Invalidate the query to refetch with updated status
+        () => {
           queryClient.invalidateQueries({ queryKey: ['lead-pool-leads', poolId] });
         }
       )
