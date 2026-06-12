@@ -185,21 +185,6 @@ export function RuleBuilderSheet({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Rule Type</Label>
-                <Select value={ruleType} onValueChange={(v) => setRuleType(v as RuleType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(RULE_TYPE_LABELS) as RuleType[]).map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {RULE_TYPE_LABELS[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label>Evaluation Priority</Label>
                 <Input
                   type="number"
