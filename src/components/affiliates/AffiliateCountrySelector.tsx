@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Settings2, Search } from "lucide-react";
@@ -145,6 +145,9 @@ export function AffiliateCountrySelector({ selected, onChange, compact = false }
             </div>
           )}
         </div>
+        <DialogFooter>
+          <Button onClick={() => setIsOpen(false)}>Done</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
