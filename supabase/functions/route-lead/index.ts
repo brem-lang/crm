@@ -35,6 +35,7 @@ interface RuleTarget {
   priority_order: number;
   is_fallback: boolean;
   is_enabled: boolean;
+  daily_cap: number | null;
 }
 
 interface AdvertiserConfig {
@@ -175,8 +176,9 @@ async function checkEligible(
     return { eligible: false, reason: "affiliate_not_allowed" };
   }
 
-  // Daily cap
-  if (config.default_daily_cap != null) {
+  // Daily cap — per-rule override takes precedence over advertiser config
+  const effectiveDailyCap = target.daily_cap ?? config.default_daily_cap;
+  if (effectiveDailyCap != null) {
     const { count } = await supabase
       .from("lead_distributions")
       .select("*", { count: "exact", head: true })
@@ -184,7 +186,7 @@ async function checkEligible(
       .eq("status", "sent")
       .gte("created_at", `${today}T00:00:00Z`);
 
-    if ((count ?? 0) >= config.default_daily_cap) {
+    if ((count ?? 0) >= effectiveDailyCap) {
       return { eligible: false, reason: "daily_cap_reached" };
     }
   }

@@ -425,76 +425,78 @@ function TargetRowItem({
           {index + 1}.
         </span>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="flex-1 h-auto min-h-8 text-sm justify-between font-normal py-1.5 items-start"
-          >
-            <div className="flex flex-col items-start gap-0.5 min-w-0">
-              <span className="truncate text-sm">
+      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full h-8 text-sm justify-between font-normal"
+            >
+              <span className="truncate">
                 {selectedAdvertiser?.name || "Select advertiser…"}
               </span>
-              {selectedAdvertiser && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    Cap: {selectedAdvertiser.daily_cap != null ? `${selectedAdvertiser.daily_cap}/day` : "∞"}
-                  </span>
-                  {!isFallback && (
-                    <>
-                      <span className="text-xs text-muted-foreground">·</span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        Weight: {target.weight ?? 100}%
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
+              <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[260px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search advertiser…" className="h-8" />
+              <CommandList>
+                <CommandEmpty>No advertiser found.</CommandEmpty>
+                <CommandGroup>
+                  {available.map((a) => (
+                    <CommandItem
+                      key={a.id}
+                      value={a.name}
+                      onSelect={() => {
+                        onChange({ advertiser_id: a.id });
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={`mr-2 h-3.5 w-3.5 ${target.advertiser_id === a.id ? "opacity-100" : "opacity-0"}`}
+                      />
+                      {a.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {!isFallback && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 flex-1">
+              <span className="text-xs text-muted-foreground shrink-0">Cap:</span>
+              <Input
+                type="number"
+                min={1}
+                value={target.daily_cap ?? ""}
+                onChange={(e) =>
+                  onChange({ daily_cap: e.target.value === "" ? null : Number(e.target.value) })
+                }
+                placeholder={selectedAdvertiser?.daily_cap != null ? String(selectedAdvertiser.daily_cap) : "∞"}
+                className="h-6 text-xs px-1.5 text-center"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">/day</span>
             </div>
-            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50 mt-0.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[260px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search advertiser…" className="h-8" />
-            <CommandList>
-              <CommandEmpty>No advertiser found.</CommandEmpty>
-              <CommandGroup>
-                {available.map((a) => (
-                  <CommandItem
-                    key={a.id}
-                    value={a.name}
-                    onSelect={() => {
-                      onChange({ advertiser_id: a.id });
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={`mr-2 h-3.5 w-3.5 ${target.advertiser_id === a.id ? "opacity-100" : "opacity-0"}`}
-                    />
-                    {a.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      {!isFallback && ruleType === "weighted" && (
-        <div className="flex items-center gap-1 shrink-0">
-          <Input
-            type="number"
-            min={1}
-            max={1000}
-            value={target.weight}
-            onChange={(e) => onChange({ weight: Number(e.target.value) })}
-            className="w-16 h-8 text-sm text-center"
-          />
-          <span className="text-xs text-muted-foreground">wt</span>
-        </div>
-      )}
+            <div className="flex items-center gap-1 flex-1">
+              <span className="text-xs text-muted-foreground shrink-0">Weight:</span>
+              <Input
+                type="number"
+                min={1}
+                max={1000}
+                value={target.weight}
+                onChange={(e) => onChange({ weight: Number(e.target.value) })}
+                className="h-6 text-xs px-1.5 text-center"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">%</span>
+            </div>
+          </div>
+        )}
+      </div>
       <button
         type="button"
         onClick={() => onChange({ is_enabled: !isEnabled })}

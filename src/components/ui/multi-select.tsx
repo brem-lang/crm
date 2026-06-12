@@ -97,14 +97,15 @@ export function MultiSelect({
                 <Badge
                   key={val}
                   variant="secondary"
-                  className="h-5 px-1.5 text-xs rounded-sm font-mono max-w-[100px] truncate"
+                  className="h-5 px-1.5 text-xs rounded-sm font-mono flex items-center gap-1 max-w-[140px]"
                 >
-                  {display}
+                  <span className="truncate">{display}</span>
                   <span
-                    className="ml-1 cursor-pointer hover:text-destructive"
+                    className="cursor-pointer hover:text-destructive shrink-0"
                     onClick={(e) => handleRemoveBadge(e, val)}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
-                    <X className="h-2.5 w-2.5 inline" />
+                    <X className="h-2.5 w-2.5" />
                   </span>
                 </Badge>
                 );
@@ -122,6 +123,7 @@ export function MultiSelect({
                 variant="secondary"
                 className="h-5 px-1.5 text-xs rounded-sm cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
                 onClick={handleClear}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <X className="h-3 w-3" />
               </Badge>

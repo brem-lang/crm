@@ -67,28 +67,6 @@ const RULE_TYPE_META: Record<RuleType, { label: string; color: string }> = {
   },
 };
 
-function conditionsSummary(conditions: RuleConditions): string {
-  const parts: string[] = [];
-  if (conditions.country_codes?.length) {
-    parts.push(
-      conditions.country_codes.length <= 3
-        ? conditions.country_codes.join(", ")
-        : `${conditions.country_codes.slice(0, 3).join(", ")} +${conditions.country_codes.length - 3}`,
-    );
-  }
-  if (conditions.affiliate_ids?.length) {
-    parts.push(
-      `${conditions.affiliate_ids.length} affiliate${conditions.affiliate_ids.length !== 1 ? "s" : ""}`,
-    );
-  }
-  if (conditions.device_types?.length) {
-    parts.push(conditions.device_types.join(", "));
-  }
-  if (conditions.language_codes?.length) {
-    parts.push(conditions.language_codes.join(", "));
-  }
-  return parts.length ? parts.join(" · ") : "Any";
-}
 
 export default function DistributionRules() {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -219,8 +197,8 @@ export default function DistributionRules() {
                       <TableHead className="w-8" />
                       <TableHead className="w-12 text-center">Order</TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Conditions (IF)</TableHead>
+                      <TableHead>Countries</TableHead>
+                      <TableHead>Affiliates</TableHead>
                       <TableHead>Advertisers (THEN)</TableHead>
                       <TableHead className="w-20 text-center">Active</TableHead>
                       <TableHead className="w-24 text-right">Actions</TableHead>
@@ -255,14 +233,43 @@ export default function DistributionRules() {
                             {rule.name}
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}
-                            >
-                              {meta.label}
-                            </span>
+                            {rule.conditions.country_codes?.length ? (
+                              <div className="flex flex-wrap gap-1">
+                                {rule.conditions.country_codes.slice(0, 3).map((cc) => (
+                                  <Badge key={cc} variant="outline" className="text-xs font-mono px-1.5 py-0">
+                                    {cc}
+                                  </Badge>
+                                ))}
+                                {rule.conditions.country_codes.length > 3 && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    +{rule.conditions.country_codes.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">All</span>
+                            )}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {conditionsSummary(rule.conditions)}
+                          <TableCell>
+                            {rule.conditions.affiliate_ids?.length ? (
+                              <div className="flex flex-wrap gap-1">
+                                {rule.conditions.affiliate_ids.slice(0, 2).map((id) => {
+                                  const name = affiliates?.find((a) => a.id === id)?.name ?? id.slice(0, 8);
+                                  return (
+                                    <Badge key={id} variant="outline" className="text-xs px-1.5 py-0">
+                                      {name}
+                                    </Badge>
+                                  );
+                                })}
+                                {rule.conditions.affiliate_ids.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    +{rule.conditions.affiliate_ids.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">All</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">

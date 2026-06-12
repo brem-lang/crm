@@ -18,6 +18,7 @@ export interface RuleTarget {
   priority_order: number;
   is_fallback: boolean;
   is_enabled: boolean;
+  daily_cap?: number | null;
 }
 
 export interface DistributionRule {
@@ -64,6 +65,7 @@ export function useDistributionRules() {
           priority_order: t.priority_order,
           is_fallback: t.is_fallback,
           is_enabled: t.is_enabled ?? true,
+          daily_cap: t.daily_cap ?? null,
           advertiser_name: (t as any).advertisers?.name,
         });
       }
@@ -113,6 +115,7 @@ export function useCreateDistributionRule() {
               priority_order: t.priority_order,
               is_fallback: t.is_fallback,
               is_enabled: t.is_enabled ?? true,
+              daily_cap: t.daily_cap ?? null,
             }))
           );
         if (targetsError) throw targetsError;
@@ -169,6 +172,7 @@ export function useUpdateDistributionRule() {
                 priority_order: t.priority_order,
                 is_fallback: t.is_fallback,
                 is_enabled: t.is_enabled ?? true,
+                daily_cap: t.daily_cap ?? null,
               }))
             );
           if (targetsError) throw targetsError;

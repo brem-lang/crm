@@ -120,6 +120,7 @@ export type Database = {
       distribution_rule_targets: {
         Row: {
           advertiser_id: string
+          daily_cap: number | null
           id: string
           is_enabled: boolean
           is_fallback: boolean
@@ -129,6 +130,7 @@ export type Database = {
         }
         Insert: {
           advertiser_id: string
+          daily_cap?: number | null
           id?: string
           is_enabled?: boolean
           is_fallback?: boolean
@@ -138,6 +140,7 @@ export type Database = {
         }
         Update: {
           advertiser_id?: string
+          daily_cap?: number | null
           id?: string
           is_enabled?: boolean
           is_fallback?: boolean
