@@ -20,6 +20,7 @@ import {
 export interface MultiSelectOption {
   value: string;
   label: string;
+  badgeLabel?: string; // short label shown in badge; defaults to value
 }
 
 interface MultiSelectProps {
@@ -31,6 +32,7 @@ interface MultiSelectProps {
   emptyMessage?: string;
   className?: string;
   icon?: React.ReactNode;
+  showBadges?: boolean;
 }
 
 export function MultiSelect({
@@ -42,6 +44,7 @@ export function MultiSelect({
   emptyMessage = "No results found.",
   className,
   icon,
+  showBadges = false,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -56,6 +59,11 @@ export function MultiSelect({
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange([]);
+  };
+
+  const handleRemoveBadge = (e: React.MouseEvent, value: string) => {
+    e.stopPropagation();
+    onChange(selected.filter((v) => v !== value));
   };
 
   const displayText = React.useMemo(() => {
@@ -74,13 +82,41 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("h-9 justify-between font-normal", className)}
+          className={cn(
+            "justify-between font-normal",
+            showBadges && selected.length >= 1 ? "h-auto min-h-9 py-1.5" : "h-9",
+            className
+          )}
         >
-          <div className="flex items-center gap-2 truncate">
-            {icon}
-            <span className="truncate">{displayText}</span>
-          </div>
-          <div className="flex items-center gap-1 ml-2">
+          {showBadges && selected.length >= 1 ? (
+            <div className="flex flex-wrap gap-1.5 flex-1 mr-2">
+              {selected.map((val) => {
+                const opt = options.find((o) => o.value === val);
+                const display = opt?.badgeLabel ?? val;
+                return (
+                <Badge
+                  key={val}
+                  variant="secondary"
+                  className="h-5 px-1.5 text-xs rounded-sm font-mono max-w-[100px] truncate"
+                >
+                  {display}
+                  <span
+                    className="ml-1 cursor-pointer hover:text-destructive"
+                    onClick={(e) => handleRemoveBadge(e, val)}
+                  >
+                    <X className="h-2.5 w-2.5 inline" />
+                  </span>
+                </Badge>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 truncate">
+              {icon}
+              <span className="truncate">{displayText}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1 ml-2 shrink-0">
             {selected.length > 0 && (
               <Badge
                 variant="secondary"

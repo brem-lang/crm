@@ -1,17 +1,10 @@
-import { useState, useEffect } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+import { getCountryList } from "@/components/advertisers/countryData";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -20,9 +13,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { GripVertical, Plus, Trash2, ArrowDown } from "lucide-react";
-import { getCountryList } from "@/components/advertisers/countryData";
-import type { DistributionRule, RuleConditions, RuleTarget, RuleType } from "@/hooks/useDistributionRules";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import type {
+  DistributionRule,
+  RuleConditions,
+  RuleTarget,
+  RuleType,
+} from "@/hooks/useDistributionRules";
+import { ArrowDown, GripVertical, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface Advertiser {
   id: string;
@@ -59,7 +64,6 @@ const RULE_TYPE_LABELS: Record<RuleType, string> = {
   geo: "GEO-Based Routing",
 };
 
-
 interface TargetRow extends RuleTarget {
   _key: string;
 }
@@ -91,7 +95,10 @@ export function RuleBuilderSheet({
       setPriority(initialRule.priority);
       setConditions(initialRule.conditions ?? {});
       setTargets(
-        (initialRule.targets || []).map((t) => ({ ...t, _key: newTargetKey() }))
+        (initialRule.targets || []).map((t) => ({
+          ...t,
+          _key: newTargetKey(),
+        })),
       );
     } else {
       setName("");
@@ -104,7 +111,7 @@ export function RuleBuilderSheet({
 
   const updateCondition = <K extends keyof RuleConditions>(
     key: K,
-    value: RuleConditions[K]
+    value: RuleConditions[K],
   ) => setConditions((prev) => ({ ...prev, [key]: value }));
 
   const addTarget = () => {
@@ -136,7 +143,9 @@ export function RuleBuilderSheet({
   };
 
   const updateTarget = (key: string, updates: Partial<TargetRow>) => {
-    setTargets((prev) => prev.map((t) => (t._key === key ? { ...t, ...updates } : t)));
+    setTargets((prev) =>
+      prev.map((t) => (t._key === key ? { ...t, ...updates } : t)),
+    );
   };
 
   const removeTarget = (key: string) => {
@@ -155,10 +164,18 @@ export function RuleBuilderSheet({
     const cleanTargets = targets
       .filter((t) => t.advertiser_id)
       .map(({ _key, ...rest }) => rest);
-    onSave({ name: name.trim(), rule_type: ruleType, priority, conditions, targets: cleanTargets });
+    onSave({
+      name: name.trim(),
+      rule_type: ruleType,
+      priority,
+      conditions,
+      targets: cleanTargets,
+    });
   };
 
-  const usedAdvertiserIds = new Set(targets.map((t) => t.advertiser_id).filter(Boolean));
+  const usedAdvertiserIds = new Set(
+    targets.map((t) => t.advertiser_id).filter(Boolean),
+  );
 
   const countryOptions = getCountryList().map((c) => ({
     value: c.code,
@@ -169,7 +186,9 @@ export function RuleBuilderSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 gap-0">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
-          <SheetTitle>{initialRule ? "Edit Rule" : "New Distribution Rule"}</SheetTitle>
+          <SheetTitle>
+            {initialRule ? "Edit Rule" : "New Distribution Rule"}
+          </SheetTitle>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
@@ -193,22 +212,28 @@ export function RuleBuilderSheet({
                   onChange={(e) => setPriority(Number(e.target.value))}
                   placeholder="0 = first"
                 />
-                <p className="text-xs text-muted-foreground">Lower number = evaluated first</p>
+                <p className="text-xs text-muted-foreground">
+                  Lower number = evaluated first
+                </p>
               </div>
             </div>
 
             <Separator />
 
             {/* IF Block — Conditions */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs px-2">IF</Badge>
+                <Badge variant="outline" className="font-mono text-xs px-2">
+                  IF
+                </Badge>
                 <span className="text-sm font-semibold">Conditions</span>
-                <span className="text-xs text-muted-foreground ml-1">(leave empty to match all)</span>
+                <span className="text-xs text-muted-foreground ml-1">
+                  (leave empty to match all)
+                </span>
               </div>
 
               {/* Countries */}
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Countries (GEO)
                 </Label>
@@ -218,42 +243,30 @@ export function RuleBuilderSheet({
                   onChange={(v) => updateCondition("country_codes", v)}
                   placeholder="Select countries…"
                   searchPlaceholder="Search country or code…"
+                  showBadges
                 />
               </div>
 
               {/* Affiliates */}
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Affiliates
                 </Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {affiliates.filter((a) => a.is_active).map((a) => {
-                    const sel = conditions.affiliate_ids?.includes(a.id) ?? false;
-                    return (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => {
-                          const curr = conditions.affiliate_ids || [];
-                          updateCondition(
-                            "affiliate_ids",
-                            sel ? curr.filter((x) => x !== a.id) : [...curr, a.id]
-                          );
-                        }}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                          sel
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border text-muted-foreground hover:border-primary/50"
-                        }`}
-                      >
-                        {a.name}
-                      </button>
-                    );
-                  })}
-                </div>
+                <MultiSelect
+                  options={affiliates
+                    .filter((a) => a.is_active)
+                    .map((a) => ({
+                      value: a.id,
+                      label: a.name,
+                      badgeLabel: a.name,
+                    }))}
+                  selected={conditions.affiliate_ids || []}
+                  onChange={(v) => updateCondition("affiliate_ids", v)}
+                  placeholder="Select affiliates…"
+                  searchPlaceholder="Search affiliate…"
+                  showBadges
+                />
               </div>
-
-
             </div>
 
             <Separator />
@@ -261,7 +274,9 @@ export function RuleBuilderSheet({
             {/* THEN Block — Targets */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs px-2">THEN</Badge>
+                <Badge variant="outline" className="font-mono text-xs px-2">
+                  THEN
+                </Badge>
                 <span className="text-sm font-semibold">Send To</span>
                 {ruleType === "weighted" && totalWeight > 0 && (
                   <Badge
@@ -276,7 +291,9 @@ export function RuleBuilderSheet({
               {/* Primary targets */}
               <div className="space-y-2">
                 {primaryTargets.length > 0 && (
-                  <p className="text-xs text-muted-foreground font-medium">Primary advertisers</p>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Primary advertisers
+                  </p>
                 )}
                 {primaryTargets.map((t, idx) => (
                   <TargetRowItem
@@ -290,7 +307,13 @@ export function RuleBuilderSheet({
                     onRemove={() => removeTarget(t._key)}
                   />
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={addTarget} className="w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addTarget}
+                  className="w-full"
+                >
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add Advertiser
                 </Button>
@@ -305,7 +328,8 @@ export function RuleBuilderSheet({
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  If all primary advertisers are unavailable, try these in order.
+                  If all primary advertisers are unavailable, try these in
+                  order.
                 </p>
                 {fallbackTargets.map((t, idx) => (
                   <TargetRowItem
@@ -336,12 +360,21 @@ export function RuleBuilderSheet({
         </ScrollArea>
 
         <SheetFooter className="px-6 py-4 border-t shrink-0 flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isSaving || !name.trim() || targets.filter((t) => !t.is_fallback && t.advertiser_id).length === 0}
+            disabled={
+              isSaving ||
+              !name.trim() ||
+              targets.filter((t) => !t.is_fallback && t.advertiser_id)
+                .length === 0
+            }
           >
             {isSaving ? "Saving…" : initialRule ? "Update Rule" : "Create Rule"}
           </Button>
@@ -371,14 +404,16 @@ function TargetRowItem({
   isFallback?: boolean;
 }) {
   const available = advertisers.filter(
-    (a) => a.is_active && (a.id === target.advertiser_id || !usedIds.has(a.id))
+    (a) => a.is_active && (a.id === target.advertiser_id || !usedIds.has(a.id)),
   );
 
   return (
     <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
       <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 cursor-grab" />
       {!isFallback && ruleType === "priority" && (
-        <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">{index + 1}.</span>
+        <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">
+          {index + 1}.
+        </span>
       )}
       <Select
         value={target.advertiser_id || ""}

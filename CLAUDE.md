@@ -209,3 +209,6 @@ Always import from `@/integrations/supabase/client`, not from `@supabase/supabas
 2. Add the corresponding `can*` boolean derived from `permissions` array
 3. Seed it into the migration for the roles that should have it by default
 4. Use `canDoThing` from `useCurrentUserPermissions()` in the component
+
+MAKE SURE TO FOLLOW REACT JS STYLE CODE GUIDELINES AND SUPABASE CODE GUIDELINES
+PREVENT N+1 QUERIES
