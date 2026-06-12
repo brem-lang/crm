@@ -17,6 +17,7 @@ export interface RuleTarget {
   weight: number;
   priority_order: number;
   is_fallback: boolean;
+  is_enabled: boolean;
 }
 
 export interface DistributionRule {
@@ -62,6 +63,7 @@ export function useDistributionRules() {
           weight: t.weight,
           priority_order: t.priority_order,
           is_fallback: t.is_fallback,
+          is_enabled: t.is_enabled ?? true,
           advertiser_name: (t as any).advertisers?.name,
         });
       }
@@ -110,6 +112,7 @@ export function useCreateDistributionRule() {
               weight: t.weight,
               priority_order: t.priority_order,
               is_fallback: t.is_fallback,
+              is_enabled: t.is_enabled ?? true,
             }))
           );
         if (targetsError) throw targetsError;
@@ -165,6 +168,7 @@ export function useUpdateDistributionRule() {
                 weight: t.weight,
                 priority_order: t.priority_order,
                 is_fallback: t.is_fallback,
+                is_enabled: t.is_enabled ?? true,
               }))
             );
           if (targetsError) throw targetsError;

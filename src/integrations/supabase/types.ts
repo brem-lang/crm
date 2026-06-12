@@ -121,6 +121,7 @@ export type Database = {
         Row: {
           advertiser_id: string
           id: string
+          is_enabled: boolean
           is_fallback: boolean
           priority_order: number
           rule_id: string
@@ -129,6 +130,7 @@ export type Database = {
         Insert: {
           advertiser_id: string
           id?: string
+          is_enabled?: boolean
           is_fallback?: boolean
           priority_order?: number
           rule_id: string
@@ -137,6 +139,7 @@ export type Database = {
         Update: {
           advertiser_id?: string
           id?: string
+          is_enabled?: boolean
           is_fallback?: boolean
           priority_order?: number
           rule_id?: string

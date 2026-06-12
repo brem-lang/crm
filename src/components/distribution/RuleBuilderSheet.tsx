@@ -28,13 +28,15 @@ import type {
   RuleTarget,
   RuleType,
 } from "@/hooks/useDistributionRules";
-import { ArrowDown, Check, ChevronsUpDown, GripVertical, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, Check, ChevronsUpDown, GripVertical, Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Advertiser {
   id: string;
   name: string;
   is_active: boolean;
+  daily_cap: number | null;
+  hourly_cap: number | null;
 }
 
 interface Affiliate {
@@ -126,6 +128,7 @@ export function RuleBuilderSheet({
         weight: 100,
         priority_order: nextOrder,
         is_fallback: false,
+        is_enabled: true,
       },
     ]);
   };
@@ -140,6 +143,7 @@ export function RuleBuilderSheet({
         weight: 100,
         priority_order: nextOrder,
         is_fallback: true,
+        is_enabled: true,
       },
     ]);
   };
@@ -408,11 +412,13 @@ function TargetRowItem({
   const available = advertisers.filter(
     (a) => a.is_active && (a.id === target.advertiser_id || !usedIds.has(a.id)),
   );
-  const selectedName = available.find((a) => a.id === target.advertiser_id)?.name;
+  const selectedAdvertiser = available.find((a) => a.id === target.advertiser_id);
   const [open, setOpen] = useState(false);
 
+  const isEnabled = target.is_enabled ?? true;
+
   return (
-    <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
+    <div className={`flex items-center gap-2 p-2 border rounded-md bg-muted/20 transition-opacity ${isEnabled ? "" : "opacity-50"}`}>
       <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 cursor-grab" />
       {!isFallback && ruleType === "priority" && (
         <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">
@@ -425,12 +431,29 @@ function TargetRowItem({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="flex-1 h-8 text-sm justify-between font-normal"
+            className="flex-1 h-auto min-h-8 text-sm justify-between font-normal py-1.5 items-start"
           >
-            <span className="truncate">
-              {selectedName || "Select advertiser…"}
-            </span>
-            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+            <div className="flex flex-col items-start gap-0.5 min-w-0">
+              <span className="truncate text-sm">
+                {selectedAdvertiser?.name || "Select advertiser…"}
+              </span>
+              {selectedAdvertiser && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    Cap: {selectedAdvertiser.daily_cap != null ? `${selectedAdvertiser.daily_cap}/day` : "∞"}
+                  </span>
+                  {!isFallback && (
+                    <>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        Weight: {target.weight ?? 100}%
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50 mt-0.5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[260px] p-0" align="start">
@@ -472,6 +495,18 @@ function TargetRowItem({
           <span className="text-xs text-muted-foreground">wt</span>
         </div>
       )}
+      <button
+        type="button"
+        onClick={() => onChange({ is_enabled: !isEnabled })}
+        className="shrink-0 flex items-center justify-center rounded hover:opacity-80 transition-opacity"
+        title={isEnabled ? "Disable advertiser" : "Enable advertiser"}
+      >
+        {isEnabled ? (
+          <ToggleRight className="h-7 w-7 text-green-500" />
+        ) : (
+          <ToggleLeft className="h-7 w-7 text-muted-foreground" />
+        )}
+      </button>
       <Button
         type="button"
         variant="ghost"

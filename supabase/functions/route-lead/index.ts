@@ -34,6 +34,7 @@ interface RuleTarget {
   weight: number;
   priority_order: number;
   is_fallback: boolean;
+  is_enabled: boolean;
 }
 
 interface AdvertiserConfig {
@@ -321,8 +322,8 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split("T")[0];
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const primaryTargets = (targets as RuleTarget[]).filter((t) => !t.is_fallback);
-    const fallbackTargets = (targets as RuleTarget[]).filter((t) => t.is_fallback);
+    const primaryTargets = (targets as RuleTarget[]).filter((t) => !t.is_fallback && (t.is_enabled ?? true));
+    const fallbackTargets = (targets as RuleTarget[]).filter((t) => t.is_fallback && (t.is_enabled ?? true));
 
     // Build ordered list of advertisers to try
     let orderedToTry: string[] = [];
