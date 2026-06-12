@@ -274,7 +274,7 @@ export default function DistributionRules() {
                           <TableCell>
                             <div className="space-y-1">
                               <div className="flex flex-wrap gap-1">
-                                {primaryTargets.slice(0, 3).map((t, i) => (
+                                {primaryTargets.map((t, i) => (
                                   <Badge
                                     key={t.advertiser_id}
                                     variant="secondary"
@@ -285,18 +285,13 @@ export default function DistributionRules() {
                                       : `${i + 1}. ${t.advertiser_name}`}
                                   </Badge>
                                 ))}
-                                {primaryTargets.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{primaryTargets.length - 3} more
-                                  </Badge>
-                                )}
                               </div>
                               {fallbackTargets.length > 0 && (
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-wrap items-center gap-1">
                                   <span className="text-xs text-muted-foreground">
                                     ↳ fallback:
                                   </span>
-                                  {fallbackTargets.slice(0, 2).map((t) => (
+                                  {fallbackTargets.map((t) => (
                                     <Badge
                                       key={t.advertiser_id}
                                       variant="outline"
@@ -305,11 +300,6 @@ export default function DistributionRules() {
                                       {t.advertiser_name}
                                     </Badge>
                                   ))}
-                                  {fallbackTargets.length > 2 && (
-                                    <span className="text-xs text-muted-foreground">
-                                      +{fallbackTargets.length - 2}
-                                    </span>
-                                  )}
                                 </div>
                               )}
                             </div>

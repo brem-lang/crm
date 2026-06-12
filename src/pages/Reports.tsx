@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-type DatePreset = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'thisWeek' | 'custom';
+type DatePreset = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'thisWeek' | 'all' | 'custom';
 
 export default function Reports() {
   const { getStartOfDay, getEndOfDay, getNow, getStartOfMonth, getEndOfMonth } = useCRMSettings();
@@ -54,6 +54,8 @@ export default function Reports() {
     }
   }, [datePreset, customFrom, customTo]);
 
+  const showAllDates = datePreset === 'all';
+
   const presets: { key: DatePreset; label: string }[] = [
     { key: 'today', label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
@@ -61,6 +63,7 @@ export default function Reports() {
     { key: 'last7', label: 'Last 7 Days' },
     { key: 'last30', label: 'Last 30 Days' },
     { key: 'thisMonth', label: 'This Month' },
+    { key: 'all', label: 'All' },
   ];
 
   const handlePresetClick = (key: DatePreset) => {
@@ -73,13 +76,13 @@ export default function Reports() {
 
   // Leads by status (filtered by date)
   const { data: leadsByStatus, isLoading: loadingStatus } = useQuery({
-    queryKey: ['reports-leads-by-status', dateRange.from, dateRange.to],
+    queryKey: ['reports-leads-by-status', showAllDates, dateRange.from, dateRange.to],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('status')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+      let q = supabase.from('leads').select('status');
+      if (!showAllDates) {
+        q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+      }
+      const { data, error } = await q;
       
       if (error) throw error;
       
@@ -94,8 +97,9 @@ export default function Reports() {
 
   // Leads over time (based on date range)
   const { data: leadsOverTime, isLoading: loadingTime } = useQuery({
-    queryKey: ['reports-leads-over-time', dateRange.from, dateRange.to],
+    queryKey: ['reports-leads-over-time', showAllDates, dateRange.from, dateRange.to],
     queryFn: async () => {
+      if (showAllDates) return [];
       const daysDiff = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
       const days = [];
       
@@ -120,13 +124,13 @@ export default function Reports() {
 
   // Distribution success rate (filtered by date)
   const { data: distributionStats, isLoading: loadingDist } = useQuery({
-    queryKey: ['reports-distribution-stats', dateRange.from, dateRange.to],
+    queryKey: ['reports-distribution-stats', showAllDates, dateRange.from, dateRange.to],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lead_distributions')
-        .select('status')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+      let q = supabase.from('lead_distributions').select('status');
+      if (!showAllDates) {
+        q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+      }
+      const { data, error } = await q;
       
       if (error) throw error;
       
@@ -145,13 +149,13 @@ export default function Reports() {
 
   // Top affiliates (filtered by date)
   const { data: topAffiliates, isLoading: loadingAffiliates } = useQuery({
-    queryKey: ['reports-top-affiliates', dateRange.from, dateRange.to],
+    queryKey: ['reports-top-affiliates', showAllDates, dateRange.from, dateRange.to],
     queryFn: async () => {
-      const { data: leads, error } = await supabase
-        .from('leads')
-        .select('affiliate_id, affiliates(name)')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+      let q = supabase.from('leads').select('affiliate_id, affiliates(name)');
+      if (!showAllDates) {
+        q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+      }
+      const { data: leads, error } = await q;
       
       if (error) throw error;
       

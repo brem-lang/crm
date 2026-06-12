@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CalendarIcon, X } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
 interface AdvertiserPerformanceData {
   advertiser_id: string;
@@ -39,14 +39,20 @@ export default function AdvertiserPerformance() {
   } = useCRMSettings();
   
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [advertiserSearch, setAdvertiserSearch] = useState("");
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
+    if (preset === "all") {
+      setShowAllDates(true);
+      return;
+    }
+    setShowAllDates(false);
     const now = getNow();
-    
+
     switch (preset) {
       case "today":
         setFromDate(getStartOfDay(now));
@@ -82,7 +88,7 @@ export default function AdvertiserPerformance() {
   };
 
   const { data: performanceData, isLoading } = useQuery({
-    queryKey: ['advertiser-performance', fromDate, toDate, advertiserSearch],
+    queryKey: ['advertiser-performance', showAllDates, fromDate, toDate, advertiserSearch],
     queryFn: async () => {
       // Get all advertisers
       let advertiserQuery = supabase.from('advertisers').select('id, name');
@@ -98,22 +104,26 @@ export default function AdvertiserPerformance() {
 
       for (const adv of advertisers) {
         // Get total leads sent to this advertiser
-        const { count: leadsCount } = await supabase
+        let leadsQ = supabase
           .from('lead_distributions')
           .select('*', { count: 'exact', head: true })
           .eq('advertiser_id', adv.id)
-          .eq('status', 'sent')
-          .gte('created_at', fromDate.toISOString())
-          .lte('created_at', toDate.toISOString());
+          .eq('status', 'sent');
+        if (!showAllDates) {
+          leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+        }
+        const { count: leadsCount } = await leadsQ;
 
         // Get FTD conversions - leads that were sent to this advertiser and have is_ftd = true
-        const { data: distributions } = await supabase
+        let distsQ = supabase
           .from('lead_distributions')
           .select('lead_id')
           .eq('advertiser_id', adv.id)
-          .eq('status', 'sent')
-          .gte('created_at', fromDate.toISOString())
-          .lte('created_at', toDate.toISOString());
+          .eq('status', 'sent');
+        if (!showAllDates) {
+          distsQ = distsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+        }
+        const { data: distributions } = await distsQ;
 
         let conversions = 0;
         let pendingConversions = 0;
@@ -178,6 +188,7 @@ export default function AdvertiserPerformance() {
     { key: "lastWeek", label: "Last Week" },
     { key: "thisMonth", label: "This Month" },
     { key: "lastMonth", label: "Last Month" },
+    { key: "all", label: "All" },
     { key: "custom", label: "Custom" },
   ];
 
@@ -208,51 +219,53 @@ export default function AdvertiserPerformance() {
                 </Button>
               ))}
               
-              <div className="ml-auto flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      From: {formatDate(fromDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={fromDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setFromDate(getStartOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      To: {formatDate(toDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={toDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setToDate(getEndOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {!showAllDates && (
+                <div className="ml-auto flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        From: {formatDate(fromDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setFromDate(getStartOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        To: {formatDate(toDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setToDate(getEndOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
 
             {/* Filters Row */}

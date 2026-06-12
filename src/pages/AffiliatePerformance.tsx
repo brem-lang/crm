@@ -14,7 +14,7 @@ import { CalendarIcon, X } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { useAffiliates } from "@/hooks/useAffiliates";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
 interface AffiliatePerformanceData {
   affiliate_id: string;
@@ -41,6 +41,7 @@ export default function AffiliatePerformance() {
   } = useCRMSettings();
   
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedAffiliateId, setSelectedAffiliateId] = useState<string>("");
@@ -50,8 +51,13 @@ export default function AffiliatePerformance() {
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
+    if (preset === "all") {
+      setShowAllDates(true);
+      return;
+    }
+    setShowAllDates(false);
     const now = getNow();
-    
+
     switch (preset) {
       case "today":
         setFromDate(getStartOfDay(now));
@@ -87,7 +93,7 @@ export default function AffiliatePerformance() {
   };
 
   const { data: performanceData, isLoading } = useQuery({
-    queryKey: ['affiliate-performance', fromDate, toDate, selectedAffiliateId, affiliateSearch],
+    queryKey: ['affiliate-performance', showAllDates, fromDate, toDate, selectedAffiliateId, affiliateSearch],
     queryFn: async () => {
       // Get affiliates based on selection or search
       let affiliateQuery = supabase.from('affiliates').select('id, name');
@@ -104,32 +110,38 @@ export default function AffiliatePerformance() {
 
       for (const aff of filteredAffiliates) {
         // Get total leads from this affiliate
-        const { count: leadsCount } = await supabase
+        let leadsQ = supabase
           .from('leads')
           .select('*', { count: 'exact', head: true })
-          .eq('affiliate_id', aff.id)
-          .gte('created_at', fromDate.toISOString())
-          .lte('created_at', toDate.toISOString());
+          .eq('affiliate_id', aff.id);
+        if (!showAllDates) {
+          leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+        }
+        const { count: leadsCount } = await leadsQ;
 
         // Get FTD conversions (released)
-        const { count: ftdCount } = await supabase
+        let ftdQ = supabase
           .from('leads')
           .select('*', { count: 'exact', head: true })
           .eq('affiliate_id', aff.id)
           .eq('is_ftd', true)
-          .eq('ftd_released', true)
-          .gte('created_at', fromDate.toISOString())
-          .lte('created_at', toDate.toISOString());
+          .eq('ftd_released', true);
+        if (!showAllDates) {
+          ftdQ = ftdQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+        }
+        const { count: ftdCount } = await ftdQ;
 
         // Get pending FTD (is_ftd true but not released)
-        const { count: pendingCount } = await supabase
+        let pendingQ = supabase
           .from('leads')
           .select('*', { count: 'exact', head: true })
           .eq('affiliate_id', aff.id)
           .eq('is_ftd', true)
-          .eq('ftd_released', false)
-          .gte('created_at', fromDate.toISOString())
-          .lte('created_at', toDate.toISOString());
+          .eq('ftd_released', false);
+        if (!showAllDates) {
+          pendingQ = pendingQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+        }
+        const { count: pendingCount } = await pendingQ;
 
         const leads = leadsCount || 0;
         const conversions = ftdCount || 0;
@@ -170,6 +182,7 @@ export default function AffiliatePerformance() {
     { key: "lastWeek", label: "Last Week" },
     { key: "thisMonth", label: "This Month" },
     { key: "lastMonth", label: "Last Month" },
+    { key: "all", label: "All" },
     { key: "custom", label: "Custom" },
   ];
 
@@ -200,51 +213,53 @@ export default function AffiliatePerformance() {
                 </Button>
               ))}
               
-              <div className="ml-auto flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      From: {formatDate(fromDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={fromDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setFromDate(getStartOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      To: {formatDate(toDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={toDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setToDate(getEndOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {!showAllDates && (
+                <div className="ml-auto flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        From: {formatDate(fromDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setFromDate(getStartOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        To: {formatDate(toDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setToDate(getEndOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
 
             {/* Filters Row */}

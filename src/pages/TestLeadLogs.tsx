@@ -59,6 +59,7 @@ export default function TestLeadLogs() {
   const { isSuperAdmin } = useAuth();
 
   // Use timezone-aware helpers for initial state
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() =>
     getStartOfMonth(getNow()),
   );
@@ -68,13 +69,14 @@ export default function TestLeadLogs() {
   const filteredLogs = useMemo(() => {
     return (
       logs?.filter((log) => {
+        if (showAllDates) return true;
         const logDate = new Date(log.created_at);
         const fromStart = getStartOfDay(fromDate);
         const toEnd = getEndOfDay(toDate);
         return logDate >= fromStart && logDate <= toEnd;
       }) || []
     );
-  }, [logs, fromDate, toDate]);
+  }, [logs, showAllDates, fromDate, toDate]);
 
   const allSelected =
     filteredLogs.length > 0 &&
@@ -165,6 +167,7 @@ export default function TestLeadLogs() {
             toDate={toDate}
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
+            onShowAllChange={setShowAllDates}
           />
         </Card>
 

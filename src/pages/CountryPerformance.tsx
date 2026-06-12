@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
 interface CountryPerformanceData {
   country_code: string;
@@ -50,6 +50,7 @@ export default function CountryPerformance() {
   } = useCRMSettings();
   
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [countryFilter, setCountryFilter] = useState("all");
@@ -60,8 +61,13 @@ export default function CountryPerformance() {
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
+    if (preset === "all") {
+      setShowAllDates(true);
+      return;
+    }
+    setShowAllDates(false);
     const now = getNow();
-    
+
     switch (preset) {
       case "today":
         setFromDate(getStartOfDay(now));
@@ -97,14 +103,16 @@ export default function CountryPerformance() {
   };
 
   const { data: performanceData, isLoading } = useQuery({
-    queryKey: ['country-performance', fromDate, toDate],
+    queryKey: ['country-performance', showAllDates, fromDate, toDate],
     queryFn: async () => {
       // Get all leads within date range
-      const { data: leads, error } = await supabase
+      let leadsQ = supabase
         .from('leads')
-        .select('country_code, is_ftd, ftd_released')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        .select('country_code, is_ftd, ftd_released');
+      if (!showAllDates) {
+        leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data: leads, error } = await leadsQ;
 
       if (error) throw error;
       if (!leads) return [];
@@ -149,13 +157,13 @@ export default function CountryPerformance() {
 
   // Fetch breakdown data when a country is selected
   const { data: breakdownData, isLoading: isBreakdownLoading } = useQuery({
-    queryKey: ['country-breakdown', selectedCountryForBreakdown, fromDate, toDate, breakdownTab],
+    queryKey: ['country-breakdown', selectedCountryForBreakdown, showAllDates, fromDate, toDate, breakdownTab],
     enabled: !!selectedCountryForBreakdown,
     queryFn: async () => {
       if (!selectedCountryForBreakdown) return { advertisers: [], affiliates: [] };
 
       // Get leads for the selected country with relationships
-      const { data: leads, error } = await supabase
+      let breakdownQ = supabase
         .from('leads')
         .select(`
           id,
@@ -168,9 +176,11 @@ export default function CountryPerformance() {
             advertisers!inner(id, name)
           )
         `)
-        .eq('country_code', selectedCountryForBreakdown)
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        .eq('country_code', selectedCountryForBreakdown);
+      if (!showAllDates) {
+        breakdownQ = breakdownQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data: leads, error } = await breakdownQ;
 
       if (error) throw error;
       if (!leads) return { advertisers: [], affiliates: [] };
@@ -285,6 +295,7 @@ export default function CountryPerformance() {
     { key: "lastWeek", label: "Last Week" },
     { key: "thisMonth", label: "This Month" },
     { key: "lastMonth", label: "Last Month" },
+    { key: "all", label: "All" },
     { key: "custom", label: "Custom" },
   ];
 
@@ -314,51 +325,53 @@ export default function CountryPerformance() {
                 </Button>
               ))}
               
-              <div className="ml-auto flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      From: {formatDate(fromDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={fromDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setFromDate(getStartOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      To: {formatDate(toDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={toDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setToDate(getEndOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {!showAllDates && (
+                <div className="ml-auto flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        From: {formatDate(fromDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setFromDate(getStartOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        To: {formatDate(toDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setToDate(getEndOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-4">

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ConversionCharts } from "@/components/dashboard/ConversionCharts";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
 export default function Dashboard() {
   const { isSuperAdmin, isManager } = useAuth();
@@ -38,6 +38,7 @@ export default function Dashboard() {
   } = useCRMSettings();
   
   const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfDay(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfDay(getNow()));
   const [selectedAdvertiser, setSelectedAdvertiser] = useState<string>("all");
@@ -46,8 +47,12 @@ export default function Dashboard() {
   // Handle date preset changes
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
+    if (preset === "all") {
+      setShowAllDates(true);
+      return;
+    }
+    setShowAllDates(false);
     const now = getNow();
-    
     switch (preset) {
       case "today":
         setFromDate(getStartOfDay(now));
@@ -104,14 +109,17 @@ export default function Dashboard() {
 
   // Fetch dashboard stats - based on actual distributions (leads taken by advertisers)
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats', fromDate, toDate, selectedAdvertiser, selectedAffiliate],
+    queryKey: ['dashboard-stats', showAllDates, fromDate, toDate, selectedAdvertiser, selectedAffiliate],
     queryFn: async () => {
       // Build distribution query with filters
       let distBaseQuery = supabase
         .from('lead_distributions')
-        .select('id, status, lead_id, advertiser_id, leads!inner(is_ftd, ftd_released, affiliate_id)')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        .select('id, status, lead_id, advertiser_id, leads!inner(is_ftd, ftd_released, affiliate_id)');
+      if (!showAllDates) {
+        distBaseQuery = distBaseQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
 
       if (selectedAdvertiser !== 'all') {
         distBaseQuery = distBaseQuery.eq('advertiser_id', selectedAdvertiser);
@@ -158,14 +166,18 @@ export default function Dashboard() {
 
   // Fetch chart data
   const { data: chartData } = useQuery({
-    queryKey: ['dashboard-chart', fromDate, toDate, selectedAdvertiser, selectedAffiliate],
+    queryKey: ['dashboard-chart', showAllDates, fromDate, toDate, selectedAdvertiser, selectedAffiliate],
     queryFn: async () => {
-      const { data: leads } = await supabase
+      let chartQuery = supabase
         .from('leads')
         .select('created_at, is_ftd')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString())
         .order('created_at', { ascending: true });
+      if (!showAllDates) {
+        chartQuery = chartQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
+      const { data: leads } = await chartQuery;
 
       if (!leads) return [];
 
@@ -201,13 +213,13 @@ export default function Dashboard() {
 
   // Fetch Top 5 Countries
   const { data: topCountries } = useQuery({
-    queryKey: ['dashboard-top-countries', fromDate, toDate],
+    queryKey: ['dashboard-top-countries', showAllDates, fromDate, toDate],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('leads')
-        .select('country_code, is_ftd')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+      let q = supabase.from('leads').select('country_code, is_ftd');
+      if (!showAllDates) {
+        q = q.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data } = await q;
 
       if (!data) return [];
 
@@ -233,19 +245,16 @@ export default function Dashboard() {
 
   // Fetch Top 5 Advertisers
   const { data: topAdvertisers } = useQuery({
-    queryKey: ['dashboard-top-advertisers', fromDate, toDate],
+    queryKey: ['dashboard-top-advertisers', showAllDates, fromDate, toDate],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from('lead_distributions')
-        .select(`
-          advertiser_id,
-          status,
-          leads!inner(is_ftd),
-          advertisers!inner(name)
-        `)
-        .eq('status', 'sent')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        .select(`advertiser_id, status, leads!inner(is_ftd), advertisers!inner(name)`)
+        .eq('status', 'sent');
+      if (!showAllDates) {
+        q = q.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data } = await q;
 
       if (!data) return [];
 
@@ -272,17 +281,19 @@ export default function Dashboard() {
 
   // Fetch Top 5 Affiliates
   const { data: topAffiliates } = useQuery({
-    queryKey: ['dashboard-top-affiliates', fromDate, toDate],
+    queryKey: ['dashboard-top-affiliates', showAllDates, fromDate, toDate],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from('leads')
         .select(`
           affiliate_id,
           is_ftd,
           affiliates!inner(name)
-        `)
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        `);
+      if (!showAllDates) {
+        q = q.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data } = await q;
 
       if (!data) return [];
 
@@ -411,6 +422,7 @@ export default function Dashboard() {
     { key: "lastWeek", label: "Last Week" },
     { key: "thisMonth", label: "This Month" },
     { key: "lastMonth", label: "Last Month" },
+    { key: "all", label: "All" },
     { key: "custom", label: "Custom" },
   ];
 
@@ -439,51 +451,53 @@ export default function Dashboard() {
                 </Button>
               ))}
               
-              <div className="ml-auto flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      From: {formatDate(fromDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={fromDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setFromDate(getStartOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      To: {formatDate(toDate)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={toDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setToDate(getEndOfDay(date));
-                          setDatePreset("custom");
-                        }
-                      }}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {!showAllDates && (
+                <div className="ml-auto flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        From: {formatDate(fromDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setFromDate(getStartOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        To: {formatDate(toDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setToDate(getEndOfDay(date));
+                            setDatePreset("custom");
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
 
             {/* Filters Row */}

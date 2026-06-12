@@ -56,6 +56,7 @@ export default function Distributions() {
   const bulkDeleteMutation = useBulkDeleteDistributions();
   
   // Date filter state - use timezone-aware helpers
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
 
@@ -130,8 +131,8 @@ export default function Distributions() {
       const distDate = new Date(dist.created_at);
       const fromStart = startOfDay(fromDate);
       const toEnd = endOfDay(toDate);
-      const matchesDate = distDate >= fromStart && distDate <= toEnd;
-      
+      const matchesDate = showAllDates || (distDate >= fromStart && distDate <= toEnd);
+
       return matchesSearch && matchesStatus && matchesAdvertiser && matchesDate;
     }) || [];
   }, [distributions, searchTerm, statusFilter, advertiserFilter, fromDate, toDate]);
@@ -229,6 +230,7 @@ export default function Distributions() {
             toDate={toDate}
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
+            onShowAllChange={setShowAllDates}
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}

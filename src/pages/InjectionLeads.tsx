@@ -77,6 +77,7 @@ export default function InjectionLeads() {
   const [emailSearch, setEmailSearch] = useState("");
 
   // Date filters
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
 
@@ -219,7 +220,7 @@ export default function InjectionLeads() {
       const leadDate = new Date(lead.sent_at || lead.created_at);
       const fromStart = getStartOfDay(fromDate);
       const toEnd = getEndOfDay(toDate);
-      const matchesDate = leadDate >= fromStart && leadDate <= toEnd;
+      const matchesDate = showAllDates || (leadDate >= fromStart && leadDate <= toEnd);
 
       // Email wildcard search
       let matchesEmail = true;
@@ -424,6 +425,7 @@ export default function InjectionLeads() {
             toDate={toDate}
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
+            onShowAllChange={setShowAllDates}
             advertiserFilter={advertiserFilter}
             onAdvertiserFilterChange={setAdvertiserFilter}
             injectionFilter={injectionFilter}

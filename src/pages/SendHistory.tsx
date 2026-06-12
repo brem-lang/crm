@@ -29,10 +29,12 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { format } from "date-fns";
 
 export default function SendHistory() {
-  const { defaultPageSize, getStartOfMonth, getEndOfMonth, getNow } = useCRMSettings();
+  const { defaultPageSize, getStartOfMonth, getEndOfMonth, getNow, tzSubMonths } = useCRMSettings();
 
   const [emailSearch, setEmailSearch] = useState("");
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
+  const [showAllDates, setShowAllDates] = useState(false);
+  const [activePreset, setActivePreset] = useState<"thisMonth" | "lastMonth" | "all">("thisMonth");
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,8 +59,8 @@ export default function SendHistory() {
   const { data: sentLeadsData = { leads: [], total: 0 }, isLoading } = useGlobalSentLeads({
     email: emailSearch,
     advertiser_id: advertiserFilter !== "all" ? advertiserFilter : undefined,
-    fromDate,
-    toDate,
+    fromDate: showAllDates ? undefined : fromDate,
+    toDate: showAllDates ? undefined : toDate,
     limit: pageSize,
     offset,
   });
@@ -103,6 +105,46 @@ export default function SendHistory() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Date preset row */}
+              <div className="flex flex-wrap gap-1 border-b pb-3">
+                {([
+                  { key: "thisMonth", label: "This Month" },
+                  { key: "lastMonth", label: "Last Month" },
+                  { key: "all", label: "All" },
+                ] as const).map(({ key, label }) => (
+                  <Button
+                    key={key}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setActivePreset(key);
+                      if (key === "all") {
+                        setShowAllDates(true);
+                      } else {
+                        setShowAllDates(false);
+                        const now = getNow();
+                        if (key === "thisMonth") {
+                          setFromDate(getStartOfMonth(now));
+                          setToDate(getEndOfMonth(now));
+                        } else {
+                          const lastMonth = tzSubMonths(now, 1);
+                          setFromDate(getStartOfMonth(lastMonth));
+                          setToDate(getEndOfMonth(lastMonth));
+                        }
+                        setCurrentPage(1);
+                      }
+                    }}
+                    className={`text-sm px-3 py-1 h-8 ${
+                      activePreset === key
+                        ? "border-b-2 border-primary rounded-none font-medium"
+                        : ""
+                    }`}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Email</label>
@@ -137,31 +179,35 @@ export default function SendHistory() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">From Date</label>
-                  <input
-                    type="date"
-                    value={format(fromDate, "yyyy-MM-dd")}
-                    onChange={(e) => {
-                      setFromDate(new Date(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
+                {!showAllDates && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">From Date</label>
+                      <input
+                        type="date"
+                        value={format(fromDate, "yyyy-MM-dd")}
+                        onChange={(e) => {
+                          setFromDate(new Date(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">To Date</label>
-                  <input
-                    type="date"
-                    value={format(toDate, "yyyy-MM-dd")}
-                    onChange={(e) => {
-                      setToDate(new Date(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">To Date</label>
+                      <input
+                        type="date"
+                        value={format(toDate, "yyyy-MM-dd")}
+                        onChange={(e) => {
+                          setToDate(new Date(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>

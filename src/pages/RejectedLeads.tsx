@@ -24,18 +24,20 @@ export default function RejectedLeads() {
   const { canDeleteLeads } = useCurrentUserPermissions();
   
   // Use timezone-aware helpers for initial state
+  const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filteredLeads = useMemo(() => {
     return rejectedLeads?.filter((rejection) => {
+      if (showAllDates) return true;
       const rejectedDate = new Date(rejection.created_at);
       const fromStart = getStartOfDay(fromDate);
       const toEnd = getEndOfDay(toDate);
       return rejectedDate >= fromStart && rejectedDate <= toEnd;
     }) || [];
-  }, [rejectedLeads, fromDate, toDate]);
+  }, [rejectedLeads, showAllDates, fromDate, toDate]);
 
   const allSelected = filteredLeads.length > 0 && filteredLeads.every(lead => selectedIds.has(lead.id));
   const someSelected = filteredLeads.some(lead => selectedIds.has(lead.id)) && !allSelected;
@@ -148,6 +150,7 @@ export default function RejectedLeads() {
             toDate={toDate}
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
+            onShowAllChange={setShowAllDates}
           />
         </Card>
 

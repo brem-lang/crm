@@ -8,13 +8,14 @@ import { cn } from "@/lib/utils";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { TablePagination } from "@/components/ui/table-pagination";
 
-type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
 interface DateFilterBarProps {
   fromDate: Date;
   toDate: Date;
   onFromDateChange: (date: Date) => void;
   onToDateChange: (date: Date) => void;
+  onShowAllChange?: (showAll: boolean) => void;
   children?: React.ReactNode;
   // Pagination props
   currentPage?: number;
@@ -34,6 +35,7 @@ const datePresets: { key: DatePreset; label: string }[] = [
   { key: "lastWeek", label: "Last Week" },
   { key: "thisMonth", label: "This Month" },
   { key: "lastMonth", label: "Last Month" },
+  { key: "all", label: "All" },
   { key: "custom", label: "Custom" },
 ];
 
@@ -42,6 +44,7 @@ export function DateFilterBar({
   toDate,
   onFromDateChange,
   onToDateChange,
+  onShowAllChange,
   children,
   // Pagination
   currentPage = 1,
@@ -70,8 +73,13 @@ export function DateFilterBar({
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
+    if (preset === "all") {
+      onShowAllChange?.(true);
+      return;
+    }
+    onShowAllChange?.(false);
     const now = getNow();
-    
+
     switch (preset) {
       case "today":
         onFromDateChange(getStartOfDay(now));
@@ -139,60 +147,64 @@ export function DateFilterBar({
           </Button>
         ))}
         
-        
-        <div className="ml-auto flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                From: {formatDate(fromDate)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onFromDateChange(getStartOfDay(date));
-                    setDatePreset("custom");
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                To: {formatDate(toDate)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={toDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onToDateChange(getEndOfDay(date));
-                    setDatePreset("custom");
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("prev")}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground min-w-[40px] text-center">{daysDiff}d</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("next")}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {datePreset !== "all" && (
+          <div className="ml-auto flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
+                  <CalendarIcon className="h-3 w-3" />
+                  From: {formatDate(fromDate)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={fromDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      onFromDateChange(getStartOfDay(date));
+                      setDatePreset("custom");
+                      onShowAllChange?.(false);
+                    }
+                  }}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
+                  <CalendarIcon className="h-3 w-3" />
+                  To: {formatDate(toDate)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={toDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      onToDateChange(getEndOfDay(date));
+                      setDatePreset("custom");
+                      onShowAllChange?.(false);
+                    }
+                  }}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("prev")}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground min-w-[40px] text-center">{daysDiff}d</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftDates("next")}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Optional additional filters row */}
