@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -26,7 +28,7 @@ import type {
   RuleTarget,
   RuleType,
 } from "@/hooks/useDistributionRules";
-import { ArrowDown, GripVertical, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, Check, ChevronsUpDown, GripVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Advertiser {
@@ -406,6 +408,8 @@ function TargetRowItem({
   const available = advertisers.filter(
     (a) => a.is_active && (a.id === target.advertiser_id || !usedIds.has(a.id)),
   );
+  const selectedName = available.find((a) => a.id === target.advertiser_id)?.name;
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
@@ -415,21 +419,46 @@ function TargetRowItem({
           {index + 1}.
         </span>
       )}
-      <Select
-        value={target.advertiser_id || ""}
-        onValueChange={(v) => onChange({ advertiser_id: v })}
-      >
-        <SelectTrigger className="flex-1 h-8 text-sm">
-          <SelectValue placeholder="Select advertiser…" />
-        </SelectTrigger>
-        <SelectContent>
-          {available.map((a) => (
-            <SelectItem key={a.id} value={a.id}>
-              {a.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="flex-1 h-8 text-sm justify-between font-normal"
+          >
+            <span className="truncate">
+              {selectedName || "Select advertiser…"}
+            </span>
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[260px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search advertiser…" className="h-8" />
+            <CommandList>
+              <CommandEmpty>No advertiser found.</CommandEmpty>
+              <CommandGroup>
+                {available.map((a) => (
+                  <CommandItem
+                    key={a.id}
+                    value={a.name}
+                    onSelect={() => {
+                      onChange({ advertiser_id: a.id });
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={`mr-2 h-3.5 w-3.5 ${target.advertiser_id === a.id ? "opacity-100" : "opacity-0"}`}
+                    />
+                    {a.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       {!isFallback && ruleType === "weighted" && (
         <div className="flex items-center gap-1 shrink-0">
           <Input
