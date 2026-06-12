@@ -94,9 +94,23 @@ export default function Affiliates() {
     toast.success(`Affiliate ${newStatus ? 'activated' : 'deactivated'}`);
   };
 
-  const copyApiKey = (apiKey: string) => {
-    navigator.clipboard.writeText(apiKey);
-    toast.success("API key copied to clipboard");
+  const copyApiKey = async (apiKey: string, e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success("API key copied to clipboard");
+    } catch {
+      // Fallback for browsers that block clipboard API
+      const el = document.createElement("textarea");
+      el.value = apiKey;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast.success("API key copied to clipboard");
+    }
   };
 
   return (
@@ -163,7 +177,7 @@ export default function Affiliates() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6"
-                              onClick={() => copyApiKey(affiliate.api_key)}
+                              onClick={(e) => copyApiKey(affiliate.api_key, e)}
                             >
                               <Copy className="h-3 w-3" />
                             </Button>
