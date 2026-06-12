@@ -109,6 +109,8 @@ export function LeadsTable({
         return lead.country_code;
       case "country":
         return lead.country || "-";
+      case "city":
+        return lead.city || "-";
       case "ip_address":
         return lead.ip_address || "-";
       case "status":
@@ -136,6 +138,18 @@ export function LeadsTable({
         );
       case "affiliate":
         return (lead as any).affiliates?.name || "-";
+      case "affiliate_id":
+        return lead.affiliate_id ? (
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.affiliate_id}>
+            {lead.affiliate_id.slice(0, 8)}
+          </span>
+        ) : <span className="text-muted-foreground">-</span>;
+      case "advertiser_id":
+        return lead.advertiser_id ? (
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.advertiser_id}>
+            {lead.advertiser_id.slice(0, 8)}
+          </span>
+        ) : <span className="text-muted-foreground">-</span>;
       case "advertiser":
         // Get the first successful distribution's advertiser name
         const distributions = (lead as any).lead_distributions;
@@ -173,6 +187,28 @@ export function LeadsTable({
         return formatDate(lead.created_at);
       case "ftd_date":
         return lead.ftd_date ? formatDate(lead.ftd_date) : "-";
+      case "ftd_id":
+        return lead.ftd_id || "-";
+      case "autologin":
+        return lead.autologin ? (
+          <span className="max-w-32 truncate block font-mono text-xs" title={lead.autologin}>
+            {lead.autologin}
+          </span>
+        ) : "-";
+      case "is_live":
+        return lead.is_live ? (
+          <Badge className="bg-green-100 text-green-800">Live</Badge>
+        ) : <span className="text-muted-foreground">-</span>;
+      case "user_agent":
+        return lead.user_agent ? (
+          <span className="max-w-40 truncate block text-xs" title={lead.user_agent}>
+            {lead.user_agent}
+          </span>
+        ) : "-";
+      case "platform":
+        return lead.platform || "-";
+      case "browser":
+        return lead.browser || "-";
       case "injection_ftd":
         return (lead as any).injection_ftd ? (
           <Badge className="bg-purple-100 text-purple-800">FTD</Badge>

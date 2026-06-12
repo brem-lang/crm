@@ -1658,8 +1658,12 @@ export type Database = {
       }
       leads: {
         Row: {
+          advertiser_id: string | null
           affiliate_id: string | null
           assigned_to: string | null
+          autologin: string | null
+          browser: string | null
+          city: string | null
           comment: string | null
           country: string | null
           country_code: string
@@ -1673,24 +1677,32 @@ export type Database = {
           fraud_flags: Json | null
           fraud_score: number | null
           ftd_date: string | null
+          ftd_id: string | null
           ftd_released: boolean
           ftd_released_at: string | null
           ftd_released_by: string | null
           id: string
           ip_address: string | null
           is_ftd: boolean
+          is_live: boolean
           lastname: string
           mobile: string
           needs_review: boolean | null
           offer_name: string | null
+          platform: string | null
           request_id: string | null
           sale_status: string | null
           status: Database["public"]["Enums"]["lead_status"]
           updated_at: string
+          user_agent: string | null
         }
         Insert: {
+          advertiser_id?: string | null
           affiliate_id?: string | null
           assigned_to?: string | null
+          autologin?: string | null
+          browser?: string | null
+          city?: string | null
           comment?: string | null
           country?: string | null
           country_code: string
@@ -1704,24 +1716,32 @@ export type Database = {
           fraud_flags?: Json | null
           fraud_score?: number | null
           ftd_date?: string | null
+          ftd_id?: string | null
           ftd_released?: boolean
           ftd_released_at?: string | null
           ftd_released_by?: string | null
           id?: string
           ip_address?: string | null
           is_ftd?: boolean
+          is_live?: boolean
           lastname: string
           mobile: string
           needs_review?: boolean | null
           offer_name?: string | null
+          platform?: string | null
           request_id?: string | null
           sale_status?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           updated_at?: string
+          user_agent?: string | null
         }
         Update: {
+          advertiser_id?: string | null
           affiliate_id?: string | null
           assigned_to?: string | null
+          autologin?: string | null
+          browser?: string | null
+          city?: string | null
           comment?: string | null
           country?: string | null
           country_code?: string
@@ -1735,22 +1755,33 @@ export type Database = {
           fraud_flags?: Json | null
           fraud_score?: number | null
           ftd_date?: string | null
+          ftd_id?: string | null
           ftd_released?: boolean
           ftd_released_at?: string | null
           ftd_released_by?: string | null
           id?: string
           ip_address?: string | null
           is_ftd?: boolean
+          is_live?: boolean
           lastname?: string
           mobile?: string
           needs_review?: boolean | null
           offer_name?: string | null
+          platform?: string | null
           request_id?: string | null
           sale_status?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           updated_at?: string
+          user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_affiliate_id_fkey"
             columns: ["affiliate_id"]

@@ -1,0 +1,10 @@
+-- Add new columns to leads table
+ALTER TABLE public.leads
+  ADD COLUMN IF NOT EXISTS advertiser_id UUID REFERENCES public.advertisers(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS autologin TEXT,
+  ADD COLUMN IF NOT EXISTS is_live BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS user_agent TEXT,
+  ADD COLUMN IF NOT EXISTS platform TEXT,
+  ADD COLUMN IF NOT EXISTS browser TEXT,
+  ADD COLUMN IF NOT EXISTS ftd_id TEXT;
