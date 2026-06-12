@@ -1400,6 +1400,9 @@ export type Database = {
           id: string
           last_polled_at: string | null
           lead_id: string
+          request_headers: Json | null
+          request_payload: string | null
+          request_url: string | null
           response: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["distribution_status"]
@@ -1414,6 +1417,9 @@ export type Database = {
           id?: string
           last_polled_at?: string | null
           lead_id: string
+          request_headers?: Json | null
+          request_payload?: string | null
+          request_url?: string | null
           response?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["distribution_status"]
@@ -1428,6 +1434,9 @@ export type Database = {
           id?: string
           last_polled_at?: string | null
           lead_id?: string
+          request_headers?: Json | null
+          request_payload?: string | null
+          request_url?: string | null
           response?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["distribution_status"]

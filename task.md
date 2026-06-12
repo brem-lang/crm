@@ -1,6 +1,2 @@
-in leads we need to add more columns
-Affiliate ID Advertiser ID AutoLogin Live lead lead request ID City User Agent Platform Browser FTD ID,
-
-must be added to DB
-
-create plan
+- in lead actions we need to add response and request actions just like in test lead history actions
+  create plan

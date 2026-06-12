@@ -48,6 +48,10 @@ export function useLeads() {
             advertiser_id,
             status,
             external_lead_id,
+            request_url,
+            request_headers,
+            request_payload,
+            response,
             advertisers(name)
           )
         `)
