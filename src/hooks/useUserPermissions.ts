@@ -54,7 +54,9 @@ export type UserPermission =
   | 'view_audit_logs'
   | 'view_monitoring'
   // Affiliate Manager visibility
-  | 'view_advertiser_name';
+  | 'view_advertiser_name'
+  // Advertiser Manager visibility
+  | 'view_lead_name';
 
 export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; description: string; group: string }[] = [
   // Leads
@@ -107,6 +109,8 @@ export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; descrip
   { group: 'Reports & System', id: 'view_monitoring', label: 'View Monitoring', description: 'Can access the System Monitoring page' },
   // Affiliate Manager
   { group: 'Affiliate Manager', id: 'view_advertiser_name', label: 'View Advertiser Name', description: 'Can see the advertiser name on leads (Affiliate Manager role only)' },
+  // Advertiser Manager
+  { group: 'Advertiser Manager', id: 'view_lead_name', label: 'View Lead Name', description: 'Can see first and last name on leads (Advertiser Manager role only)' },
 ];
 
 export function useUserPermissions(userId?: string) {
@@ -259,6 +263,8 @@ export function useCurrentUserPermissions() {
     canViewMonitoring: hasPermission('view_monitoring'),
     // Affiliate Manager
     canViewAdvertiserName: hasPermission('view_advertiser_name'),
+    // Advertiser Manager
+    canViewLeadName: hasPermission('view_lead_name'),
   };
 }
 

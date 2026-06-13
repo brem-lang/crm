@@ -36,18 +36,21 @@ export function useLeadsRealtime() {
 }
 
 export function useLeads(options?: {
-  // When defined, restricts results to leads from these affiliate IDs only.
-  // Pass an empty array to return no leads (user is affiliate manager with no assignments).
-  // Pass undefined to return all leads (no restriction).
+  // Restrict to leads from specific affiliate IDs (affiliate manager).
   filterAffiliateIds?: string[];
+  // Restrict to leads distributed to specific advertiser IDs (advertiser manager).
+  filterAdvertiserIds?: string[];
   enabled?: boolean;
 }) {
   return useQuery({
-    queryKey: ['leads', options?.filterAffiliateIds],
+    queryKey: ['leads', options?.filterAffiliateIds, options?.filterAdvertiserIds],
     enabled: options?.enabled !== false,
     queryFn: async () => {
-      // Affiliate manager with no assignments → no leads
-      if (options?.filterAffiliateIds !== undefined && options.filterAffiliateIds.length === 0) {
+      // No assignments at all → no leads
+      if (
+        (options?.filterAffiliateIds !== undefined && options.filterAffiliateIds.length === 0) ||
+        (options?.filterAdvertiserIds !== undefined && options.filterAdvertiserIds.length === 0)
+      ) {
         return [];
       }
 
@@ -72,6 +75,18 @@ export function useLeads(options?: {
 
       if (options?.filterAffiliateIds !== undefined && options.filterAffiliateIds.length > 0) {
         query = query.in('affiliate_id', options.filterAffiliateIds);
+      }
+
+      // For advertiser filter: resolve lead IDs via lead_distributions first
+      if (options?.filterAdvertiserIds !== undefined && options.filterAdvertiserIds.length > 0) {
+        const { data: dists, error: distsError } = await supabase
+          .from('lead_distributions')
+          .select('lead_id')
+          .in('advertiser_id', options.filterAdvertiserIds);
+        if (distsError) throw distsError;
+        const leadIds = [...new Set((dists || []).map(d => d.lead_id))];
+        if (leadIds.length === 0) return [];
+        query = query.in('id', leadIds);
       }
 
       const { data, error } = await query;

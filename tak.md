@@ -1,6 +1,6 @@
-hey i have created a role named affilate manager
+hey i have created a role named advertisor manager
 
-affiliate manager role should have the ability to assign specific affiliate and should see the leads on those affiliate
-not all the leads and we will not show him the name of the advertisor or other things super admin can decide
+advertisor manager should see the advertisor assign to him and there leads only not all leads and super admin can decide
+what he should see or not like email,names,phone and others
 
-maybe we should include the affiliate manage role in the system roles
+maybe we should include the advertisor manage role in the system roles

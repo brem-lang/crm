@@ -21,6 +21,10 @@ import {
   useUserAffiliateAssignments,
   useSetUserAffiliateAssignments,
 } from "@/hooks/useUserAffiliateAssignments";
+import {
+  useUserAdvertiserAssignments,
+  useSetUserAdvertiserAssignments,
+} from "@/hooks/useUserAdvertiserAssignments";
 
 const SYSTEM_ROLE_SLUGS = new Set(["super_admin", "manager", "agent", "affiliate"]);
 
@@ -103,6 +107,39 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
     );
   };
 
+  const isAdvertiserManager = selectedSlug === "advertiser_manager";
+
+  // Advertiser assignment state (only relevant for advertiser_manager role)
+  const { data: currentAdvertiserAssignments } = useUserAdvertiserAssignments(isAdvertiserManager ? user.id : undefined);
+  const setAdvertiserAssignments = useSetUserAdvertiserAssignments();
+  const [selectedAdvertiserIds, setSelectedAdvertiserIds] = useState<string[]>([]);
+  const [advertisersSynced, setAdvertisersSynced] = useState(false);
+
+  if (!advertisersSynced && currentAdvertiserAssignments !== undefined) {
+    setSelectedAdvertiserIds(currentAdvertiserAssignments);
+    setAdvertisersSynced(true);
+  }
+
+  const { data: allAdvertisers } = useQuery({
+    queryKey: ["advertisers-for-assignment"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("advertisers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdvertiserManager,
+  });
+
+  const toggleAdvertiser = (id: string) => {
+    setSelectedAdvertiserIds(prev =>
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -148,6 +185,14 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
         await setAffiliateAssignments.mutateAsync({
           userId: user.id,
           affiliateIds: selectedAffiliateIds,
+        });
+      }
+
+      // Save advertiser assignments if the role is advertiser_manager
+      if (selectedSlug === "advertiser_manager") {
+        await setAdvertiserAssignments.mutateAsync({
+          userId: user.id,
+          advertiserIds: selectedAdvertiserIds,
         });
       }
 
@@ -202,6 +247,7 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
             onValueChange={v => {
               setSelectedSlug(v === "all" ? "" : v);
               setAffiliatesSynced(false);
+              setAdvertisersSynced(false);
             }}
             options={roleOptions}
             placeholder={rolesLoading ? "Loading roles…" : "Select a role…"}
@@ -243,6 +289,43 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
             {selectedAffiliateIds.length === 0 && (
               <p className="text-xs text-destructive">
                 No affiliates assigned — this user will see no leads.
+              </p>
+            )}
+          </div>
+        )}
+
+        {isAdvertiserManager && (
+          <div className="space-y-2">
+            <Label>Assigned Advertisers</Label>
+            <p className="text-xs text-muted-foreground">
+              This user will only see leads distributed to the selected advertisers.
+            </p>
+            <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+              {!allAdvertisers ? (
+                <p className="text-sm text-muted-foreground">Loading advertisers…</p>
+              ) : allAdvertisers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active advertisers found.</p>
+              ) : (
+                allAdvertisers.map(advertiser => (
+                  <div key={advertiser.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`adv-${advertiser.id}`}
+                      checked={selectedAdvertiserIds.includes(advertiser.id)}
+                      onCheckedChange={() => toggleAdvertiser(advertiser.id)}
+                    />
+                    <label
+                      htmlFor={`adv-${advertiser.id}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {advertiser.name}
+                    </label>
+                  </div>
+                ))
+              )}
+            </div>
+            {selectedAdvertiserIds.length === 0 && (
+              <p className="text-xs text-destructive">
+                No advertisers assigned — this user will see no leads.
               </p>
             )}
           </div>

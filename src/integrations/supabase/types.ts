@@ -1965,6 +1965,32 @@ export type Database = {
         }
         Relationships: []
       }
+      user_advertiser_assignments: {
+        Row: {
+          user_id: string
+          advertiser_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          advertiser_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          advertiser_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uadv_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_affiliate_assignments: {
         Row: {
           user_id: string
