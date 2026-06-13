@@ -219,8 +219,13 @@ export default function TestLeadLogs() {
                       )}
                       <TableHead>Status</TableHead>
                       <TableHead>Advertiser</TableHead>
-                      <TableHead>Test Lead</TableHead>
+                      <TableHead>First Name</TableHead>
+                      <TableHead>Last Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Country</TableHead>
+                      <TableHead>IP Address</TableHead>
+                      <TableHead>Offer</TableHead>
                       <TableHead>Response</TableHead>
                       <TableHead>Sent At</TableHead>
                     </TableRow>
@@ -265,40 +270,36 @@ export default function TestLeadLogs() {
                               {advertiser?.name || "Unknown"}
                             </span>
                           </TableCell>
+                          <TableCell>{testData?.firstname || "-"}</TableCell>
+                          <TableCell>{testData?.lastname || "-"}</TableCell>
                           <TableCell>
-                            <div className="space-y-1">
-                              <p className="font-medium text-sm">
-                                {testData?.firstname} {testData?.lastname}
-                              </p>
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-xs text-muted-foreground">
-                                  {testData?.email}
-                                </p>
-                                {testData?.email && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        testData.email,
-                                      );
-                                      toast.success(
-                                        "Email copied to clipboard",
-                                      );
-                                    }}
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">{testData?.email || "-"}</span>
+                              {testData?.email && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(testData.email);
+                                    toast.success("Email copied to clipboard");
+                                  }}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
+                          <TableCell>{testData?.mobile || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">
                               {testData?.country_code || "-"}
                             </Badge>
                           </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-mono">{testData?.ip_address || "-"}</span>
+                          </TableCell>
+                          <TableCell>{testData?.offer_name || "-"}</TableCell>
                           <TableCell className="max-w-[250px]">
                             <div className="flex gap-2">
                               {/* View Request Button */}

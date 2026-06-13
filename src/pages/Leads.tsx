@@ -106,7 +106,7 @@ export default function Leads() {
   const { data: affiliateRestriction } = useMyAffiliateRestriction();
   const { data: advertiserRestriction } = useMyAdvertiserRestriction();
   const restrictionsResolved = affiliateRestriction !== undefined && advertiserRestriction !== undefined;
-  const { data: leads, isLoading, error, refetch } = useLeads({
+  const { data: leads, isLoading, isFetching, error, refetch } = useLeads({
     filterAffiliateIds: Array.isArray(affiliateRestriction) ? affiliateRestriction : undefined,
     filterAdvertiserIds: Array.isArray(advertiserRestriction) ? advertiserRestriction : undefined,
     enabled: restrictionsResolved,
@@ -593,9 +593,9 @@ export default function Leads() {
               Manage and track all your leads
             </p>
           </div>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
+            {isFetching ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
 

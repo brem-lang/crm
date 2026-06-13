@@ -65,7 +65,7 @@ export default function Distributions() {
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const pageSizeOptions = [5, 10, 15, 25, 50, 100, 200];
 
-  const { data: distributions, isLoading, error, refetch } = useQuery({
+  const { data: distributions, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['distributions'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -217,9 +217,9 @@ export default function Distributions() {
               Track lead distributions to advertisers
             </p>
           </div>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
+            {isFetching ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
 
