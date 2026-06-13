@@ -88,7 +88,11 @@ export default function AdvertiserConfig() {
 
   return (
     <DashboardLayout>
-      <ConflictLinterSheet open={linterOpen} onOpenChange={setLinterOpen} />
+      <ConflictLinterSheet
+        open={linterOpen}
+        onOpenChange={setLinterOpen}
+        onSelectAdvertiser={(id) => setSelectedAdvertiserId(id)}
+      />
 
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Top bar */}
