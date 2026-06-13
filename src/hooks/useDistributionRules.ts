@@ -208,14 +208,62 @@ export function useToggleDistributionRule() {
 
   return useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      // Step 1: Toggle the rule itself
       const { error } = await supabase
         .from("distribution_rules")
         .update({ is_active })
         .eq("id", id);
       if (error) throw error;
+
+      // Step 2: Get all advertiser IDs targeted by this rule
+      const { data: targets, error: targetsError } = await supabase
+        .from("distribution_rule_targets")
+        .select("advertiser_id")
+        .eq("rule_id", id);
+      if (targetsError) throw targetsError;
+
+      const advertiserIds = [...new Set((targets || []).map((t) => t.advertiser_id))];
+      if (advertiserIds.length === 0) return;
+
+      if (!is_active) {
+        // Deactivating — pause all targeted advertisers immediately (strict: any inactive rule = paused)
+        const { error: settingsError } = await supabase
+          .from("advertiser_distribution_settings")
+          .update({ is_active: false })
+          .in("advertiser_id", advertiserIds);
+        if (settingsError) throw settingsError;
+        return;
+      }
+
+      // Activating — re-activate only advertisers where ALL sibling rules are also active
+      const { data: siblingTargets, error: siblingError } = await supabase
+        .from("distribution_rule_targets")
+        .select("advertiser_id, rule_id, distribution_rules(is_active)")
+        .in("advertiser_id", advertiserIds)
+        .neq("rule_id", id);
+      if (siblingError) throw siblingError;
+
+      // Collect advertisers that still have at least one inactive sibling rule
+      const blockedByInactiveRule = new Set<string>();
+      for (const t of siblingTargets || []) {
+        if ((t as any).distribution_rules?.is_active === false) {
+          blockedByInactiveRule.add(t.advertiser_id);
+        }
+      }
+
+      // Only re-activate advertisers with no remaining inactive rules
+      const toActivate = advertiserIds.filter((aid) => !blockedByInactiveRule.has(aid));
+      if (toActivate.length > 0) {
+        const { error: settingsError } = await supabase
+          .from("advertiser_distribution_settings")
+          .update({ is_active: true })
+          .in("advertiser_id", toActivate);
+        if (settingsError) throw settingsError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["distribution-settings"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
