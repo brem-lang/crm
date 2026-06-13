@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,9 +14,13 @@ import {
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoles, useUserCustomRoles, useSyncUserCustomRoles } from "@/hooks/useRoles";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  useUserAffiliateAssignments,
+  useSetUserAffiliateAssignments,
+} from "@/hooks/useUserAffiliateAssignments";
 
 const SYSTEM_ROLE_SLUGS = new Set(["super_admin", "manager", "agent", "affiliate"]);
 
@@ -65,6 +70,39 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
 
   const roleOptions = (allRoles ?? []).map(r => ({ value: r.slug, label: r.name }));
 
+  const isAffiliateManager = selectedSlug === "affiliate_manager";
+
+  // Affiliate assignment state (only relevant for affiliate_manager role)
+  const { data: currentAssignments } = useUserAffiliateAssignments(isAffiliateManager ? user.id : undefined);
+  const setAffiliateAssignments = useSetUserAffiliateAssignments();
+  const [selectedAffiliateIds, setSelectedAffiliateIds] = useState<string[]>([]);
+  const [affiliatesSynced, setAffiliatesSynced] = useState(false);
+
+  if (!affiliatesSynced && currentAssignments !== undefined) {
+    setSelectedAffiliateIds(currentAssignments);
+    setAffiliatesSynced(true);
+  }
+
+  const { data: allAffiliates } = useQuery({
+    queryKey: ["affiliates-for-assignment"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("affiliates")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAffiliateManager,
+  });
+
+  const toggleAffiliate = (id: string) => {
+    setSelectedAffiliateIds(prev =>
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -102,6 +140,14 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
         await syncCustomRoles.mutateAsync({
           userId: user.id,
           roleIds: customRole ? [customRole.id] : [],
+        });
+      }
+
+      // Save affiliate assignments if the role is affiliate_manager
+      if (selectedSlug === "affiliate_manager") {
+        await setAffiliateAssignments.mutateAsync({
+          userId: user.id,
+          affiliateIds: selectedAffiliateIds,
         });
       }
 
@@ -153,7 +199,10 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
           <Label>Role *</Label>
           <SearchableSelect
             value={selectedSlug}
-            onValueChange={v => setSelectedSlug(v === "all" ? "" : v)}
+            onValueChange={v => {
+              setSelectedSlug(v === "all" ? "" : v);
+              setAffiliatesSynced(false);
+            }}
             options={roleOptions}
             placeholder={rolesLoading ? "Loading roles…" : "Select a role…"}
             searchPlaceholder="Search roles…"
@@ -161,6 +210,43 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
             className="w-full"
           />
         </div>
+
+        {isAffiliateManager && (
+          <div className="space-y-2">
+            <Label>Assigned Affiliates</Label>
+            <p className="text-xs text-muted-foreground">
+              This user will only see leads from the selected affiliates.
+            </p>
+            <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+              {!allAffiliates ? (
+                <p className="text-sm text-muted-foreground">Loading affiliates…</p>
+              ) : allAffiliates.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active affiliates found.</p>
+              ) : (
+                allAffiliates.map(affiliate => (
+                  <div key={affiliate.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`aff-${affiliate.id}`}
+                      checked={selectedAffiliateIds.includes(affiliate.id)}
+                      onCheckedChange={() => toggleAffiliate(affiliate.id)}
+                    />
+                    <label
+                      htmlFor={`aff-${affiliate.id}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {affiliate.name}
+                    </label>
+                  </div>
+                ))
+              )}
+            </div>
+            {selectedAffiliateIds.length === 0 && (
+              <p className="text-xs text-destructive">
+                No affiliates assigned — this user will see no leads.
+              </p>
+            )}
+          </div>
+        )}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

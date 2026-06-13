@@ -1965,6 +1965,32 @@ export type Database = {
         }
         Relationships: []
       }
+      user_affiliate_assignments: {
+        Row: {
+          user_id: string
+          affiliate_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          affiliate_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          affiliate_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uaa_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_custom_roles: {
         Row: {
           id: string

@@ -37,6 +37,7 @@ import {
   useUpdateLead,
 } from "@/hooks/useLeads";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
+import { useMyAffiliateRestriction } from "@/hooks/useUserAffiliateAssignments";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FlaskConical, Send, Trash2 } from "lucide-react";
@@ -44,6 +45,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "leads-column-visibility";
+const ADVERTISER_COLUMN_IDS = new Set(["advertiser", "advertiser_id"]);
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "request_id", label: "Lead ID", visible: true },
@@ -86,7 +88,13 @@ export default function Leads() {
     getStartOfDay,
     getEndOfDay,
   } = useCRMSettings();
-  const { data: leads, isLoading, error } = useLeads();
+  // null = no restriction; string[] = affiliate manager scoped to these IDs; undefined = still loading
+  const { data: affiliateRestriction } = useMyAffiliateRestriction();
+  const { data: leads, isLoading, error } = useLeads({
+    filterAffiliateIds: Array.isArray(affiliateRestriction) ? affiliateRestriction : undefined,
+    // Wait until we know whether the user is an affiliate manager before fetching
+    enabled: affiliateRestriction !== undefined,
+  });
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
   const bulkDeleteLeads = useBulkDeleteLeads();
@@ -98,6 +106,7 @@ export default function Leads() {
     canExportLeads,
     canDeleteLeads,
     canEditLeads,
+    canViewAdvertiserName,
   } = useCurrentUserPermissions();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -211,6 +220,14 @@ export default function Leads() {
       ),
     );
   };
+
+  // Hide advertiser columns for users without the view_advertiser_name permission
+  const effectiveColumns = useMemo(() => {
+    if (isSuperAdmin || canViewAdvertiserName) return columns;
+    return columns.map(col =>
+      ADVERTISER_COLUMN_IDS.has(col.id) ? { ...col, visible: false } : col
+    );
+  }, [columns, isSuperAdmin, canViewAdvertiserName]);
 
   const filteredLeads = useMemo(() => {
     return (
@@ -563,7 +580,9 @@ export default function Leads() {
             onPageSizeChange={setPageSize}
           >
             <LeadColumnSelector
-              columns={columns}
+              columns={effectiveColumns.filter(col =>
+                (isSuperAdmin || canViewAdvertiserName) || !ADVERTISER_COLUMN_IDS.has(col.id)
+              )}
               onToggle={handleToggleColumn}
             />
             {canExportLeads && (
@@ -646,7 +665,7 @@ export default function Leads() {
               <>
                 <LeadsTable
                   leads={paginatedLeads}
-                  columns={columns}
+                  columns={effectiveColumns}
                   isSuperAdmin={isSuperAdmin}
                   onEdit={handleEdit}
                   onDelete={handleDelete}

@@ -35,11 +35,23 @@ export function useLeadsRealtime() {
   }, [queryClient]);
 }
 
-export function useLeads() {
+export function useLeads(options?: {
+  // When defined, restricts results to leads from these affiliate IDs only.
+  // Pass an empty array to return no leads (user is affiliate manager with no assignments).
+  // Pass undefined to return all leads (no restriction).
+  filterAffiliateIds?: string[];
+  enabled?: boolean;
+}) {
   return useQuery({
-    queryKey: ['leads'],
+    queryKey: ['leads', options?.filterAffiliateIds],
+    enabled: options?.enabled !== false,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Affiliate manager with no assignments → no leads
+      if (options?.filterAffiliateIds !== undefined && options.filterAffiliateIds.length === 0) {
+        return [];
+      }
+
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -58,6 +70,11 @@ export function useLeads() {
         .neq('status', 'rejected')
         .order('created_at', { ascending: false });
 
+      if (options?.filterAffiliateIds !== undefined && options.filterAffiliateIds.length > 0) {
+        query = query.in('affiliate_id', options.filterAffiliateIds);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },

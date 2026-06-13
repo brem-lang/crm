@@ -82,6 +82,7 @@ Set in `.env` (local) or hosting platform environment settings.
 - `manager` — most access
 - `agent` — leads + reports
 - `affiliate` — submit leads only
+- `affiliate_manager` — affiliate manager role
 
 Stored in `user_roles` table (`user_id`, `role: app_role`).
 
