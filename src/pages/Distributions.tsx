@@ -38,7 +38,7 @@ interface Distribution {
   autologin_url: string | null;
   sent_at: string | null;
   created_at: string;
-  leads: { firstname: string; lastname: string; email: string; country_code: string; request_id: string | null } | null;
+  leads: { firstname: string; lastname: string; email: string; mobile: string | null; country_code: string; request_id: string | null; sale_status: string | null; status: string | null } | null;
   advertisers: { name: string; advertiser_type: string } | null;
   affiliates: { name: string } | null;
 }
@@ -72,7 +72,7 @@ export default function Distributions() {
         .from('lead_distributions')
         .select(`
           *,
-          leads(firstname, lastname, email, country_code, request_id),
+          leads(firstname, lastname, email, mobile, country_code, request_id, sale_status, status),
           advertisers(name, advertiser_type),
           affiliates(name)
         `)
@@ -366,6 +366,10 @@ export default function Distributions() {
                       </TableHead>
                       <TableHead>Lead ID</TableHead>
                       <TableHead>Lead</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Sale Status</TableHead>
+                      <TableHead>Lead Status</TableHead>
                       <TableHead>Country</TableHead>
                       <TableHead>Advertiser</TableHead>
                       <TableHead>Affiliate</TableHead>
@@ -397,10 +401,31 @@ export default function Distributions() {
                             <p className="font-medium">
                               {dist.leads?.firstname} {dist.leads?.lastname}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {dist.leads?.email}
-                            </p>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{dist.leads?.email || "-"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{dist.leads?.mobile || "-"}</span>
+                        </TableCell>
+                        <TableCell>
+                          {dist.leads?.sale_status ? (
+                            <Badge variant="outline" className="text-xs">
+                              {dist.leads.sale_status}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {dist.leads?.status ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {dist.leads.status}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {dist.leads?.country_code || "-"}

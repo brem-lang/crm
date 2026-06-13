@@ -41,7 +41,7 @@ import { useMyAffiliateRestriction } from "@/hooks/useUserAffiliateAssignments";
 import { useMyAdvertiserRestriction } from "@/hooks/useUserAdvertiserAssignments";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Download, FlaskConical, Send, Trash2 } from "lucide-react";
+import { Download, FlaskConical, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -106,7 +106,7 @@ export default function Leads() {
   const { data: affiliateRestriction } = useMyAffiliateRestriction();
   const { data: advertiserRestriction } = useMyAdvertiserRestriction();
   const restrictionsResolved = affiliateRestriction !== undefined && advertiserRestriction !== undefined;
-  const { data: leads, isLoading, error } = useLeads({
+  const { data: leads, isLoading, error, refetch } = useLeads({
     filterAffiliateIds: Array.isArray(affiliateRestriction) ? affiliateRestriction : undefined,
     filterAdvertiserIds: Array.isArray(advertiserRestriction) ? advertiserRestriction : undefined,
     enabled: restrictionsResolved,
@@ -593,6 +593,10 @@ export default function Leads() {
               Manage and track all your leads
             </p>
           </div>
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
         {/* Date & Advanced Filters */}
