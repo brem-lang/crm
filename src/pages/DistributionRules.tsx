@@ -251,25 +251,16 @@ export default function DistributionRules() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {rule.conditions.affiliate_ids?.length ? (
-                              <div className="flex flex-wrap gap-1">
-                                {rule.conditions.affiliate_ids.slice(0, 2).map((id) => {
-                                  const name = affiliates?.find((a) => a.id === id)?.name ?? id.slice(0, 8);
-                                  return (
-                                    <Badge key={id} variant="outline" className="text-xs px-1.5 py-0">
-                                      {name}
-                                    </Badge>
-                                  );
-                                })}
-                                {rule.conditions.affiliate_ids.length > 2 && (
-                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                    +{rule.conditions.affiliate_ids.length - 2}
+                            <div className="flex flex-wrap gap-1">
+                              {(rule.conditions.affiliate_ids ?? []).map((id) => {
+                                const name = affiliates?.find((a) => a.id === id)?.name ?? id.slice(0, 8);
+                                return (
+                                  <Badge key={id} variant="outline" className="text-xs px-1.5 py-0">
+                                    {name}
                                   </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">All</span>
-                            )}
+                                );
+                              })}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
