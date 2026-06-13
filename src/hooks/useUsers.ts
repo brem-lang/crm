@@ -8,6 +8,7 @@ interface UserWithRoles {
   full_name: string | null;
   username: string | null;
   created_at: string;
+  is_active: boolean;
   roles: string[];
   customRoles: { name: string; color: string; slug: string }[];
 }
@@ -21,7 +22,7 @@ export function useUsers() {
       const [profilesRes, systemRolesRes, customRolesRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, email, full_name, username, created_at")
+          .select("id, email, full_name, username, created_at, is_active")
           .order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase
@@ -42,7 +43,7 @@ export function useUsers() {
           .map((r) => r.roles)
           .filter(Boolean);
 
-        return { ...profile, roles: systemRoles, customRoles };
+        return { ...profile, is_active: profile.is_active ?? true, roles: systemRoles, customRoles };
       });
 
       return usersWithRoles;
@@ -91,11 +92,29 @@ export function useUsers() {
     },
   });
 
+  const toggleUserActive = useMutation({
+    mutationFn: async ({ userId, active }: { userId: string; active: boolean }) => {
+      const { error } = await supabase.rpc("set_user_active", {
+        _target_user_id: userId,
+        _active: active,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
+      toast.success(`User ${variables.active ? "activated" : "deactivated"} successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to update user status");
+    },
+  });
+
   return {
     users,
     isLoading,
     error,
     updateUserRole,
     updateUsername,
+    toggleUserActive,
   };
 }

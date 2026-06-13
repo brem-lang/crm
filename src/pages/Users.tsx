@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users as UsersIcon, Shield, Edit, MoreHorizontal, LogIn, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { getRoleColor } from "@/hooks/useRoles";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +45,7 @@ interface UserToEdit {
 }
 
 export default function Users() {
-  const { users, isLoading } = useUsers();
+  const { users, isLoading, toggleUserActive } = useUsers();
   const { isSuperAdmin, user: currentUser } = useAuth();
   const [editingUser, setEditingUser] = useState<UserToEdit | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -168,14 +169,20 @@ export default function Users() {
                     <TableHead>Full Name</TableHead>
                     <TableHead>Roles</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="w-[80px] text-center">Active</TableHead>
                     {isSuperAdmin && <TableHead className="w-[50px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users?.map((tableUser) => (
-                    <TableRow key={tableUser.id}>
+                    <TableRow key={tableUser.id} className={!tableUser.is_active ? "opacity-50 bg-muted/20" : undefined}>
                       <TableCell className="font-mono">
-                        {tableUser.username || <span className="text-muted-foreground italic">Not set</span>}
+                        <div className="flex items-center gap-2">
+                          {tableUser.username || <span className="text-muted-foreground italic">Not set</span>}
+                          {!tableUser.is_active && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{tableUser.email}</TableCell>
                       <TableCell>{tableUser.full_name || "-"}</TableCell>
@@ -201,6 +208,19 @@ export default function Users() {
                       </TableCell>
                       <TableCell>
                         {format(new Date(tableUser.created_at), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={tableUser.is_active}
+                          onCheckedChange={(active) =>
+                            toggleUserActive.mutate({ userId: tableUser.id, active })
+                          }
+                          disabled={
+                            !isSuperAdmin ||
+                            tableUser.id === currentUser?.id ||
+                            toggleUserActive.isPending
+                          }
+                        />
                       </TableCell>
                       {isSuperAdmin && (
                         <TableCell>
