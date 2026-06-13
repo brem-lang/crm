@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, GitBranch, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus } from "lucide-react";
-import { RoutingTab } from "./RoutingTab";
+import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus } from "lucide-react";
 import { ScheduleHeatmap, type HeatmapConfig } from "./ScheduleHeatmap";
 import { countryData } from "@/components/advertisers/countryData";
 import {
@@ -186,10 +185,6 @@ export function AdvertiserConfigPanel({
 
       <Tabs defaultValue="caps" className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="mx-6 mt-4 w-fit shrink-0">
-          <TabsTrigger value="routing" className="flex items-center gap-1.5">
-            <GitBranch className="h-3.5 w-3.5" />
-            Routing
-          </TabsTrigger>
           <TabsTrigger value="caps" className="flex items-center gap-1.5">
             <Zap className="h-3.5 w-3.5" />
             Caps & Pacing
@@ -209,11 +204,6 @@ export function AdvertiserConfigPanel({
         </TabsList>
 
         <ScrollArea className="flex-1">
-          {/* Routing tab */}
-          <TabsContent value="routing" className="m-6">
-            <RoutingTab highlightedAdvertiserId={advertiser.id} />
-          </TabsContent>
-
           {/* Caps & Pacing tab */}
           <TabsContent value="caps" className="m-6 space-y-4">
             <Card>
