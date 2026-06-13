@@ -55,8 +55,20 @@ export type UserPermission =
   | 'view_monitoring'
   // Affiliate Manager visibility
   | 'view_advertiser_name'
-  // Advertiser Manager visibility
-  | 'view_lead_name';
+  // Advertiser Manager visibility — per-column toggles
+  | 'view_lead_name'
+  | 'view_lead_id'
+  | 'view_lead_country'
+  | 'view_lead_ip'
+  | 'view_lead_status'
+  | 'view_lead_ftd'
+  | 'view_lead_affiliate'
+  | 'view_lead_offer'
+  | 'view_lead_autologin'
+  | 'view_lead_device'
+  | 'view_lead_comment'
+  | 'view_lead_date'
+  | 'view_lead_live';
 
 export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; description: string; group: string }[] = [
   // Leads
@@ -109,8 +121,20 @@ export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; descrip
   { group: 'Reports & System', id: 'view_monitoring', label: 'View Monitoring', description: 'Can access the System Monitoring page' },
   // Affiliate Manager
   { group: 'Affiliate Manager', id: 'view_advertiser_name', label: 'View Advertiser Name', description: 'Can see the advertiser name on leads (Affiliate Manager role only)' },
-  // Advertiser Manager
-  { group: 'Advertiser Manager', id: 'view_lead_name', label: 'View Lead Name', description: 'Can see first and last name on leads (Advertiser Manager role only)' },
+  // Advertiser Manager — column visibility toggles
+  { group: 'Advertiser Manager', id: 'view_lead_name',      label: 'View Name',        description: 'Can see first and last name columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_id',        label: 'View Lead ID',     description: 'Can see the Lead ID (request_id) column' },
+  { group: 'Advertiser Manager', id: 'view_lead_country',   label: 'View Country',     description: 'Can see Country Code, Country, and City columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_ip',        label: 'View IP Address',  description: 'Can see the IP Address column' },
+  { group: 'Advertiser Manager', id: 'view_lead_status',    label: 'View Status',      description: 'Can see Status and Sale Status columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_ftd',       label: 'View FTD',         description: 'Can see FTD, FTD Date, FTD ID, and Injection FTD columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_affiliate', label: 'View Affiliate',   description: 'Can see Affiliate and Affiliate ID columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_offer',     label: 'View Offer Name',  description: 'Can see the Offer Name column' },
+  { group: 'Advertiser Manager', id: 'view_lead_autologin', label: 'View AutoLogin',   description: 'Can see the AutoLogin column' },
+  { group: 'Advertiser Manager', id: 'view_lead_device',    label: 'View Device Info', description: 'Can see User Agent, Platform, and Browser columns' },
+  { group: 'Advertiser Manager', id: 'view_lead_comment',   label: 'View Comment',     description: 'Can see the Comment column' },
+  { group: 'Advertiser Manager', id: 'view_lead_date',      label: 'View Date',        description: 'Can see the Created date column' },
+  { group: 'Advertiser Manager', id: 'view_lead_live',      label: 'View Live Lead',   description: 'Can see the Live Lead column' },
 ];
 
 export function useUserPermissions(userId?: string) {
@@ -263,8 +287,20 @@ export function useCurrentUserPermissions() {
     canViewMonitoring: hasPermission('view_monitoring'),
     // Affiliate Manager
     canViewAdvertiserName: hasPermission('view_advertiser_name'),
-    // Advertiser Manager
-    canViewLeadName: hasPermission('view_lead_name'),
+    // Advertiser Manager — column visibility
+    canViewLeadName:      hasPermission('view_lead_name'),
+    canViewLeadId:        hasPermission('view_lead_id'),
+    canViewLeadCountry:   hasPermission('view_lead_country'),
+    canViewLeadIp:        hasPermission('view_lead_ip'),
+    canViewLeadStatus:    hasPermission('view_lead_status'),
+    canViewLeadFtd:       hasPermission('view_lead_ftd'),
+    canViewLeadAffiliate: hasPermission('view_lead_affiliate'),
+    canViewLeadOffer:     hasPermission('view_lead_offer'),
+    canViewLeadAutologin: hasPermission('view_lead_autologin'),
+    canViewLeadDevice:    hasPermission('view_lead_device'),
+    canViewLeadComment:   hasPermission('view_lead_comment'),
+    canViewLeadDate:      hasPermission('view_lead_date'),
+    canViewLeadLive:      hasPermission('view_lead_live'),
   };
 }
 

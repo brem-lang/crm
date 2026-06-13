@@ -47,7 +47,19 @@ import { toast } from "sonner";
 
 const STORAGE_KEY = "leads-column-visibility";
 const ADVERTISER_COLUMN_IDS = new Set(["advertiser", "advertiser_id"]);
-const NAME_COLUMN_IDS = new Set(["firstname", "lastname"]);
+const NAME_COLUMN_IDS      = new Set(["firstname", "lastname"]);
+const ID_COLUMN_IDS        = new Set(["request_id"]);
+const COUNTRY_COLUMN_IDS   = new Set(["country_code", "country", "city"]);
+const IP_COLUMN_IDS        = new Set(["ip_address"]);
+const STATUS_COLUMN_IDS    = new Set(["status", "sale_status"]);
+const FTD_COLUMN_IDS       = new Set(["is_ftd", "ftd_date", "ftd_id", "injection_ftd"]);
+const AFFILIATE_COLUMN_IDS = new Set(["affiliate", "affiliate_id"]);
+const OFFER_COLUMN_IDS     = new Set(["offer_name"]);
+const AUTOLOGIN_COLUMN_IDS = new Set(["autologin"]);
+const DEVICE_COLUMN_IDS    = new Set(["user_agent", "platform", "browser"]);
+const COMMENT_COLUMN_IDS   = new Set(["comment"]);
+const DATE_COLUMN_IDS      = new Set(["created_at"]);
+const LIVE_COLUMN_IDS      = new Set(["is_live"]);
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "request_id", label: "Lead ID", visible: true },
@@ -112,6 +124,18 @@ export default function Leads() {
     canEditLeads,
     canViewAdvertiserName,
     canViewLeadName,
+    canViewLeadId,
+    canViewLeadCountry,
+    canViewLeadIp,
+    canViewLeadStatus,
+    canViewLeadFtd,
+    canViewLeadAffiliate,
+    canViewLeadOffer,
+    canViewLeadAutologin,
+    canViewLeadDevice,
+    canViewLeadComment,
+    canViewLeadDate,
+    canViewLeadLive,
   } = useCurrentUserPermissions();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -226,16 +250,33 @@ export default function Leads() {
     );
   };
 
-  // Hide restricted columns based on permissions
+  // Map each column set to its required permission (super admins bypass all)
+  const columnPermissions: [Set<string>, boolean][] = [
+    [ADVERTISER_COLUMN_IDS, canViewAdvertiserName],
+    [NAME_COLUMN_IDS,       canViewLeadName],
+    [ID_COLUMN_IDS,         canViewLeadId],
+    [COUNTRY_COLUMN_IDS,    canViewLeadCountry],
+    [IP_COLUMN_IDS,         canViewLeadIp],
+    [STATUS_COLUMN_IDS,     canViewLeadStatus],
+    [FTD_COLUMN_IDS,        canViewLeadFtd],
+    [AFFILIATE_COLUMN_IDS,  canViewLeadAffiliate],
+    [OFFER_COLUMN_IDS,      canViewLeadOffer],
+    [AUTOLOGIN_COLUMN_IDS,  canViewLeadAutologin],
+    [DEVICE_COLUMN_IDS,     canViewLeadDevice],
+    [COMMENT_COLUMN_IDS,    canViewLeadComment],
+    [DATE_COLUMN_IDS,       canViewLeadDate],
+    [LIVE_COLUMN_IDS,       canViewLeadLive],
+  ];
+
   const effectiveColumns = useMemo(() => {
+    if (isSuperAdmin) return columns;
     return columns.map(col => {
-      if (!isSuperAdmin && !canViewAdvertiserName && ADVERTISER_COLUMN_IDS.has(col.id))
-        return { ...col, visible: false };
-      if (!isSuperAdmin && !canViewLeadName && NAME_COLUMN_IDS.has(col.id))
-        return { ...col, visible: false };
-      return col;
+      const restricted = columnPermissions.some(
+        ([ids, permitted]) => ids.has(col.id) && !permitted
+      );
+      return restricted ? { ...col, visible: false } : col;
     });
-  }, [columns, isSuperAdmin, canViewAdvertiserName, canViewLeadName]);
+  }, [columns, isSuperAdmin, ...columnPermissions.map(([, p]) => p)]);
 
   const filteredLeads = useMemo(() => {
     return (
@@ -588,11 +629,9 @@ export default function Leads() {
             onPageSizeChange={setPageSize}
           >
             <LeadColumnSelector
-              columns={effectiveColumns.filter(col => {
-                if (!isSuperAdmin && !canViewAdvertiserName && ADVERTISER_COLUMN_IDS.has(col.id)) return false;
-                if (!isSuperAdmin && !canViewLeadName && NAME_COLUMN_IDS.has(col.id)) return false;
-                return true;
-              })}
+              columns={isSuperAdmin ? effectiveColumns : effectiveColumns.filter(col =>
+                !columnPermissions.some(([ids, permitted]) => ids.has(col.id) && !permitted)
+              )}
               onToggle={handleToggleColumn}
             />
             {canExportLeads && (
