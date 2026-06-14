@@ -76,21 +76,21 @@ export function useUpdateAdvertiser() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Advertiser> & { id: string }) => {
+    mutationFn: async ({ id, silent: _silent, ...updates }: Partial<Advertiser> & { id: string; silent?: boolean }) => {
       const { data, error } = await supabase
         .from('advertisers')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['advertisers'] });
       queryClient.invalidateQueries({ queryKey: ['advertiser', data.id] });
-      toast.success('Advertiser updated successfully');
+      if (!variables.silent) toast.success('Advertiser updated successfully');
     },
     onError: (error: Error) => {
       toast.error(error.message);
