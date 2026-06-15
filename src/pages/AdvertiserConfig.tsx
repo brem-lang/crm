@@ -289,12 +289,11 @@ export default function AdvertiserConfig() {
             <Badge
               variant="outline"
               className={cn(
-                "gap-1.5 px-2.5 py-1 font-medium cursor-pointer",
+                "gap-1.5 px-2.5 py-1 font-medium",
                 issues.length === 0
                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                   : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
               )}
-              onClick={() => setLinterOpen(true)}
             >
               {issues.length === 0 ? (
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -309,7 +308,6 @@ export default function AdvertiserConfig() {
               advertisers={advertisers || []}
               settings={settings as any[] || []}
               avgStats={avgStats}
-              onClick={() => setLinterOpen(true)}
             />
 
             <Badge variant="secondary" className="gap-1.5">

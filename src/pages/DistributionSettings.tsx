@@ -168,7 +168,6 @@ export default function DistributionSettings() {
               advertisers={advertisers || []}
               settings={settings as any[] || []}
               avgStats={avgStats}
-              onClick={() => setLinterOpen(true)}
             />
           </div>
           <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">

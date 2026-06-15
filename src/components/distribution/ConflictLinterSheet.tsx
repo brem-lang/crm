@@ -302,12 +302,10 @@ export function ConflictLinterBadge({
   advertisers,
   settings,
   avgStats,
-  onClick,
 }: {
   advertisers: { id: string; name: string; is_active: boolean }[];
   settings: any[];
   avgStats: Record<string, number>;
-  onClick: () => void;
 }) {
   const warnings = useMemo(
     () => computeWarnings(advertisers, settings, avgStats),
@@ -319,10 +317,7 @@ export function ConflictLinterBadge({
   if (total === 0) return null;
 
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors hover:bg-muted"
-    >
+    <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border">
       {errors > 0 ? (
         <XCircle className="h-3.5 w-3.5 text-destructive" />
       ) : (
@@ -331,6 +326,6 @@ export function ConflictLinterBadge({
       <span className={errors > 0 ? "text-destructive" : "text-yellow-600"}>
         {total} {total === 1 ? "issue" : "issues"}
       </span>
-    </button>
+    </span>
   );
 }
