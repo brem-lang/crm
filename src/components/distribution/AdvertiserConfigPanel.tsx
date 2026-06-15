@@ -161,8 +161,8 @@ export function AdvertiserConfigPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Panel header */}
-      <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
+      {/* Panel header — pr-14 keeps content clear of the Dialog's absolute X button */}
+      <div className="pl-6 pr-14 py-4 border-b flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-semibold">{advertiser.name}</h2>
           <p className="text-sm text-muted-foreground">{advertiser.advertiser_type}</p>
