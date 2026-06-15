@@ -19,14 +19,7 @@ import {
 } from "@/lib/scheduleUtils";
 import type { WeeklySchedule } from "./WeeklyScheduleSelector";
 import { useAdvertiserHourlyStats } from "@/hooks/useAdvertiserHourlyStats";
-
-const REGION_PRESETS: Record<string, { label: string; codes: string[] }> = {
-  tier1: { label: "Tier 1", codes: ["US", "GB", "CA", "AU", "NZ", "DE", "FR", "NL", "SE", "NO", "DK", "FI", "CH", "AT", "BE", "IE"] },
-  gcc: { label: "GCC", codes: ["AE", "SA", "QA", "KW", "BH", "OM"] },
-  latam: { label: "LATAM", codes: ["BR", "MX", "AR", "CO", "CL", "PE", "UY", "PY", "BO", "EC", "DO", "PR", "GT", "HN", "SV", "CR", "PA"] },
-  apac: { label: "APAC", codes: ["JP", "KR", "SG", "HK", "TW", "TH", "MY", "ID", "PH", "VN", "IN", "PK", "BD"] },
-  mea: { label: "MEA", codes: ["ZA", "NG", "KE", "EG", "MA", "GH", "TZ", "ET", "TN", "DZ", "CI", "SN", "UG", "CM"] },
-};
+import { useUpdateAdvertiser } from "@/hooks/useAdvertisers";
 
 interface Advertiser {
   id: string;
@@ -136,6 +129,13 @@ export function AdvertiserConfigPanel({
   const update = (fields: Partial<DistSetting>) =>
     setDraft(prev => ({ ...prev, ...fields }));
 
+  const updateAdvertiser = useUpdateAdvertiser();
+
+  const handleActiveToggle = (value: boolean) => {
+    updateAdvertiser.mutate({ id: advertiser.id, is_active: value, silent: true });
+    update({ is_active: value });
+  };
+
   const handleSave = () => {
     const heatmapSchedule = {
       format: "heatmap" as const,
@@ -172,9 +172,9 @@ export function AdvertiserConfigPanel({
             <Label htmlFor="adv-active" className="text-sm">Active</Label>
             <Switch
               id="adv-active"
-              checked={draft.is_active}
-              onCheckedChange={v => update({ is_active: v })}
-              disabled={!advertiser.is_active}
+              checked={advertiser.is_active}
+              onCheckedChange={handleActiveToggle}
+              disabled={updateAdvertiser.isPending}
             />
           </div>
         </div>
@@ -443,16 +443,6 @@ function CountriesCard({
     onChange(selected.includes(code) ? selected.filter(c => c !== code) : [...selected, code]);
   };
 
-  const applyPreset = (codes: string[]) => {
-    const allIn = codes.every(c => selected.includes(c));
-    if (allIn) {
-      onChange(selected.filter(c => !codes.includes(c)));
-    } else {
-      const next = new Set([...selected, ...codes]);
-      onChange([...next]);
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -461,34 +451,10 @@ function CountriesCard({
           <Badge variant="secondary">{selected.length || "All"}</Badge>
         </CardTitle>
         <CardDescription>
-          Leave empty to accept all countries. Use presets or search to restrict.
+          Leave empty to accept all countries. Search to restrict.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Region preset buttons */}
-        <div className="flex flex-wrap gap-1.5">
-          {Object.entries(REGION_PRESETS).map(([key, preset]) => {
-            const allIn = preset.codes.every(c => selected.includes(c));
-            return (
-              <Button
-                key={key}
-                size="sm"
-                variant={allIn ? "default" : "outline"}
-                className="h-7 text-xs px-2.5"
-                onClick={() => applyPreset(preset.codes)}
-              >
-                {preset.label}
-                <span className="ml-1 opacity-60 text-xs">({preset.codes.length})</span>
-              </Button>
-            );
-          })}
-          {selected.length > 0 && (
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange([])}>
-              Clear all
-            </Button>
-          )}
-        </div>
-
         <div className="flex gap-2">
           <Input
             placeholder="Search countries..."
