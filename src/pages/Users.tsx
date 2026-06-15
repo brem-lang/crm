@@ -22,7 +22,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users as UsersIcon, Shield, Edit, MoreHorizontal, LogIn, Loader2 } from "lucide-react";
+import { Users as UsersIcon, Shield, Edit, MoreHorizontal, LogIn, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { getRoleColor } from "@/hooks/useRoles";
 import { format } from "date-fns";
@@ -45,11 +55,13 @@ interface UserToEdit {
 }
 
 export default function Users() {
-  const { users, isLoading, toggleUserActive } = useUsers();
+  const { users, isLoading, toggleUserActive, deleteUser } = useUsers();
   const { isSuperAdmin, user: currentUser } = useAuth();
   const [editingUser, setEditingUser] = useState<UserToEdit | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteUserName, setDeleteUserName] = useState<string>("");
 
   const handleEditUser = (userToEdit: typeof users extends (infer T)[] | undefined ? T : never) => {
     setEditingUser({
@@ -248,6 +260,21 @@ export default function Users() {
                                 )}
                                 Login as User
                               </DropdownMenuItem>
+                              {tableUser.id !== currentUser?.id && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => {
+                                      setDeleteUserId(tableUser.id);
+                                      setDeleteUserName(tableUser.username || tableUser.email || "this user");
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete User
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -266,6 +293,29 @@ export default function Users() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
       />
+
+      <AlertDialog open={!!deleteUserId} onOpenChange={(open) => { if (!open) setDeleteUserId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteUserName}</strong>? This action cannot be undone and will permanently remove the user and all their data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteUserId) deleteUser.mutate(deleteUserId, { onSettled: () => setDeleteUserId(null) });
+              }}
+            >
+              {deleteUser.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
