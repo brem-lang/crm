@@ -11,7 +11,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Send, Eye, Copy, Download, Trash2, X } from "lucide-react";
+import { CalendarIcon, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw } from "lucide-react";
+import { LeadColumnSelector, type ColumnConfig } from "@/components/leads/LeadColumnSelector";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,6 +30,42 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
+
+const statusColors: Record<string, string> = {
+  new: "bg-blue-100 text-blue-800",
+  contacted: "bg-yellow-100 text-yellow-800",
+  qualified: "bg-purple-100 text-purple-800",
+  converted: "bg-green-100 text-green-800",
+  lost: "bg-red-100 text-red-800",
+};
+
+const DEFAULT_CONVERSION_COLUMNS: ColumnConfig[] = [
+  { id: "request_id",    label: "Lead ID",       visible: true  },
+  { id: "firstname",     label: "First Name",    visible: true  },
+  { id: "lastname",      label: "Last Name",     visible: true  },
+  { id: "email",         label: "Email",         visible: true  },
+  { id: "mobile",        label: "Phone",         visible: true  },
+  { id: "country_code",  label: "Country Code",  visible: true  },
+  { id: "country",       label: "Country",       visible: true  },
+  { id: "city",          label: "City",          visible: true  },
+  { id: "ip_address",    label: "IP Address",    visible: false },
+  { id: "affiliate",     label: "Affiliate",     visible: true  },
+  { id: "created_at",    label: "Created",       visible: true  },
+  { id: "status",        label: "Status",        visible: true  },
+  { id: "offer_name",    label: "Offer Name",    visible: false },
+  { id: "advertiser",    label: "Advertiser",    visible: true  },
+  { id: "sale_status",   label: "Sale Status",   visible: true  },
+  { id: "ftd_date",      label: "FTD Date",      visible: true  },
+  { id: "ftd_id",        label: "FTD ID",        visible: false },
+  { id: "injection_ftd", label: "Injection FTD", visible: false },
+  { id: "ftd_status",    label: "FTD Status",    visible: true  },
+  { id: "is_live",       label: "Live",          visible: false },
+  { id: "autologin",     label: "AutoLogin",     visible: false },
+  { id: "platform",      label: "Platform",      visible: false },
+  { id: "browser",       label: "Browser",       visible: false },
+  { id: "user_agent",    label: "User Agent",    visible: false },
+  { id: "comment",       label: "Comment",       visible: false },
+];
 
 export default function Conversions() {
   const { 
@@ -45,6 +92,29 @@ export default function Conversions() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [releaseConfirmId, setReleaseConfirmId] = useState<string | null>(null);
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem("conversions-column-visibility");
+      if (saved) {
+        const parsed: Record<string, boolean> = JSON.parse(saved);
+        return DEFAULT_CONVERSION_COLUMNS.map(c => ({ ...c, visible: parsed[c.id] ?? c.visible }));
+      }
+    } catch {}
+    return DEFAULT_CONVERSION_COLUMNS;
+  });
+
+  const handleToggleColumn = (columnId: string) => {
+    setColumns(prev => {
+      const next = prev.map(c => c.id === columnId ? { ...c, visible: !c.visible } : c);
+      const vis: Record<string, boolean> = {};
+      next.forEach(c => { vis[c.id] = c.visible; });
+      localStorage.setItem("conversions-column-visibility", JSON.stringify(vis));
+      return next;
+    });
+  };
+
+  const isVisible = (id: string) => columns.find(c => c.id === id)?.visible ?? true;
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -117,7 +187,7 @@ export default function Conversions() {
     },
   });
 
-  const { data: conversions, isLoading } = useQuery({
+  const { data: conversions, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['conversions', showAllDates, fromDate, toDate, searchEmail, advertiserFilter, affiliateFilter],
     queryFn: async () => {
       let query = supabase
@@ -128,11 +198,25 @@ export default function Conversions() {
           firstname,
           lastname,
           email,
+          mobile,
           country_code,
+          country,
+          city,
+          ip_address,
+          status,
           is_ftd,
           ftd_date,
           ftd_released,
+          ftd_id,
+          injection_ftd,
           sale_status,
+          offer_name,
+          autologin,
+          is_live,
+          user_agent,
+          platform,
+          browser,
+          comment,
           created_at,
           affiliate_id,
           affiliates (name),
@@ -226,9 +310,7 @@ export default function Conversions() {
   });
 
   const handleReleaseFtd = (id: string) => {
-    if (confirm("Release this FTD to the affiliate? They will see is_ftd=1 in the API.")) {
-      releaseFtd.mutate(id);
-    }
+    setReleaseConfirmId(id);
   };
 
   // Bulk delete mutation
@@ -500,6 +582,18 @@ export default function Conversions() {
                 onChange={(e) => setSearchEmail(e.target.value)}
                 className="w-[200px] h-9"
               />
+
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+                  <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
+                  {isFetching ? "Refreshing…" : "Refresh"}
+                </Button>
+                <LeadColumnSelector columns={columns} onToggle={handleToggleColumn} />
+                <Button variant="outline" size="sm" onClick={handleExport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export {selectedIds.size > 0 ? `(${selectedIds.size})` : "All"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -549,14 +643,8 @@ export default function Conversions() {
 
         {/* Conversions Table */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle>FTD Conversions</CardTitle>
-            {selectedIds.size === 0 && filteredConversions && filteredConversions.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
-                <Download className="h-4 w-4" />
-                Export All
-              </Button>
-            )}
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -575,17 +663,31 @@ export default function Conversions() {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Lead ID</TableHead>
-                    <TableHead>First Name</TableHead>
-                    <TableHead>Last Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Affiliate</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Advertiser</TableHead>
-                    <TableHead>Sale Status</TableHead>
-                    <TableHead>FTD Date</TableHead>
-                    <TableHead>Status</TableHead>
+                    {isVisible("request_id")    && <TableHead>Lead ID</TableHead>}
+                    {isVisible("firstname")     && <TableHead>First Name</TableHead>}
+                    {isVisible("lastname")      && <TableHead>Last Name</TableHead>}
+                    {isVisible("email")         && <TableHead>Email</TableHead>}
+                    {isVisible("mobile")        && <TableHead>Phone</TableHead>}
+                    {isVisible("country_code")  && <TableHead>Country Code</TableHead>}
+                    {isVisible("country")       && <TableHead>Country</TableHead>}
+                    {isVisible("city")          && <TableHead>City</TableHead>}
+                    {isVisible("ip_address")    && <TableHead>IP Address</TableHead>}
+                    {isVisible("affiliate")     && <TableHead>Affiliate</TableHead>}
+                    {isVisible("created_at")    && <TableHead>Created</TableHead>}
+                    {isVisible("status")        && <TableHead>Status</TableHead>}
+                    {isVisible("offer_name")    && <TableHead>Offer Name</TableHead>}
+                    {isVisible("advertiser")    && <TableHead>Advertiser</TableHead>}
+                    {isVisible("sale_status")   && <TableHead>Sale Status</TableHead>}
+                    {isVisible("ftd_date")      && <TableHead>FTD Date</TableHead>}
+                    {isVisible("ftd_id")        && <TableHead>FTD ID</TableHead>}
+                    {isVisible("injection_ftd") && <TableHead>Injection FTD</TableHead>}
+                    {isVisible("ftd_status")    && <TableHead>FTD Status</TableHead>}
+                    {isVisible("is_live")       && <TableHead>Live</TableHead>}
+                    {isVisible("autologin")     && <TableHead>AutoLogin</TableHead>}
+                    {isVisible("platform")      && <TableHead>Platform</TableHead>}
+                    {isVisible("browser")       && <TableHead>Browser</TableHead>}
+                    {isVisible("user_agent")    && <TableHead>User Agent</TableHead>}
+                    {isVisible("comment")       && <TableHead>Comment</TableHead>}
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -606,50 +708,105 @@ export default function Conversions() {
                               onCheckedChange={() => toggleSelect(lead.id)}
                             />
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {lead.request_id || lead.id.slice(0, 8)}
-                          </TableCell>
-                          <TableCell>{lead.firstname}</TableCell>
-                          <TableCell>{lead.lastname}</TableCell>
-                          <TableCell>
-                            <span className="flex items-center gap-1.5 group">
-                              <span className="truncate max-w-[150px]">{lead.email}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(lead.email);
-                                  toast.success("Email copied");
-                                }}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </span>
-                          </TableCell>
-                          <TableCell>{lead.country_code}</TableCell>
-                          <TableCell>{affiliateName}</TableCell>
-                          <TableCell className="text-sm">
-                            {lead.created_at ? formatDate(lead.created_at, "yyyy-MM-dd HH:mm") : '-'}
-                          </TableCell>
-                          <TableCell>{advertiserName}</TableCell>
-                          <TableCell>
-                            {lead.sale_status ? (
-                              <Badge variant="outline">{lead.sale_status}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {lead.ftd_date ? formatDate(lead.ftd_date, "yyyy-MM-dd HH:mm") : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {lead.ftd_released ? (
-                              <Badge className="bg-green-500">Released</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="bg-yellow-500 text-white">Pending</Badge>
-                            )}
-                          </TableCell>
+                          {isVisible("request_id") && (
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                                {(lead.request_id || lead.id).slice(0, 8)}
+                              </span>
+                            </TableCell>
+                          )}
+                          {isVisible("firstname") && <TableCell>{lead.firstname}</TableCell>}
+                          {isVisible("lastname")  && <TableCell>{lead.lastname}</TableCell>}
+                          {isVisible("email") && (
+                            <TableCell>
+                              <span className="flex items-center gap-1.5 group">
+                                <span className="truncate max-w-[150px]">{lead.email}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => { navigator.clipboard.writeText(lead.email); toast.success("Email copied"); }}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </span>
+                            </TableCell>
+                          )}
+                          {isVisible("mobile")       && <TableCell>{lead.mobile || '-'}</TableCell>}
+                          {isVisible("country_code") && <TableCell>{lead.country_code}</TableCell>}
+                          {isVisible("country")      && <TableCell>{lead.country || '-'}</TableCell>}
+                          {isVisible("city")         && <TableCell>{lead.city || '-'}</TableCell>}
+                          {isVisible("ip_address")   && <TableCell>{lead.ip_address || '-'}</TableCell>}
+                          {isVisible("affiliate")    && <TableCell>{affiliateName}</TableCell>}
+                          {isVisible("created_at") && (
+                            <TableCell className="text-sm">
+                              {lead.created_at ? formatDate(lead.created_at, "yyyy-MM-dd HH:mm") : '-'}
+                            </TableCell>
+                          )}
+                          {isVisible("status") && (
+                            <TableCell>
+                              <Badge className={`${statusColors["converted"]} pointer-events-none`}>converted</Badge>
+                            </TableCell>
+                          )}
+                          {isVisible("offer_name") && <TableCell>{lead.offer_name || '-'}</TableCell>}
+                          {isVisible("advertiser") && <TableCell>{advertiserName}</TableCell>}
+                          {isVisible("sale_status") && (
+                            <TableCell>
+                              {lead.sale_status ? (
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                  {lead.sale_status}
+                                </Badge>
+                              ) : <span className="text-muted-foreground text-sm">-</span>}
+                            </TableCell>
+                          )}
+                          {isVisible("ftd_date") && (
+                            <TableCell>{lead.ftd_date ? formatDate(lead.ftd_date, "yyyy-MM-dd HH:mm") : '-'}</TableCell>
+                          )}
+                          {isVisible("ftd_id") && <TableCell>{lead.ftd_id || '-'}</TableCell>}
+                          {isVisible("injection_ftd") && (
+                            <TableCell>
+                              {lead.injection_ftd
+                                ? <Badge className="bg-purple-100 text-purple-800">FTD</Badge>
+                                : <span className="text-muted-foreground">-</span>}
+                            </TableCell>
+                          )}
+                          {isVisible("ftd_status") && (
+                            <TableCell>
+                              {lead.ftd_released
+                                ? <Badge className="bg-green-100 text-green-800">Released</Badge>
+                                : <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>}
+                            </TableCell>
+                          )}
+                          {isVisible("is_live") && (
+                            <TableCell>
+                              {lead.is_live
+                                ? <Badge className="bg-green-100 text-green-800">Live</Badge>
+                                : <span className="text-muted-foreground">-</span>}
+                            </TableCell>
+                          )}
+                          {isVisible("autologin") && (
+                            <TableCell>
+                              {lead.autologin
+                                ? <span className="max-w-32 truncate block font-mono text-xs" title={lead.autologin}>{lead.autologin}</span>
+                                : '-'}
+                            </TableCell>
+                          )}
+                          {isVisible("platform")  && <TableCell>{lead.platform || '-'}</TableCell>}
+                          {isVisible("browser")   && <TableCell>{lead.browser || '-'}</TableCell>}
+                          {isVisible("user_agent") && (
+                            <TableCell>
+                              {lead.user_agent
+                                ? <span className="max-w-40 truncate block text-xs" title={lead.user_agent}>{lead.user_agent}</span>
+                                : '-'}
+                            </TableCell>
+                          )}
+                          {isVisible("comment") && (
+                            <TableCell>
+                              {lead.comment
+                                ? <span className="max-w-32 truncate block" title={lead.comment}>{lead.comment}</span>
+                                : '-'}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex items-center gap-1">
                               {responseData && (
@@ -695,7 +852,7 @@ export default function Conversions() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={columns.filter(c => c.visible).length + 2} className="text-center text-muted-foreground py-8">
                         No conversions found for the selected period
                       </TableCell>
                     </TableRow>
@@ -706,6 +863,29 @@ export default function Conversions() {
           </CardContent>
         </Card>
       </div>
+      <AlertDialog open={!!releaseConfirmId} onOpenChange={(open) => { if (!open) setReleaseConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Release FTD</AlertDialogTitle>
+            <AlertDialogDescription>
+              Release this FTD to the affiliate? They will see <code>is_ftd=1</code> in the API. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (releaseConfirmId) {
+                  releaseFtd.mutate(releaseConfirmId, { onSettled: () => setReleaseConfirmId(null) });
+                }
+              }}
+            >
+              {releaseFtd.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Release
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

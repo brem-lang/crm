@@ -319,30 +319,6 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch Recent Activity (last 10 leads)
-  const { data: recentLeads } = useQuery({
-    queryKey: ['dashboard-recent-leads'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('leads')
-        .select(`
-          id,
-          request_id,
-          firstname,
-          lastname,
-          country_code,
-          status,
-          is_ftd,
-          created_at,
-          affiliates(name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      return data || [];
-    },
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
 
   // Fetch System Alerts (cap warnings, failed distributions)
   const { data: systemAlerts } = useQuery({
@@ -837,59 +813,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Recent Activity
-              <Badge variant="outline" className="ml-2 text-xs">Live</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-8 text-xs">Lead ID</TableHead>
-                  <TableHead className="h-8 text-xs">Name</TableHead>
-                  <TableHead className="h-8 text-xs">Country</TableHead>
-                  <TableHead className="h-8 text-xs">Affiliate</TableHead>
-                  <TableHead className="h-8 text-xs">Status</TableHead>
-                  <TableHead className="h-8 text-xs text-right">Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentLeads && recentLeads.length > 0 ? (
-                  recentLeads.map((lead: any) => (
-                    <TableRow key={lead.id}>
-                      <TableCell className="py-2 font-mono text-xs" title={lead.request_id || lead.id}>{(lead.request_id || lead.id).slice(0, 8)}</TableCell>
-                      <TableCell className="py-2">{lead.firstname} {lead.lastname}</TableCell>
-                      <TableCell className="py-2">{lead.country_code}</TableCell>
-                      <TableCell className="py-2">{lead.affiliates?.name || '-'}</TableCell>
-                      <TableCell className="py-2">
-                        {lead.is_ftd ? (
-                          <Badge className="bg-green-100 text-green-800 text-xs">FTD</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">{lead.status}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-2 text-right text-xs text-muted-foreground">
-                        {formatDate(lead.created_at, 'HH:mm:ss')}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-4">
-                      No recent leads
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
 
         {/* Conversion Charts by Country and Advertiser */}
         <ConversionCharts fromDate={fromDate} toDate={toDate} />
