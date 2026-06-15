@@ -20,19 +20,6 @@ import {
 import type { WeeklySchedule } from "./WeeklyScheduleSelector";
 import { useAdvertiserHourlyStats } from "@/hooks/useAdvertiserHourlyStats";
 
-const ADVERTISER_TYPES = [
-  { value: "trackbox", label: "TrackBox" },
-  { value: "drmailer", label: "Dr Tracker" },
-  { value: "enigma", label: "Getlinked" },
-  { value: "timelocal", label: "Timelocal" },
-  { value: "elitecrm", label: "EliteCRM" },
-  { value: "gsi", label: "GSI Markets" },
-  { value: "elnopy", label: "ELNOPY" },
-  { value: "reacto", label: "Reacto Trading" },
-  { value: "streamline11", label: "Streamline11" },
-  { value: "custom", label: "Custom" },
-];
-
 const REGION_PRESETS: Record<string, { label: string; codes: string[] }> = {
   tier1: { label: "Tier 1", codes: ["US", "GB", "CA", "AU", "NZ", "DE", "FR", "NL", "SE", "NO", "DK", "FI", "CH", "AT", "BE", "IE"] },
   gcc: { label: "GCC", codes: ["AE", "SA", "QA", "KW", "BH", "OM"] },
@@ -149,42 +136,6 @@ export function AdvertiserConfigPanel({
   const update = (fields: Partial<DistSetting>) =>
     setDraft(prev => ({ ...prev, ...fields }));
 
-  const updateAdvertiser = useUpdateAdvertiser();
-
-  // Advertiser details draft
-  const [advDraft, setAdvDraft] = useState({
-    name: advertiser.name,
-    advertiser_type: advertiser.advertiser_type,
-    url: advertiser.url ?? "",
-    api_key: advertiser.api_key ?? "",
-    is_active: advertiser.is_active,
-    config: { ...(advertiser.config ?? {}) } as Record<string, string>,
-  });
-
-  const isAdvDirty =
-    advDraft.name !== advertiser.name ||
-    advDraft.advertiser_type !== advertiser.advertiser_type ||
-    advDraft.url !== (advertiser.url ?? "") ||
-    advDraft.api_key !== (advertiser.api_key ?? "") ||
-    advDraft.is_active !== advertiser.is_active ||
-    JSON.stringify(advDraft.config) !== JSON.stringify(advertiser.config ?? {});
-
-  const updateAdvConfig = (key: string, value: string) =>
-    setAdvDraft(prev => ({ ...prev, config: { ...prev.config, [key]: value } }));
-
-  const handleSaveAdvertiser = (silent = false) => {
-    updateAdvertiser.mutate({
-      id: advertiser.id,
-      name: advDraft.name,
-      advertiser_type: advDraft.advertiser_type as any,
-      url: advDraft.url || null,
-      api_key: advDraft.api_key || null,
-      is_active: advDraft.is_active,
-      config: Object.keys(advDraft.config).length ? advDraft.config : null,
-      silent,
-    });
-  };
-
   const handleSave = () => {
     const heatmapSchedule = {
       format: "heatmap" as const,
@@ -192,7 +143,6 @@ export function AdvertiserConfigPanel({
       ...(Object.keys(countryCaps).length > 0 ? { country_caps: countryCaps } : {}),
     };
     onSave({ ...draft, advertiser_id: advertiser.id, weekly_schedule: heatmapSchedule });
-    if (isAdvDirty) handleSaveAdvertiser(true);
   };
 
   const { data: volumeData } = useAdvertiserHourlyStats(advertiser.id, heatmap.timezone);
@@ -247,10 +197,6 @@ export function AdvertiserConfigPanel({
           <TabsTrigger value="overrides" className="flex items-center gap-1.5">
             <Sliders className="h-3.5 w-3.5" />
             Overrides
-          </TabsTrigger>
-          <TabsTrigger value="details" className="flex items-center gap-1.5">
-            <Building2 className="h-3.5 w-3.5" />
-            Details
           </TabsTrigger>
         </TabsList>
 
@@ -407,188 +353,6 @@ export function AdvertiserConfigPanel({
             />
           </TabsContent>
 
-          {/* Details tab — edit the advertiser record itself */}
-          <TabsContent value="details" className="m-6 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Advertiser Details</CardTitle>
-                <CardDescription>Update the advertiser's name, type, endpoint, and credentials.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Name */}
-                <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input
-                    value={advDraft.name}
-                    onChange={e => setAdvDraft(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Advertiser name"
-                  />
-                </div>
-
-                {/* Type */}
-                <div className="space-y-1.5">
-                  <Label>CRM Type</Label>
-                  <Select
-                    value={advDraft.advertiser_type}
-                    onValueChange={v => setAdvDraft(prev => ({ ...prev, advertiser_type: v, config: {} }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ADVERTISER_TYPES.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* API URL */}
-                <div className="space-y-1.5">
-                  <Label>API URL</Label>
-                  <Input
-                    value={advDraft.url}
-                    onChange={e => setAdvDraft(prev => ({ ...prev, url: e.target.value }))}
-                    placeholder="https://api.example.com/leads"
-                  />
-                </div>
-
-                {/* Active toggle */}
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="adv-details-active"
-                    checked={advDraft.is_active}
-                    onCheckedChange={v => setAdvDraft(prev => ({ ...prev, is_active: v }))}
-                  />
-                  <Label htmlFor="adv-details-active">Advertiser active</Label>
-                </div>
-
-                {/* Type-specific credential fields */}
-                {(advDraft.advertiser_type === "trackbox") && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">TrackBox Credentials</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>API Key POST</Label>
-                        <Input value={advDraft.config.api_key_post ?? ""} onChange={e => updateAdvConfig("api_key_post", e.target.value)} placeholder="For push/registration" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>API Key GET</Label>
-                        <Input value={advDraft.config.api_key_get ?? ""} onChange={e => updateAdvConfig("api_key_get", e.target.value)} placeholder="For pull/status" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Username</Label>
-                        <Input value={advDraft.config.username ?? ""} onChange={e => updateAdvConfig("username", e.target.value)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Password</Label>
-                        <Input type="password" value={advDraft.config.password ?? ""} onChange={e => updateAdvConfig("password", e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {["ai", "ci", "gi"].map(k => (
-                        <div key={k} className="space-y-1.5">
-                          <Label>{k.toUpperCase()}</Label>
-                          <Input value={advDraft.config[k] ?? ""} onChange={e => updateAdvConfig(k, e.target.value)} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {["enigma", "timelocal", "elitecrm", "drmailer", "reacto"].includes(advDraft.advertiser_type) && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Credentials</p>
-                    <div className="space-y-1.5">
-                      <Label>API Key</Label>
-                      <Input
-                        value={advDraft.api_key}
-                        onChange={e => setAdvDraft(prev => ({ ...prev, api_key: e.target.value }))}
-                        placeholder="API key"
-                      />
-                    </div>
-                    {advDraft.advertiser_type === "drmailer" && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label>Password</Label>
-                          <Input type="password" value={advDraft.config.pass ?? ""} onChange={e => updateAdvConfig("pass", e.target.value)} />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label>Campaign ID</Label>
-                          <Input value={advDraft.config.campaign_id ?? ""} onChange={e => updateAdvConfig("campaign_id", e.target.value)} />
-                        </div>
-                      </div>
-                    )}
-                    {advDraft.advertiser_type === "elitecrm" && (
-                      <div className="space-y-1.5">
-                        <Label>Sender</Label>
-                        <Input value={advDraft.config.sender ?? ""} onChange={e => updateAdvConfig("sender", e.target.value)} />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {advDraft.advertiser_type === "gsi" && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">GSI Markets Credentials</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Advertiser ID</Label>
-                        <Input value={advDraft.config.gsi_id ?? ""} onChange={e => updateAdvConfig("gsi_id", e.target.value)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Hash</Label>
-                        <Input value={advDraft.config.gsi_hash ?? ""} onChange={e => updateAdvConfig("gsi_hash", e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {advDraft.advertiser_type === "elnopy" && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ELNOPY Credentials</p>
-                    <div className="space-y-1.5">
-                      <Label>API Token</Label>
-                      <Input value={advDraft.config.api_token ?? ""} onChange={e => updateAdvConfig("api_token", e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Link ID</Label>
-                        <Input value={advDraft.config.link_id ?? ""} onChange={e => updateAdvConfig("link_id", e.target.value)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Source</Label>
-                        <Input value={advDraft.config.source ?? ""} onChange={e => updateAdvConfig("source", e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {advDraft.advertiser_type === "streamline11" && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Streamline11 Credentials</p>
-                    <div className="space-y-1.5">
-                      <Label>Affiliate ID (affid)</Label>
-                      <Input value={advDraft.config.affid ?? ""} onChange={e => updateAdvConfig("affid", e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Affiliate Token</Label>
-                        <Input value={advDraft.config.token ?? ""} onChange={e => updateAdvConfig("token", e.target.value)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Source URL</Label>
-                        <Input value={advDraft.config.offer_website ?? ""} onChange={e => updateAdvConfig("offer_website", e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </CardContent>
-            </Card>
-          </TabsContent>
         </ScrollArea>
       </Tabs>
 
