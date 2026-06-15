@@ -7,7 +7,6 @@ import { useAffiliates } from "@/hooks/useAffiliates";
 import {
   useDistributionSettings,
   useUpsertDistributionSetting,
-  useBulkUpdateSettings,
 } from "@/hooks/useDistributionSettings";
 import { useTodayDistributionCounts } from "@/hooks/useTodayDistributionCounts";
 import { useRecentDistributionStats } from "@/hooks/useRecentDistributionStats";
@@ -26,17 +25,13 @@ import {
   AlertTriangle,
   Building2,
   CheckCircle2,
-  CheckSquare,
   ChevronLeft,
   ChevronRight,
   CircleDot,
-  PauseCircle,
-  PlayCircle,
   Search,
   ShieldAlert,
   Sliders,
   TrendingUp,
-  X,
   Zap,
 } from "lucide-react";
 
@@ -178,8 +173,6 @@ function KpiTile({
 
 export default function AdvertiserConfig() {
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string | null>(null);
-  const [bulkSelectMode, setBulkSelectMode] = useState(false);
-  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
   const [linterOpen, setLinterOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,16 +185,8 @@ export default function AdvertiserConfig() {
   const { data: throughput, isLoading: loadingThroughput } = useThroughput();
 
   const upsertSetting = useUpsertDistributionSetting();
-  const bulkUpdateSettings = useBulkUpdateSettings();
 
   // ── derived ──────────────────────────────────────────────────────────────
-
-  const bulkAdvertiserIds = [...bulkSelectedIds]
-    .map((id) => ({
-      id: (settings || []).find((s) => s.advertiser_id === id)?.id,
-      advertiser_id: id,
-    }))
-    .filter((x): x is { id: string; advertiser_id: string } => !!x.id);
 
   const filtered = useMemo(() => {
     const list = advertisers || [];
@@ -255,26 +240,8 @@ export default function AdvertiserConfig() {
     } as any);
   };
 
-  const handleBulkPause = (is_active: boolean) => {
-    const updates = bulkAdvertiserIds.map((x) => ({ id: x.id, is_active }));
-    bulkUpdateSettings.mutate(updates, {
-      onSuccess: () => {
-        setBulkSelectedIds(new Set());
-        setBulkSelectMode(false);
-      },
-    });
-  };
-
   const handleCardClick = (id: string) => {
-    if (bulkSelectMode) {
-      setBulkSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.has(id) ? next.delete(id) : next.add(id);
-        return next;
-      });
-    } else {
-      setSelectedAdvertiserId(id);
-    }
+    setSelectedAdvertiserId(id);
   };
 
   // ── loading ───────────────────────────────────────────────────────────────
@@ -349,39 +316,8 @@ export default function AdvertiserConfig() {
               <Activity className="h-3 w-3 animate-pulse text-emerald-500" />
               Live
             </Badge>
-
-            <Button
-              variant={bulkSelectMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setBulkSelectMode((v) => !v);
-                setBulkSelectedIds(new Set());
-              }}
-            >
-              <CheckSquare className="h-4 w-4 mr-1.5" />
-              {bulkSelectMode ? "Cancel" : "Select"}
-            </Button>
           </div>
         </div>
-
-        {/* Bulk action bar */}
-        {bulkSelectMode && bulkSelectedIds.size > 0 && (
-          <div className="flex items-center gap-3 rounded-lg border bg-primary/5 px-4 py-2.5">
-            <Badge variant="secondary">{bulkSelectedIds.size} selected</Badge>
-            <Button size="sm" variant="outline" onClick={() => handleBulkPause(false)} disabled={bulkUpdateSettings.isPending}>
-              <PauseCircle className="h-4 w-4 mr-1.5" />
-              Pause all
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleBulkPause(true)} disabled={bulkUpdateSettings.isPending}>
-              <PlayCircle className="h-4 w-4 mr-1.5" />
-              Activate all
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setBulkSelectedIds(new Set())}>
-              <X className="h-4 w-4 mr-1" />
-              Clear
-            </Button>
-          </div>
-        )}
 
         {/* KPI strip */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -442,8 +378,6 @@ export default function AdvertiserConfig() {
               const sent24 = stats?.sent24 ?? todayCounts[a.id] ?? 0;
               const pct = cap ? Math.min(100, (sent24 / cap) * 100) : 0;
               const status = statusFor(a, stats);
-              const isSelected = bulkSelectedIds.has(a.id);
-
               return (
                 <button
                   key={a.id}
@@ -451,8 +385,7 @@ export default function AdvertiserConfig() {
                   className={cn(
                     "group relative overflow-hidden rounded-lg border bg-card p-4 text-left shadow-sm transition-all",
                     "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-                    "focus:outline-none focus:ring-2 focus:ring-primary/40",
-                    isSelected && "ring-2 ring-primary border-primary/60"
+                    "focus:outline-none focus:ring-2 focus:ring-primary/40"
                   )}
                 >
                   {/* Status color bar */}

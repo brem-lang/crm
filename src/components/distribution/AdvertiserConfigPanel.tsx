@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus, Building2 } from "lucide-react";
+import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus } from "lucide-react";
 import { ScheduleHeatmap, type HeatmapConfig } from "./ScheduleHeatmap";
 import { countryData } from "@/components/advertisers/countryData";
 import {
@@ -19,7 +19,6 @@ import {
 } from "@/lib/scheduleUtils";
 import type { WeeklySchedule } from "./WeeklyScheduleSelector";
 import { useAdvertiserHourlyStats } from "@/hooks/useAdvertiserHourlyStats";
-import { useUpdateAdvertiser } from "@/hooks/useAdvertisers";
 
 const ADVERTISER_TYPES = [
   { value: "trackbox", label: "TrackBox" },
