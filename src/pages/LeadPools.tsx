@@ -35,14 +35,14 @@ export default function LeadPools() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Lead Pools</h1>
             <p className="text-muted-foreground">
               Store and manage leads for injection campaigns
             </p>
           </div>
-          <Button onClick={() => setShowCreate(true)}>
+          <Button onClick={() => setShowCreate(true)} className="self-start sm:self-auto">
             <Plus className="mr-2 h-4 w-4" /> New Lead Pool
           </Button>
         </div>

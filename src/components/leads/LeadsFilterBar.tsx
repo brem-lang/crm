@@ -197,7 +197,7 @@ export function LeadsFilterBar({
           </Button>
         ))}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="sm:ml-auto flex flex-wrap items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">

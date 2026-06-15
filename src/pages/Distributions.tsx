@@ -288,7 +288,7 @@ export default function Distributions() {
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Distributions</CardTitle>

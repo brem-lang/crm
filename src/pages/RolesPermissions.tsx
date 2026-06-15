@@ -281,7 +281,7 @@ export default function RolesPermissions() {
       <div className="flex flex-col h-[calc(100vh-4rem)]">
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b shrink-0 gap-3">
+        <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 py-3 border-b shrink-0 gap-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5" />
             <h1 className="text-xl font-bold">Roles & Permissions</h1>
@@ -293,10 +293,10 @@ export default function RolesPermissions() {
         </div>
 
         {/* Two-pane content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-auto lg:overflow-hidden">
 
           {/* Left sidebar */}
-          <div className="w-72 border-r shrink-0 flex flex-col">
+          <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r shrink-0 flex flex-col lg:max-h-full max-h-64 overflow-hidden">
             {/* Sidebar search */}
             <div className="p-3 border-b shrink-0">
               <div className="relative">
@@ -370,9 +370,9 @@ export default function RolesPermissions() {
 
           {/* Right panel */}
           {selectedRole ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-auto lg:overflow-hidden">
               {/* Panel header */}
-              <div className="flex items-center justify-between px-6 py-3 border-b shrink-0 gap-3">
+              <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 py-3 border-b shrink-0 gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={cn(

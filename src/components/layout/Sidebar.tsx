@@ -16,7 +16,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   FileText,
   TrendingUp,
   ChevronDown,
@@ -314,12 +313,12 @@ export function Sidebar() {
     <>
       {/* Mobile menu button */}
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className="fixed top-4 left-4 z-50 lg:hidden"
+        className={cn("fixed top-3 left-3 z-50 lg:hidden bg-background shadow-sm", isMobileOpen && "hidden")}
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
-        {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        <Menu className="h-5 w-5" />
       </Button>
 
       {/* Mobile overlay */}

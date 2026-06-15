@@ -430,7 +430,7 @@ export default function Conversions() {
         </div>
 
         {/* Stats Summary */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total FTDs</CardTitle>
@@ -474,7 +474,7 @@ export default function Conversions() {
               ))}
               
               {!showAllDates && (
-                <div className="ml-auto flex items-center gap-2">
+                <div className="sm:ml-auto flex flex-wrap items-center gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
@@ -583,7 +583,7 @@ export default function Conversions() {
                 className="w-[200px] h-9"
               />
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="sm:ml-auto flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
                   <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
                   {isFetching ? "Refreshing…" : "Refresh"}
@@ -601,7 +601,7 @@ export default function Conversions() {
         {/* Bulk Actions Bar */}
         {selectedIds.size > 0 && (
           <Card className="border-primary bg-primary/5">
-            <CardContent className="p-3 flex items-center justify-between">
+            <CardContent className="p-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium">
                   {selectedIds.size} selected

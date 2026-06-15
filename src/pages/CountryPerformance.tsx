@@ -326,7 +326,7 @@ export default function CountryPerformance() {
               ))}
               
               {!showAllDates && (
-                <div className="ml-auto flex items-center gap-2">
+                <div className="sm:ml-auto flex flex-wrap items-center gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">

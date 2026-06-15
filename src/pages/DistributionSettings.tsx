@@ -160,7 +160,7 @@ export default function DistributionSettings() {
 
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b shrink-0 gap-3">
+        <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 py-3 border-b shrink-0 gap-3">
           <div className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             <h1 className="text-xl font-bold">Distribution Settings</h1>
@@ -248,9 +248,9 @@ export default function DistributionSettings() {
 
         {/* Two-pane layout */}
         {viewMode === 'config' && (
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-col lg:flex-row flex-1 overflow-auto lg:overflow-hidden">
             {/* Left pane */}
-            <div className="w-72 shrink-0 overflow-hidden">
+            <div className="w-full lg:w-72 shrink-0 overflow-hidden border-b lg:border-b-0">
               <AdvertiserSidebar
                 advertisers={advertisers || []}
                 settings={(settings || []).map(s => ({
@@ -272,7 +272,7 @@ export default function DistributionSettings() {
             </div>
 
             {/* Center pane */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-auto lg:overflow-hidden">
               {selectedAdvertiser ? (
                 <AdvertiserConfigPanel
                   key={selectedAdvertiser.id}
