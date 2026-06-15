@@ -18,6 +18,7 @@ export function useUsers() {
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ["users-with-roles"],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const [profilesRes, systemRolesRes, customRolesRes] = await Promise.all([
         supabase

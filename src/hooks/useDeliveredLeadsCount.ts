@@ -10,6 +10,7 @@ interface DeliveredLeadsCount {
 export function useDeliveredLeadsCount() {
   return useQuery({
     queryKey: ['delivered-leads-count'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<DeliveredLeadsCount[]> => {
       // Get count of successfully sent leads per advertiser + country
       const { data, error } = await supabase

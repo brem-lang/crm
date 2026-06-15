@@ -89,84 +89,65 @@ export default function AdvertiserPerformance() {
 
   const { data: performanceData, isLoading } = useQuery({
     queryKey: ['advertiser-performance', showAllDates, fromDate, toDate, advertiserSearch],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
-      // Get all advertisers
+      // 1 query: get filtered advertisers
       let advertiserQuery = supabase.from('advertisers').select('id, name');
       if (advertiserSearch) {
         advertiserQuery = advertiserQuery.ilike('name', `%${advertiserSearch}%`);
       }
       const { data: advertisers } = await advertiserQuery;
+      if (!advertisers?.length) return [];
 
-      if (!advertisers) return [];
+      const advertiserIds = advertisers.map(a => a.id);
 
-      // Get distributions for each advertiser
-      const results: AdvertiserPerformanceData[] = [];
+      // 1 batched query: all distributions in range (replaces N count queries)
+      let distsQuery = supabase
+        .from('lead_distributions')
+        .select('advertiser_id, lead_id')
+        .in('advertiser_id', advertiserIds)
+        .eq('status', 'sent');
+      if (!showAllDates) {
+        distsQuery = distsQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
+      const { data: distributions } = await distsQuery;
+      if (!distributions?.length) return [];
 
-      for (const adv of advertisers) {
-        // Get total leads sent to this advertiser
-        let leadsQ = supabase
-          .from('lead_distributions')
-          .select('*', { count: 'exact', head: true })
-          .eq('advertiser_id', adv.id)
-          .eq('status', 'sent');
-        if (!showAllDates) {
-          leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
-        }
-        const { count: leadsCount } = await leadsQ;
+      // 1 batched query: FTD status for all unique lead IDs
+      const leadIds = [...new Set(distributions.map(d => d.lead_id))];
+      const { data: ftdLeads } = await supabase
+        .from('leads')
+        .select('id, is_ftd, ftd_released')
+        .in('id', leadIds);
 
-        // Get FTD conversions - leads that were sent to this advertiser and have is_ftd = true
-        let distsQ = supabase
-          .from('lead_distributions')
-          .select('lead_id')
-          .eq('advertiser_id', adv.id)
-          .eq('status', 'sent');
-        if (!showAllDates) {
-          distsQ = distsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
-        }
-        const { data: distributions } = await distsQ;
+      const ftdMap = new Map((ftdLeads || []).map(l => [l.id, l]));
 
-        let conversions = 0;
-        let pendingConversions = 0;
-
-        if (distributions && distributions.length > 0) {
-          const leadIds = distributions.map(d => d.lead_id);
-          
-          // Get FTD count
-          const { count: ftdCount } = await supabase
-            .from('leads')
-            .select('*', { count: 'exact', head: true })
-            .in('id', leadIds)
-            .eq('is_ftd', true)
-            .eq('ftd_released', true);
-
-          // Get pending FTD (is_ftd true but not released)
-          const { count: pendingCount } = await supabase
-            .from('leads')
-            .select('*', { count: 'exact', head: true })
-            .in('id', leadIds)
-            .eq('is_ftd', true)
-            .eq('ftd_released', false);
-
-          conversions = ftdCount || 0;
-          pendingConversions = pendingCount || 0;
-        }
-
-        const leads = leadsCount || 0;
-        const cr = leads > 0 ? (conversions / leads) * 100 : 0;
-
-        if (leads > 0 || conversions > 0) {
-          results.push({
-            advertiser_id: adv.id,
-            advertiser_name: adv.name,
-            leads,
-            conversions,
-            pending_conversions: pendingConversions,
-            cr,
-          });
-        }
+      // Aggregate client-side
+      const stats: Record<string, { leads: number; conversions: number; pending: number }> = {};
+      for (const dist of distributions) {
+        if (!stats[dist.advertiser_id]) stats[dist.advertiser_id] = { leads: 0, conversions: 0, pending: 0 };
+        stats[dist.advertiser_id].leads++;
+        const lead = ftdMap.get(dist.lead_id);
+        if (lead?.is_ftd && lead.ftd_released) stats[dist.advertiser_id].conversions++;
+        if (lead?.is_ftd && !lead.ftd_released) stats[dist.advertiser_id].pending++;
       }
 
-      return results;
+      return advertisers
+        .map(adv => {
+          const s = stats[adv.id];
+          if (!s || (s.leads === 0 && s.conversions === 0)) return null;
+          return {
+            advertiser_id: adv.id,
+            advertiser_name: adv.name,
+            leads: s.leads,
+            conversions: s.conversions,
+            pending_conversions: s.pending,
+            cr: s.leads > 0 ? (s.conversions / s.leads) * 100 : 0,
+          };
+        })
+        .filter(Boolean) as AdvertiserPerformanceData[];
     },
   });
 

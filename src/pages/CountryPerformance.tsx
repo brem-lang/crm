@@ -104,6 +104,7 @@ export default function CountryPerformance() {
 
   const { data: performanceData, isLoading } = useQuery({
     queryKey: ['country-performance', showAllDates, fromDate, toDate],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       // Get all leads within date range
       let leadsQ = supabase
@@ -158,6 +159,7 @@ export default function CountryPerformance() {
   // Fetch breakdown data when a country is selected
   const { data: breakdownData, isLoading: isBreakdownLoading } = useQuery({
     queryKey: ['country-breakdown', selectedCountryForBreakdown, showAllDates, fromDate, toDate, breakdownTab],
+    staleTime: 2 * 60 * 1000,
     enabled: !!selectedCountryForBreakdown,
     queryFn: async () => {
       if (!selectedCountryForBreakdown) return { advertisers: [], affiliates: [] };

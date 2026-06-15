@@ -34,13 +34,15 @@ export function useCallbackLogs(limit: number = 100) {
       if (error) throw error;
       return data as CallbackLog[];
     },
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
 export function useCallbackLogsCount() {
   return useQuery({
     queryKey: ['callback-logs-count'],
+    staleTime: 30_000,
     queryFn: async () => {
       const { count, error } = await supabase
         .from('callback_logs')
@@ -49,6 +51,6 @@ export function useCallbackLogsCount() {
       if (error) throw error;
       return count || 0;
     },
-    refetchInterval: 30000,
+    refetchInterval: 60_000,
   });
 }

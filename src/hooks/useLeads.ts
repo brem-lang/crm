@@ -44,6 +44,7 @@ export function useLeads(options?: {
 }) {
   return useQuery({
     queryKey: ['leads', options?.filterAffiliateIds, options?.filterAdvertiserIds],
+    staleTime: 30 * 1000,
     enabled: options?.enabled !== false,
     queryFn: async () => {
       // No assignments at all → no leads

@@ -10,6 +10,7 @@ type DistributionSettingUpdate = Database['public']['Tables']['advertiser_distri
 export function useDistributionSettings() {
   return useQuery({
     queryKey: ['distribution-settings'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('advertiser_distribution_settings')
@@ -28,6 +29,7 @@ export function useDistributionSettings() {
 export function useDistributionSettingsByAdvertiser(advertiserId: string) {
   return useQuery({
     queryKey: ['distribution-settings', advertiserId],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('advertiser_distribution_settings')

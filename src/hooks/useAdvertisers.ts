@@ -9,6 +9,7 @@ type AdvertiserInsert = Database['public']['Tables']['advertisers']['Insert'];
 export function useAdvertisers() {
   return useQuery({
     queryKey: ['advertisers'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('advertisers')
@@ -24,6 +25,7 @@ export function useAdvertisers() {
 export function useAdvertiser(id: string) {
   return useQuery({
     queryKey: ['advertiser', id],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('advertisers')

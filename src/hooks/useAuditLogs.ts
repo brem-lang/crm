@@ -32,10 +32,11 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
 
   return useQuery({
     queryKey: ['audit-logs', action, tableName, userEmail, dateFrom, dateTo, page, pageSize],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       let query = supabase
         .from('audit_logs')
-        .select('*', { count: 'exact' })
+        .select('id, action, table_name, record_id, user_id, user_email, old_data, new_data, changes_summary, ip_address, created_at', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (action) {
@@ -75,36 +76,38 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
 export function useAuditLogActions() {
   return useQuery({
     queryKey: ['audit-log-actions'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
+      // Limit scan — distinct actions rarely exceed a handful of values
       const { data, error } = await supabase
         .from('audit_logs')
         .select('action')
-        .order('action');
+        .order('action')
+        .limit(500);
 
       if (error) throw error;
 
-      const uniqueActions = [...new Set(data?.map(d => d.action) || [])];
-      return uniqueActions;
+      return [...new Set(data?.map(d => d.action) || [])];
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 
 export function useAuditLogTables() {
   return useQuery({
     queryKey: ['audit-log-tables'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
+      // Limit scan — distinct table names are a small fixed set
       const { data, error } = await supabase
         .from('audit_logs')
         .select('table_name')
         .not('table_name', 'is', null)
-        .order('table_name');
+        .order('table_name')
+        .limit(500);
 
       if (error) throw error;
 
-      const uniqueTables = [...new Set(data?.map(d => d.table_name).filter(Boolean) || [])];
-      return uniqueTables as string[];
+      return [...new Set(data?.map(d => d.table_name).filter(Boolean) || [])] as string[];
     },
-    staleTime: 5 * 60 * 1000,
   });
 }

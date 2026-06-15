@@ -38,6 +38,7 @@ const QUERY_KEY = ["distribution-rules"] as const;
 export function useDistributionRules() {
   return useQuery({
     queryKey: QUERY_KEY,
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data: rules, error } = await supabase
         .from("distribution_rules")

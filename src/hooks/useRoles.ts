@@ -30,6 +30,7 @@ export function getRoleColor(color: string) {
 export function useRoles() {
   return useQuery({
     queryKey: ["roles"],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data: rolesData, error: rolesError } = await supabase
         .from("roles")
@@ -109,6 +110,7 @@ export function useDeleteRole() {
 export function useUserCustomRoles(userId?: string) {
   return useQuery({
     queryKey: ["user-custom-roles", userId],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       if (!userId) return [];
       const { data, error } = await supabase

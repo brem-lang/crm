@@ -49,6 +49,7 @@ export interface LeadPoolLead {
 export function useLeadPools() {
   return useQuery({
     queryKey: ['lead-pools'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data: pools, error } = await supabase
         .from('lead_pools')

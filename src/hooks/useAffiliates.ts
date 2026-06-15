@@ -10,6 +10,7 @@ type AffiliateUpdate = Database['public']['Tables']['affiliates']['Update'];
 export function useAffiliates() {
   return useQuery({
     queryKey: ['affiliates'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('affiliates')
@@ -25,6 +26,7 @@ export function useAffiliates() {
 export function useAffiliate(id: string) {
   return useQuery({
     queryKey: ['affiliate', id],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('affiliates')

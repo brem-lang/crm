@@ -94,8 +94,9 @@ export default function AffiliatePerformance() {
 
   const { data: performanceData, isLoading } = useQuery({
     queryKey: ['affiliate-performance', showAllDates, fromDate, toDate, selectedAffiliateId, affiliateSearch],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
-      // Get affiliates based on selection or search
+      // 1 query: get filtered affiliates
       let affiliateQuery = supabase.from('affiliates').select('id, name');
       if (selectedAffiliateId) {
         affiliateQuery = affiliateQuery.eq('id', selectedAffiliateId);
@@ -103,64 +104,45 @@ export default function AffiliatePerformance() {
         affiliateQuery = affiliateQuery.ilike('name', `%${affiliateSearch}%`);
       }
       const { data: filteredAffiliates } = await affiliateQuery;
+      if (!filteredAffiliates?.length) return [];
 
-      if (!filteredAffiliates) return [];
+      const affiliateIds = filteredAffiliates.map(a => a.id);
 
-      const results: AffiliatePerformanceData[] = [];
+      // 1 batched query for all leads (replaces 3 queries × N affiliates)
+      let leadsQuery = supabase
+        .from('leads')
+        .select('affiliate_id, is_ftd, ftd_released')
+        .in('affiliate_id', affiliateIds);
+      if (!showAllDates) {
+        leadsQuery = leadsQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
+      const { data: leads } = await leadsQuery;
 
-      for (const aff of filteredAffiliates) {
-        // Get total leads from this affiliate
-        let leadsQ = supabase
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('affiliate_id', aff.id);
-        if (!showAllDates) {
-          leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
-        }
-        const { count: leadsCount } = await leadsQ;
-
-        // Get FTD conversions (released)
-        let ftdQ = supabase
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('affiliate_id', aff.id)
-          .eq('is_ftd', true)
-          .eq('ftd_released', true);
-        if (!showAllDates) {
-          ftdQ = ftdQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
-        }
-        const { count: ftdCount } = await ftdQ;
-
-        // Get pending FTD (is_ftd true but not released)
-        let pendingQ = supabase
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('affiliate_id', aff.id)
-          .eq('is_ftd', true)
-          .eq('ftd_released', false);
-        if (!showAllDates) {
-          pendingQ = pendingQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
-        }
-        const { count: pendingCount } = await pendingQ;
-
-        const leads = leadsCount || 0;
-        const conversions = ftdCount || 0;
-        const pendingConversions = pendingCount || 0;
-        const cr = leads > 0 ? (conversions / leads) * 100 : 0;
-
-        if (leads > 0 || conversions > 0) {
-          results.push({
-            affiliate_id: aff.id,
-            affiliate_name: aff.name,
-            leads,
-            conversions,
-            pending_conversions: pendingConversions,
-            cr,
-          });
-        }
+      // Aggregate client-side
+      const stats: Record<string, { leads: number; conversions: number; pending: number }> = {};
+      for (const lead of leads || []) {
+        if (!stats[lead.affiliate_id]) stats[lead.affiliate_id] = { leads: 0, conversions: 0, pending: 0 };
+        stats[lead.affiliate_id].leads++;
+        if (lead.is_ftd && lead.ftd_released) stats[lead.affiliate_id].conversions++;
+        if (lead.is_ftd && !lead.ftd_released) stats[lead.affiliate_id].pending++;
       }
 
-      return results;
+      return filteredAffiliates
+        .map(aff => {
+          const s = stats[aff.id] || { leads: 0, conversions: 0, pending: 0 };
+          if (s.leads === 0 && s.conversions === 0) return null;
+          return {
+            affiliate_id: aff.id,
+            affiliate_name: aff.name,
+            leads: s.leads,
+            conversions: s.conversions,
+            pending_conversions: s.pending,
+            cr: s.leads > 0 ? (s.conversions / s.leads) * 100 : 0,
+          };
+        })
+        .filter(Boolean) as AffiliatePerformanceData[];
     },
   });
 
