@@ -235,12 +235,12 @@ export default function AuditLogs() {
                                   View Details
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
+                              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                                 <DialogHeader>
                                   <DialogTitle>Audit Log Details</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div>
                                       <span className="text-muted-foreground">Action:</span>
                                       <Badge className={`ml-2 ${getActionColor(log.action)}`}>{log.action}</Badge>

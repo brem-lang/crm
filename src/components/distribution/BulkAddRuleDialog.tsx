@@ -188,7 +188,7 @@ export function BulkAddRuleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden grid grid-cols-2 gap-4 py-4">
+        <div className="flex-1 overflow-hidden grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
           {/* Countries Selection */}
           <div className="flex flex-col space-y-2">
             <Label className="font-semibold">Countries</Label>

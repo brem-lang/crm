@@ -209,7 +209,7 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
   return (
     <form onSubmit={handleSubmit}>
       <div className="space-y-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="edit-username">Username</Label>
             <Input
@@ -345,7 +345,7 @@ function EditUserForm({ user, onClose }: { user: UserData; onClose: () => void }
 export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit User</DialogTitle>
           <DialogDescription>Update user details and role.</DialogDescription>

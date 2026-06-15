@@ -328,7 +328,7 @@ export function LeadsTable({
                                 Response
                               </DropdownMenuItem>
                             </DialogTrigger>
-                            <DialogContent className="max-w-lg">
+                            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                               <DialogHeader>
                                 <DialogTitle>Advertiser Response</DialogTitle>
                                 <DialogDescription>Response from {advertiserName}</DialogDescription>

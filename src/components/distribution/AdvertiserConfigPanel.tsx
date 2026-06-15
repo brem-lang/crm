@@ -161,48 +161,49 @@ export function AdvertiserConfigPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Panel header — pr-14 keeps content clear of the Dialog's absolute X button */}
-      <div className="pl-6 pr-14 py-4 border-b flex items-center justify-between shrink-0">
+      {/* Panel header — pr-10 sm:pr-14 keeps content clear of the Dialog's absolute X button */}
+      <div className="pl-4 sm:pl-6 pr-10 sm:pr-14 py-3 sm:py-4 border-b flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div>
-          <h2 className="text-lg font-semibold">{advertiser.name}</h2>
-          <p className="text-sm text-muted-foreground">{advertiser.advertiser_type}</p>
+          <h2 className="text-base sm:text-lg font-semibold">{advertiser.name}</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">{advertiser.advertiser_type}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="adv-active" className="text-sm">Active</Label>
-            <Switch
-              id="adv-active"
-              checked={advertiser.is_active}
-              onCheckedChange={handleActiveToggle}
-              disabled={updateAdvertiser.isPending}
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="adv-active" className="text-sm">Active</Label>
+          <Switch
+            id="adv-active"
+            checked={advertiser.is_active}
+            onCheckedChange={handleActiveToggle}
+            disabled={updateAdvertiser.isPending}
+          />
         </div>
       </div>
 
       <Tabs defaultValue="caps" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="mx-6 mt-4 w-fit shrink-0">
-          <TabsTrigger value="caps" className="flex items-center gap-1.5">
-            <Zap className="h-3.5 w-3.5" />
-            Caps & Pacing
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            Schedule
-          </TabsTrigger>
-          <TabsTrigger value="geo" className="flex items-center gap-1.5">
-            <Globe className="h-3.5 w-3.5" />
-            Countries & Affiliates
-          </TabsTrigger>
-          <TabsTrigger value="overrides" className="flex items-center gap-1.5">
-            <Sliders className="h-3.5 w-3.5" />
-            Overrides
-          </TabsTrigger>
-        </TabsList>
+        {/* TabsList in a scrollable row so all 4 tabs fit on narrow screens */}
+        <div className="px-3 sm:px-6 mt-3 sm:mt-4 overflow-x-auto shrink-0">
+          <TabsList className="w-max">
+            <TabsTrigger value="caps" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Zap className="h-3.5 w-3.5" />
+              Caps & Pacing
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Clock className="h-3.5 w-3.5" />
+              Schedule
+            </TabsTrigger>
+            <TabsTrigger value="geo" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Globe className="h-3.5 w-3.5" />
+              Geo & Affiliates
+            </TabsTrigger>
+            <TabsTrigger value="overrides" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Sliders className="h-3.5 w-3.5" />
+              Overrides
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <ScrollArea className="flex-1">
           {/* Caps & Pacing tab */}
-          <TabsContent value="caps" className="m-6 space-y-4">
+          <TabsContent value="caps" className="m-3 sm:m-6 space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Daily & Hourly Caps</CardTitle>
@@ -309,7 +310,7 @@ export function AdvertiserConfigPanel({
           </TabsContent>
 
           {/* Schedule tab — 7×24 heatmap */}
-          <TabsContent value="schedule" className="m-6">
+          <TabsContent value="schedule" className="m-3 sm:m-6">
             <Card>
               <CardHeader>
                 <CardTitle>Schedule</CardTitle>
@@ -329,7 +330,7 @@ export function AdvertiserConfigPanel({
           </TabsContent>
 
           {/* Countries & Affiliates tab */}
-          <TabsContent value="geo" className="m-6 space-y-4">
+          <TabsContent value="geo" className="m-3 sm:m-6 space-y-4">
             <CountriesCard
               selected={draft.countries ?? []}
               onChange={countries => update({ countries: countries.length ? countries : null })}
@@ -345,7 +346,7 @@ export function AdvertiserConfigPanel({
           </TabsContent>
 
           {/* Overrides tab — per-country cap overrides */}
-          <TabsContent value="overrides" className="m-6">
+          <TabsContent value="overrides" className="m-3 sm:m-6">
             <CountryCapsCard
               selected={draft.countries ?? []}
               countryCaps={countryCaps}
@@ -527,7 +528,7 @@ function AffiliatesCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <Button size="sm" variant="outline" className="h-8" onClick={() => onChange([])}>
             Clear all
           </Button>
@@ -535,9 +536,9 @@ function AffiliatesCard({
             Select all
           </Button>
           {/* Copy from another advertiser */}
-          <div className="flex gap-1 ml-auto">
+          <div className="flex gap-1 sm:ml-auto">
             <Select value={copyFromId} onValueChange={setCopyFromId}>
-              <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectTrigger className="h-8 w-36 sm:w-44 text-xs">
                 <SelectValue placeholder="Copy from…" />
               </SelectTrigger>
               <SelectContent>
@@ -674,8 +675,8 @@ function CountryCapsCard({
         )}
 
         {/* Add new override */}
-        <div className="flex gap-2 items-end">
-          <div className="flex-1 space-y-1">
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[140px] space-y-1">
             <Label className="text-xs">Country</Label>
             <Select value={addCode} onValueChange={setAddCode}>
               <SelectTrigger className="h-8 text-sm">
@@ -690,7 +691,7 @@ function CountryCapsCard({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-28 space-y-1">
+          <div className="w-24 sm:w-28 space-y-1">
             <Label className="text-xs">Cap / day</Label>
             <Input
               type="number"

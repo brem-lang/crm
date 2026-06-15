@@ -184,7 +184,7 @@ export function WeeklyScheduleSelector({
           {getSummary()}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Weekly Schedule</DialogTitle>
           <DialogDescription>
@@ -255,7 +255,7 @@ export function WeeklyScheduleSelector({
                   return (
                     <div
                       key={day.key}
-                      className={`flex items-center gap-3 p-2 rounded-lg border ${
+                      className={`flex flex-wrap items-center gap-2 p-2 rounded-lg border ${
                         daySchedule.is_active ? "bg-background" : "bg-muted/50"
                       } ${isWeekend ? "border-dashed" : ""}`}
                     >

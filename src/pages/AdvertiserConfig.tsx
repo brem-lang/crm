@@ -249,7 +249,7 @@ export default function AdvertiserConfig() {
   if (loadingAdvertisers || loadingSettings || loadingAffiliates) {
     return (
       <DashboardLayout>
-        <div className="space-y-6 p-6">
+        <div className="space-y-6">
           <Skeleton className="h-10 w-64" />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
@@ -272,7 +272,7 @@ export default function AdvertiserConfig() {
         onSelectAdvertiser={(id) => setSelectedAdvertiserId(id)}
       />
 
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -474,9 +474,9 @@ export default function AdvertiserConfig() {
         open={!!selectedAdvertiser}
         onOpenChange={(o) => { if (!o) setSelectedAdvertiserId(null); }}
       >
-        <DialogContent className="max-w-5xl w-full p-0 gap-0 overflow-hidden">
+        <DialogContent className="top-0 sm:top-1/2 left-0 sm:left-1/2 translate-x-0 sm:-translate-x-1/2 translate-y-0 sm:-translate-y-1/2 w-full sm:max-w-5xl h-screen sm:h-auto rounded-none sm:rounded-lg p-0 gap-0 overflow-hidden">
           {selectedAdvertiser && (
-            <div className="h-[88vh] flex flex-col">
+            <div className="h-full sm:h-[88vh] flex flex-col">
               <AdvertiserConfigPanel
                 key={selectedAdvertiser.id}
                 advertiser={{

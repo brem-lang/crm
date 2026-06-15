@@ -98,7 +98,7 @@ export function CreateUserDialog() {
           Create User
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
@@ -107,7 +107,7 @@ export function CreateUserDialog() {
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username *</Label>
                 <Input

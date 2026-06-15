@@ -179,93 +179,82 @@ export function LeadsFilterBar({
 
   return (
     <div className="space-y-3">
-      {/* Date Preset Tabs */}
-      <div className="flex flex-wrap items-center gap-1 border-b pb-3">
+      {/* Date Preset Row — horizontally scrollable, single line */}
+      <div className="flex overflow-x-auto gap-1 pb-2 border-b">
         {datePresets.map((preset) => (
           <Button
             key={preset.key}
-            variant="ghost"
+            variant={datePreset === preset.key ? "default" : "ghost"}
             size="sm"
             onClick={() => handlePresetChange(preset.key)}
-            className={cn(
-              "text-sm px-3 py-1 h-8",
-              datePreset === preset.key &&
-                "border-b-2 border-primary rounded-none font-medium",
-            )}
+            className="text-sm shrink-0"
           >
             {preset.label}
           </Button>
         ))}
+      </div>
 
-        <div className="sm:ml-auto flex flex-wrap items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                From: {formatDate(fromDate)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onFromDateChange(getStartOfDay(date));
-                    setDatePreset("custom");
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
+      {/* Date Range Row — From → To side by side */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+              <CalendarIcon className="h-3 w-3" />
+              {formatDate(fromDate, "MMM d, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={fromDate}
+              onSelect={(date) => {
+                if (date) {
+                  onFromDateChange(getStartOfDay(date));
+                  setDatePreset("custom");
+                }
+              }}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                To: {formatDate(toDate)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={toDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onToDateChange(getEndOfDay(date));
-                    setDatePreset("custom");
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
+        <span className="text-muted-foreground text-xs">→</span>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => shiftDates("prev")}
-          >
-            <ChevronLeft className="h-4 w-4" />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+              <CalendarIcon className="h-3 w-3" />
+              {formatDate(toDate, "MMM d, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={toDate}
+              onSelect={(date) => {
+                if (date) {
+                  onToDateChange(getEndOfDay(date));
+                  setDatePreset("custom");
+                }
+              }}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("prev")}>
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground min-w-[40px] text-center">
-            {daysDiff}d
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => shiftDates("next")}
-          >
-            <ChevronRight className="h-4 w-4" />
+          <span className="text-xs text-muted-foreground min-w-[28px] text-center">{daysDiff}d</span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("next")}>
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
       {/* Filters Row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
         <SearchableSelect
           value={advertiserFilter}
           onValueChange={onAdvertiserFilterChange}
@@ -276,7 +265,7 @@ export function LeadsFilterBar({
           placeholder="All Advertisers"
           searchPlaceholder="Search advertiser..."
           emptyMessage="No advertisers found"
-          className="w-[160px]"
+          className="w-full sm:w-[160px]"
         />
 
         <SearchableSelect
@@ -286,7 +275,7 @@ export function LeadsFilterBar({
           placeholder="All Countries"
           searchPlaceholder="Search country..."
           emptyMessage="No countries found"
-          className="w-[140px]"
+          className="w-full sm:w-[140px]"
         />
 
         <SearchableSelect
@@ -299,14 +288,14 @@ export function LeadsFilterBar({
           placeholder="All Affiliates"
           searchPlaceholder="Search affiliate..."
           emptyMessage="No affiliates found"
-          className="w-[160px]"
+          className="w-full sm:w-[160px]"
         />
 
         <Input
           placeholder="Search ID, email, phone, IP..."
           value={freeSearch}
           onChange={(e) => onFreeSearchChange(e.target.value)}
-          className="w-[220px] h-9"
+          className="col-span-2 sm:col-span-1 w-full sm:w-[220px] h-9"
         />
 
         <SearchableSelect
@@ -322,7 +311,7 @@ export function LeadsFilterBar({
           placeholder="All Status"
           searchPlaceholder="Search status..."
           emptyMessage="No statuses found"
-          className="w-[130px]"
+          className="w-full sm:w-[130px]"
         />
 
         <MultiSelect
@@ -332,7 +321,7 @@ export function LeadsFilterBar({
           placeholder="All Sale Status"
           searchPlaceholder="Search status..."
           emptyMessage="No statuses found"
-          className="w-[170px]"
+          className="col-span-2 sm:col-span-1 w-full sm:w-[170px]"
           icon={<Filter className="h-3.5 w-3.5 text-muted-foreground" />}
         />
 

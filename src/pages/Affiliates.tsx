@@ -124,7 +124,7 @@ export default function Affiliates() {
             </p>
           </div>
           {isSuperAdmin && (
-            <Button onClick={() => setIsCreateOpen(true)}>
+            <Button onClick={() => setIsCreateOpen(true)} className="self-start sm:self-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Affiliate
             </Button>

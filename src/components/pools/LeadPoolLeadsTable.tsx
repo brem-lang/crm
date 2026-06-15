@@ -305,7 +305,7 @@ export function LeadPoolLeadsTable({ leads, poolId }: LeadPoolLeadsTableProps) {
 
       {/* Error Details Dialog */}
       <Dialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ open, injection: null })}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
@@ -316,7 +316,7 @@ export function LeadPoolLeadsTable({ leads, poolId }: LeadPoolLeadsTableProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="font-medium text-muted-foreground">Advertiser</p>
                 <p>{errorDialog.injection?.advertiser_name || '-'}</p>

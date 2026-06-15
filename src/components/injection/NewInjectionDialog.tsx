@@ -65,7 +65,7 @@ export function NewInjectionDialog({ open, onOpenChange }: NewInjectionDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Injection</DialogTitle>
           <DialogDescription>

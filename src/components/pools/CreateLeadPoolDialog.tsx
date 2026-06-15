@@ -57,7 +57,7 @@ export function CreateLeadPoolDialog({ open, onOpenChange }: CreateLeadPoolDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Lead Pool</DialogTitle>
           <DialogDescription>

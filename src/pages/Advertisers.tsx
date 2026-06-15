@@ -317,7 +317,7 @@ export default function Advertisers() {
             </p>
           </div>
           {canCreateAdvertisers && (
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="self-start sm:self-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Advertiser
             </Button>

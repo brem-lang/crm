@@ -311,72 +311,76 @@ export default function CountryPerformance() {
 
         {/* Date Tabs & Filters */}
         <Card>
-          <CardContent className="p-4 space-y-4">
-            <div className="flex flex-wrap items-center gap-1 border-b pb-4">
+          <CardContent className="p-4 space-y-3">
+            {/* Date Preset Row — horizontally scrollable */}
+            <div className="flex overflow-x-auto gap-1 pb-2 border-b">
               {datePresets.map((preset) => (
                 <Button
                   key={preset.key}
                   variant={datePreset === preset.key ? "default" : "ghost"}
                   size="sm"
                   onClick={() => handlePresetChange(preset.key)}
-                  className="text-sm"
+                  className="text-sm shrink-0"
                 >
                   {preset.label}
                 </Button>
               ))}
-              
-              {!showAllDates && (
-                <div className="sm:ml-auto flex flex-wrap items-center gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        From: {formatDate(fromDate)}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={fromDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setFromDate(getStartOfDay(date));
-                            setDatePreset("custom");
-                          }
-                        }}
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        To: {formatDate(toDate)}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={toDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setToDate(getEndOfDay(date));
-                            setDatePreset("custom");
-                          }
-                        }}
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
+            {/* Date Range Row — From → To side by side */}
+            {!showAllDates && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                      <CalendarIcon className="h-3 w-3" />
+                      {formatDate(fromDate, "MMM d, yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={fromDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          setFromDate(getStartOfDay(date));
+                          setDatePreset("custom");
+                        }
+                      }}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span className="text-muted-foreground text-xs">→</span>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                      <CalendarIcon className="h-3 w-3" />
+                      {formatDate(toDate, "MMM d, yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={toDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          setToDate(getEndOfDay(date));
+                          setDatePreset("custom");
+                        }
+                      }}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
               <Select value={countryFilter} onValueChange={setCountryFilter}>
-                <SelectTrigger className="w-[180px] h-9">
+                <SelectTrigger className="w-full sm:w-[160px] h-9">
                   <SelectValue placeholder="All Countries" />
                 </SelectTrigger>
                 <SelectContent>
@@ -506,7 +510,7 @@ export default function CountryPerformance() {
           open={!!selectedCountryForBreakdown} 
           onOpenChange={(open) => !open && setSelectedCountryForBreakdown(null)}
         >
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {selectedCountryForBreakdown} - Performance Breakdown
