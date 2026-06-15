@@ -200,8 +200,8 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
         {filteredNavItems.map((item) => {
-          const isActive = location.pathname === item.href;
           const hasChildren = item.children && item.children.length > 0;
+          const isActive = !hasChildren && location.pathname === item.href;
           const isOpen = openMenus.includes(item.href);
 
           if (hasChildren && !isCollapsed) {
