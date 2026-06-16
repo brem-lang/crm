@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Globe, Zap, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { customPatternMatrix, emptyMatrix } from "@/lib/scheduleUtils";
+import { customPatternMatrix } from "@/lib/scheduleUtils";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -46,7 +46,7 @@ export interface HeatmapConfig {
 
 interface ScheduleHeatmapProps {
   config: HeatmapConfig;
-  volumeData?: number[][] | null; // [7][24] normalized 0-1
+  volumeData?: number[][] | null;
   onChange: (config: HeatmapConfig) => void;
 }
 
@@ -56,7 +56,6 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
   const isPainting = useRef(false);
   const paintValue = useRef(false);
 
-  // Custom pattern state — seeded from saved config, falls back to Mon–Fri 09–17
   const [customDays, setCustomDays] = useState<boolean[]>(
     config.custom_days ?? [true, true, true, true, true, false, false]
   );
@@ -88,7 +87,21 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
     toggleCell(day, hour, paintValue.current);
   };
 
-  const handleMouseUp = () => { isPainting.current = false; };
+  const handleMouseUp = useCallback(() => { isPainting.current = false; }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isPainting.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el instanceof HTMLElement) {
+      const day = el.dataset.day;
+      const hour = el.dataset.hour;
+      if (day !== undefined && hour !== undefined) {
+        toggleCell(Number(day), Number(hour), paintValue.current);
+      }
+    }
+  }, [toggleCell]);
 
   const setAll = (val: boolean) =>
     update({ matrix: Array.from({ length: 7 }, () => Array(24).fill(val) as boolean[]) });
@@ -113,16 +126,24 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
     return acc;
   }, {} as Record<string, typeof TIMEZONE_OPTIONS>);
 
-  const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0–24 for toHour
+  const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i);
+
+  // CSS grid column template: 32px day label + 24 equal-fraction cells
+  // 1fr cells can NEVER overflow — they shrink with the container automatically
+  const gridCols = "32px repeat(24, 1fr)";
 
   return (
-    <div className="space-y-4" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-      {/* Row 1: Timezone + All on / Clear + active count */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+    <div
+      className="space-y-3 w-full min-w-0"
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <Select value={timezone} onValueChange={v => update({ timezone: v })}>
-            <SelectTrigger className="h-7 text-xs w-44">
+            <SelectTrigger className="h-7 text-xs w-36 min-w-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -139,52 +160,42 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
             </SelectContent>
           </Select>
         </div>
-
-        <div className="flex gap-1 ml-auto">
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAll(true)}>
-            All on
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAll(false)}>
-            Clear
-          </Button>
+        <div className="flex items-center gap-1 ml-auto shrink-0">
+          <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => setAll(true)}>All on</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => setAll(false)}>Clear</Button>
+          <Badge variant="secondary" className="text-xs h-7 px-2 flex items-center shrink-0">
+            {activeCount}/168h
+          </Badge>
         </div>
-
-        <Badge variant="secondary" className="text-xs">
-          {activeCount} / 168 hrs
-        </Badge>
       </div>
 
-      {/* Row 2: Custom pattern — day toggles + hour range + Apply */}
-      <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-muted/40 border">
-        <span className="text-xs text-muted-foreground shrink-0">Pattern:</span>
-
-        {/* Day toggle pills */}
-        <div className="flex gap-1">
-          {DAYS.map((day, i) => (
-            <button
-              key={day}
-              onClick={() => toggleDay(i)}
-              className={cn(
-                "h-6 w-8 rounded text-[11px] font-medium border transition-colors",
-                customDays[i]
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/50"
-              )}
-            >
-              {day}
-            </button>
-          ))}
+      {/* ── Pattern builder ── */}
+      <div className="rounded-lg bg-muted/40 border p-2 space-y-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-muted-foreground shrink-0">Days:</span>
+          <div className="flex gap-1 flex-wrap">
+            {DAYS.map((day, i) => (
+              <button
+                key={day}
+                onClick={() => toggleDay(i)}
+                className={cn(
+                  "h-6 w-8 rounded text-[11px] font-medium border transition-colors",
+                  customDays[i]
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                )}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
         </div>
-
-        <div className="h-4 w-px bg-border shrink-0" />
-
-        {/* Hour range */}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">From</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground shrink-0">Hours:</span>
           <select
             value={fromHour}
             onChange={e => setFromHour(Number(e.target.value))}
-            className="h-6 rounded border bg-background px-1 text-xs"
+            className="h-6 rounded border bg-background px-1 text-xs flex-1 min-w-0"
           >
             {HOUR_OPTIONS.slice(0, 24).map(h => (
               <option key={h} value={h} disabled={h >= toHour}>
@@ -192,11 +203,11 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
               </option>
             ))}
           </select>
-          <span className="text-muted-foreground">To</span>
+          <span className="text-[11px] text-muted-foreground shrink-0">–</span>
           <select
             value={toHour}
             onChange={e => setToHour(Number(e.target.value))}
-            className="h-6 rounded border bg-background px-1 text-xs"
+            className="h-6 rounded border bg-background px-1 text-xs flex-1 min-w-0"
           >
             {HOUR_OPTIONS.slice(1).map(h => (
               <option key={h} value={h} disabled={h <= fromHour}>
@@ -204,72 +215,67 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
               </option>
             ))}
           </select>
+          <Button
+            size="sm"
+            className="h-6 text-xs px-3 shrink-0"
+            onClick={applyPattern}
+            disabled={!customDays.some(Boolean) || fromHour >= toHour}
+          >
+            Apply
+          </Button>
         </div>
-
-        <Button
-          size="sm"
-          className="h-6 text-xs px-3 ml-auto"
-          onClick={applyPattern}
-          disabled={!customDays.some(Boolean) || fromHour >= toHour}
-        >
-          Apply
-        </Button>
       </div>
 
-      {/* Heatmap grid */}
-      <div className="overflow-x-auto">
-        <div className="inline-block min-w-full select-none">
-          {/* Hour headers */}
-          <div className="flex ml-10 mb-0.5">
-            {HOURS.map(h => (
-              <div
-                key={h}
-                className="text-center text-[10px] text-muted-foreground leading-none"
-                style={{ width: 22, flexShrink: 0 }}
-              >
-                {h % 3 === 0 ? h : ""}
-              </div>
-            ))}
-          </div>
+      {/* ── Heatmap grid ──
+          Uses CSS grid with 1fr columns — cells proportionally fill available width,
+          impossible to overflow regardless of the parent scroll container. */}
+      <div
+        className="w-full min-w-0 select-none"
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleMouseUp}
+      >
+        {/* Hour header row */}
+        <div className="grid mb-0.5" style={{ gridTemplateColumns: gridCols }}>
+          <div /> {/* corner spacer */}
+          {HOURS.map(h => (
+            <div
+              key={h}
+              className="text-center text-[10px] text-muted-foreground leading-none"
+              style={{ minWidth: 0 }}
+            >
+              {h % 6 === 0 ? h : ""}
+            </div>
+          ))}
+        </div>
 
-          {/* Day rows */}
-          {DAYS.map((day, di) => (
-            <div key={day} className="flex items-center mb-0.5">
-              {/* Day label */}
-              <div className="text-[10px] font-medium text-muted-foreground w-10 shrink-0 pr-1 text-right">
+        {/* Day rows */}
+        {DAYS.map((day, di) => (
+          <React.Fragment key={day}>
+            <div className="grid mb-[2px]" style={{ gridTemplateColumns: gridCols }}>
+              <div className="text-[10px] font-medium text-muted-foreground text-right pr-1 self-center" style={{ minWidth: 0 }}>
                 {day}
               </div>
-
-              {/* Cells */}
               {HOURS.map(h => {
                 const active = matrix[di]?.[h] ?? false;
                 const vol = volumeData?.[di]?.[h] ?? 0;
-
                 return (
                   <div
                     key={h}
+                    data-day={di}
+                    data-hour={h}
                     className={cn(
                       "rounded-[2px] cursor-pointer border border-background transition-colors relative",
-                      active
-                        ? "bg-primary hover:bg-primary/80"
-                        : "bg-muted hover:bg-muted/70"
+                      active ? "bg-primary hover:bg-primary/80" : "bg-muted hover:bg-muted/70"
                     )}
-                    style={{
-                      width: 22,
-                      height: 20,
-                      flexShrink: 0,
-                    }}
-                    title={`${day} ${String(h).padStart(2, "0")}:00${vol > 0 ? ` · volume ${Math.round(vol * 100)}%` : ""}`}
+                    style={{ minWidth: 0, height: 18 }}
+                    title={`${day} ${String(h).padStart(2, "0")}:00${vol > 0 ? ` · ${Math.round(vol * 100)}%` : ""}`}
                     onMouseDown={e => { e.preventDefault(); handleMouseDown(di, h); }}
                     onMouseEnter={() => handleMouseEnter(di, h)}
+                    onTouchStart={e => { e.preventDefault(); handleMouseDown(di, h); }}
                   >
-                    {/* Volume overlay */}
                     {vol > 0 && (
                       <div
-                        className={cn(
-                          "absolute inset-0 rounded-[2px]",
-                          active ? "bg-white" : "bg-blue-400"
-                        )}
+                        className={cn("absolute inset-0 rounded-[2px]", active ? "bg-white" : "bg-blue-400")}
                         style={{ opacity: active ? vol * 0.25 : vol * 0.6 }}
                       />
                     )}
@@ -277,58 +283,53 @@ export function ScheduleHeatmap({ config, volumeData, onChange }: ScheduleHeatma
                 );
               })}
             </div>
-          ))}
+          </React.Fragment>
+        ))}
 
-          {/* Volume legend */}
-          {hasVolume && (
-            <div className="flex items-center gap-2 mt-2 ml-10 text-[10px] text-muted-foreground">
-              <div className="w-3 h-3 rounded-sm bg-blue-400 opacity-60" />
-              <span>Volume overlay (last 30 days)</span>
-            </div>
-          )}
-        </div>
+        {hasVolume && (
+          <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground pl-8">
+            <div className="w-3 h-3 rounded-sm bg-blue-400 opacity-60 shrink-0" />
+            <span>Volume overlay (last 30 days)</span>
+          </div>
+        )}
       </div>
 
-      {/* Smart pacing & soft cap */}
-      <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
+      {/* ── Smart pacing & Soft-cap ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t">
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-card">
+          <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-muted-foreground" />
-              <Label className="text-sm">Smart pacing</Label>
+              <Zap className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <Label className="text-sm font-medium">Smart pacing</Label>
             </div>
-            <Switch
-              checked={smart_pacing}
-              onCheckedChange={v => update({ smart_pacing: v })}
-            />
+            <p className="text-xs text-muted-foreground">Spread cap evenly across active hours.</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Spread the daily cap evenly across active hours instead of first-come-first-served.
-          </p>
+          <Switch
+            checked={smart_pacing}
+            onCheckedChange={v => update({ smart_pacing: v })}
+            className="shrink-0 mt-0.5"
+          />
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5">
-            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-sm">Soft-cap warning</Label>
+        <div className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Bell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <Label className="text-sm font-medium">Soft-cap warning</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={99}
+                placeholder="e.g. 80"
+                value={soft_cap_pct ?? ""}
+                onChange={e => update({ soft_cap_pct: e.target.value ? parseInt(e.target.value) : null })}
+                className="h-7 w-20 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">% of cap</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={1}
-              max={99}
-              placeholder="e.g. 80"
-              value={soft_cap_pct ?? ""}
-              onChange={e =>
-                update({ soft_cap_pct: e.target.value ? parseInt(e.target.value) : null })
-              }
-              className="h-8 w-24 text-sm"
-            />
-            <span className="text-xs text-muted-foreground">% of daily cap</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Alert when this advertiser reaches the threshold.
-          </p>
         </div>
       </div>
     </div>

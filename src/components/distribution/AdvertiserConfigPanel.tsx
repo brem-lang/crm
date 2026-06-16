@@ -184,19 +184,19 @@ export function AdvertiserConfigPanel({
           <TabsList className="w-max">
             <TabsTrigger value="caps" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Zap className="h-3.5 w-3.5" />
-              Caps & Pacing
+              <span className="hidden sm:inline">Caps & Pacing</span>
             </TabsTrigger>
             <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Clock className="h-3.5 w-3.5" />
-              Schedule
+              <span className="hidden sm:inline">Schedule</span>
             </TabsTrigger>
             <TabsTrigger value="geo" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Globe className="h-3.5 w-3.5" />
-              Geo & Affiliates
+              <span className="hidden sm:inline">Geo & Affiliates</span>
             </TabsTrigger>
             <TabsTrigger value="overrides" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Sliders className="h-3.5 w-3.5" />
-              Overrides
+              <span className="hidden sm:inline">Overrides</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -211,7 +211,7 @@ export function AdvertiserConfigPanel({
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Daily cap */}
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
                   <div className="space-y-1 flex-1 max-w-xs">
                     <Label>Daily cap</Label>
                     <Input
@@ -225,7 +225,7 @@ export function AdvertiserConfigPanel({
                     />
                   </div>
                   {cap != null && (
-                    <div className="pt-6">
+                    <div className="sm:pt-6">
                       <Badge variant={capVariant}>
                         {todayCount} / {cap} today ({capPct}%)
                         {softPct && capPct != null && capPct >= softPct && capPct < 100 && (
@@ -310,16 +310,16 @@ export function AdvertiserConfigPanel({
           </TabsContent>
 
           {/* Schedule tab — 7×24 heatmap */}
-          <TabsContent value="schedule" className="m-3 sm:m-6">
-            <Card>
-              <CardHeader>
+          <TabsContent value="schedule" className="m-2 sm:m-6">
+            <Card className="overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <CardTitle>Schedule</CardTitle>
                 <CardDescription>
                   Click or drag cells to toggle active hours. Blue overlay shows actual received
                   volume (last 30 days). Smart pacing and soft-cap are saved with the schedule.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 pt-0 overflow-hidden">
                 <ScheduleHeatmap
                   config={heatmap}
                   volumeData={volumeData}
