@@ -187,11 +187,17 @@ CREATE TRIGGER trg_audit_adv_dist_settings
   AFTER INSERT OR UPDATE OR DELETE ON public.advertiser_distribution_settings
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_log();
 
--- crm_settings
-DROP TRIGGER IF EXISTS trg_audit_crm_settings ON public.crm_settings;
-CREATE TRIGGER trg_audit_crm_settings
-  AFTER UPDATE ON public.crm_settings
-  FOR EACH ROW EXECUTE FUNCTION public.fn_audit_log();
+-- crm_settings (table may not exist in all deployments)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'crm_settings') THEN
+    DROP TRIGGER IF EXISTS trg_audit_crm_settings ON public.crm_settings;
+    CREATE TRIGGER trg_audit_crm_settings
+      AFTER UPDATE ON public.crm_settings
+      FOR EACH ROW EXECUTE FUNCTION public.fn_audit_log();
+  END IF;
+END;
+$$;
 
 -- roles
 DROP TRIGGER IF EXISTS trg_audit_roles ON public.roles;
