@@ -113,6 +113,19 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("user_roles").insert({ user_id: newUserId, role });
     }
 
+    // Audit log
+    try {
+      await supabaseAdmin.from("audit_logs").insert({
+        user_id: caller.id,
+        user_email: caller.email ?? null,
+        action: "create_user",
+        table_name: "auth.users",
+        record_id: newUserId,
+        new_data: { email, username: username ?? null, fullName: fullName ?? null, roles: roles ?? [] },
+        changes_summary: `Created user ${email}${roles?.length ? " with roles: " + roles.join(", ") : ""}`,
+      });
+    } catch { /* non-critical */ }
+
     return new Response(
       JSON.stringify({ success: true, userId: newUserId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuditLogs, useAuditLogActions, useAuditLogTables } from "@/hooks/useAuditLogs";
 import { useState } from "react";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Search, FileText, User, Clock, Database } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, FileText, User, Clock, Database, ArrowRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -17,12 +17,16 @@ export default function AuditLogs() {
   const [action, setAction] = useState<string>("");
   const [tableName, setTableName] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useAuditLogs({
     action: action || undefined,
     tableName: tableName || undefined,
     userEmail: userEmail || undefined,
+    dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
+    dateTo: dateTo ? new Date(dateTo + "T23:59:59").toISOString() : undefined,
     page,
     pageSize: 50,
   });
@@ -41,6 +45,15 @@ export default function AuditLogs() {
   const formatJson = (data: Record<string, unknown> | null) => {
     if (!data) return 'N/A';
     return JSON.stringify(data, null, 2);
+  };
+
+  const getDiffFields = (
+    oldData: Record<string, unknown> | null,
+    newData: Record<string, unknown> | null
+  ) => {
+    if (!oldData || !newData) return [];
+    const keys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+    return [...keys].filter(k => JSON.stringify(oldData[k]) !== JSON.stringify(newData[k]));
   };
 
   return (
@@ -106,13 +119,33 @@ export default function AuditLogs() {
                 </SelectContent>
               </Select>
 
-              {(action || tableName || userEmail) && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                  className="w-[150px]"
+                  title="From date"
+                />
+                <span className="text-muted-foreground text-sm">to</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                  className="w-[150px]"
+                  title="To date"
+                />
+              </div>
+
+              {(action || tableName || userEmail || dateFrom || dateTo) && (
                 <Button
                   variant="outline"
                   onClick={() => {
                     setAction("");
                     setTableName("");
                     setUserEmail("");
+                    setDateFrom("");
+                    setDateTo("");
                     setPage(1);
                   }}
                 >
@@ -274,26 +307,72 @@ export default function AuditLogs() {
                                     </div>
                                   )}
 
-                                  {log.old_data && (
+                                  {log.action === 'update' && log.old_data && log.new_data ? (
                                     <div>
-                                      <span className="text-sm text-muted-foreground">Previous Data:</span>
-                                      <ScrollArea className="h-32 mt-1">
-                                        <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                                          {formatJson(log.old_data)}
-                                        </pre>
-                                      </ScrollArea>
+                                      <span className="text-sm text-muted-foreground">Changed Fields:</span>
+                                      {(() => {
+                                        const changed = getDiffFields(log.old_data, log.new_data);
+                                        if (changed.length === 0) return (
+                                          <p className="text-xs text-muted-foreground mt-1">No field changes detected.</p>
+                                        );
+                                        return (
+                                          <div className="mt-2 border rounded overflow-hidden">
+                                            <table className="w-full text-xs">
+                                              <thead className="bg-muted">
+                                                <tr>
+                                                  <th className="text-left px-3 py-1.5 font-medium">Field</th>
+                                                  <th className="text-left px-3 py-1.5 font-medium text-destructive">Before</th>
+                                                  <th className="px-1 py-1.5 text-muted-foreground"><ArrowRight className="h-3 w-3 mx-auto" /></th>
+                                                  <th className="text-left px-3 py-1.5 font-medium text-emerald-700 dark:text-emerald-400">After</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {changed.map((field) => (
+                                                  <tr key={field} className="border-t">
+                                                    <td className="px-3 py-1.5 font-mono font-medium">{field}</td>
+                                                    <td className="px-3 py-1.5 font-mono text-destructive max-w-[120px] truncate" title={String(log.old_data![field] ?? '')}>
+                                                      {log.old_data![field] === null || log.old_data![field] === undefined
+                                                        ? <span className="text-muted-foreground italic">null</span>
+                                                        : String(log.old_data![field])}
+                                                    </td>
+                                                    <td className="px-1 py-1.5 text-center text-muted-foreground">→</td>
+                                                    <td className="px-3 py-1.5 font-mono text-emerald-700 dark:text-emerald-400 max-w-[120px] truncate" title={String(log.new_data![field] ?? '')}>
+                                                      {log.new_data![field] === null || log.new_data![field] === undefined
+                                                        ? <span className="text-muted-foreground italic">null</span>
+                                                        : String(log.new_data![field])}
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
-                                  )}
+                                  ) : (
+                                    <>
+                                      {log.old_data && (
+                                        <div>
+                                          <span className="text-sm text-muted-foreground">Previous Data:</span>
+                                          <ScrollArea className="h-32 mt-1">
+                                            <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
+                                              {formatJson(log.old_data)}
+                                            </pre>
+                                          </ScrollArea>
+                                        </div>
+                                      )}
 
-                                  {log.new_data && (
-                                    <div>
-                                      <span className="text-sm text-muted-foreground">New Data:</span>
-                                      <ScrollArea className="h-32 mt-1">
-                                        <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                                          {formatJson(log.new_data)}
-                                        </pre>
-                                      </ScrollArea>
-                                    </div>
+                                      {log.new_data && (
+                                        <div>
+                                          <span className="text-sm text-muted-foreground">New Data:</span>
+                                          <ScrollArea className="h-32 mt-1">
+                                            <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
+                                              {formatJson(log.new_data)}
+                                            </pre>
+                                          </ScrollArea>
+                                        </div>
+                                      )}
+                                    </>
                                   )}
 
                                   {log.user_agent && (

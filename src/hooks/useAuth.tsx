@@ -69,10 +69,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchUserData(session.user.id), 0);
+
+          // Log successful login
+          if (event === 'SIGNED_IN') {
+            setTimeout(async () => {
+              try {
+                await supabase.from('audit_logs').insert({
+                  user_id: session.user.id,
+                  user_email: session.user.email ?? null,
+                  action: 'login',
+                  changes_summary: `User signed in: ${session.user.email}`,
+                  request_path: window.location.pathname,
+                });
+              } catch { /* non-critical */ }
+            }, 0);
+          }
         } else {
           setRoles([]);
           setCustomRoleNames([]);
@@ -162,6 +177,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Log before session is destroyed
+    if (user) {
+      try {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          user_email: user.email ?? null,
+          action: 'logout',
+          changes_summary: `User signed out: ${user.email}`,
+          request_path: window.location.pathname,
+        });
+      } catch { /* non-critical */ }
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setRoles([]);

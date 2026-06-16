@@ -321,14 +321,60 @@ Deno.serve(async (req) => {
                      req.headers.get('x-real-ip') || 
                      'unknown';
 
-    // === STEP 7: Try distribution FIRST before creating lead ===
-    // Only create the lead if an advertiser accepts it
+    // === STEP 7: Insert lead into DB immediately (always stored regardless of distribution outcome) ===
+    const { data: newLead, error: leadInsertError } = await supabase
+      .from('leads')
+      .insert({
+        firstname: body.firstname.trim(),
+        lastname: body.lastname.trim(),
+        email: body.email.trim().toLowerCase(),
+        mobile: cleanedPhone,
+        country_code: normalizedCountryCode,
+        country: body.country?.trim() || null,
+        ip_address: clientIp,
+        affiliate_id: affiliate.id,
+        offer_name: body.offer_name?.substring(0, 100) || null,
+        custom1: body.custom1?.substring(0, 255) || null,
+        custom2: body.custom2?.substring(0, 255) || null,
+        custom3: body.custom3?.substring(0, 255) || null,
+        comment: body.comment?.substring(0, 500) || null,
+        status: 'new',
+      })
+      .select('id')
+      .single();
+
+    if (leadInsertError || !newLead) {
+      console.error('Failed to insert lead:', leadInsertError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Failed to save lead',
+          rejection: { code: 'SYSTEM_ERROR', message: 'Could not store lead in database' }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Lead created with id: ${newLead.id}, status: new`);
+
+    // Audit: lead received
+    try {
+      await supabase.from("audit_logs").insert({
+        user_id: null,
+        action: "lead_submitted",
+        table_name: "leads",
+        record_id: newLead.id,
+        new_data: { email: body.email.trim().toLowerCase(), country_code: normalizedCountryCode, affiliate_id: affiliate.id },
+        changes_summary: `Lead submitted by affiliate "${affiliate.name}": ${body.email.trim().toLowerCase()}`,
+        ip_address: clientIp,
+      });
+    } catch { /* non-critical */ }
+
+    // === STEP 8: Attempt distribution using the real lead_id ===
     let distributionResult = null;
     let distributionSuccess = false;
-    
+
     try {
-      // Use distribute-lead with test_mode=true to try distribution first
-      // This sends to advertiser and only creates lead on success
       const distributeUrl = `${supabaseUrl}/functions/v1/distribute-lead`;
       const distributeResponse = await fetch(distributeUrl, {
         method: 'POST',
@@ -336,81 +382,48 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseServiceKey}`,
         },
-        body: JSON.stringify({
-          test_mode: true,
-          test_lead_data: {
-            firstname: body.firstname.trim(),
-            lastname: body.lastname.trim(),
-            email: body.email.trim().toLowerCase(),
-            mobile: cleanedPhone,
-            country_code: normalizedCountryCode,
-            country: body.country?.trim() || null,
-            ip_address: clientIp,
-            affiliate_id: affiliate.id,
-            custom1: body.custom1?.substring(0, 255) || null,
-            custom2: body.custom2?.substring(0, 255) || null,
-            custom3: body.custom3?.substring(0, 255) || null,
-            offer_name: body.offer_name?.substring(0, 100) || null,
-            comment: body.comment?.substring(0, 500) || null,
-          },
-          // Will be picked by eligibility, no specific advertiser_id
-        }),
+        body: JSON.stringify({ lead_id: newLead.id }),
       });
-      
+
       distributionResult = await distributeResponse.json();
-      console.log('Distribution-first result:', distributionResult);
+      console.log('Distribution result:', distributionResult);
       distributionSuccess = distributionResult?.success === true;
     } catch (distError) {
-      console.error('Distribution-first error:', distError);
+      console.error('Distribution error:', distError);
       distributionSuccess = false;
     }
 
-    // === STEP 8: If distribution failed, reject WITHOUT creating lead ===
+    // === STEP 9: If distribution failed, mark lead as rejected (still in DB) ===
     if (!distributionSuccess) {
-      console.log(`Lead rejected - advertiser did not accept: ${body.email}`);
-      
-      // Record the rejection in affiliate_submission_failures for tracking
-      const rejectionMessage = distributionResult?.advertiser_response || distributionResult?.message || 'Advertiser did not accept this lead';
-      try {
-        await supabase
-          .from('affiliate_submission_failures')
-          .insert({
-            affiliate_id: affiliate.id,
-            email: body.email.trim().toLowerCase(),
-            firstname: body.firstname.trim(),
-            lastname: body.lastname.trim(),
-            mobile: cleanedPhone,
-            country_code: normalizedCountryCode,
-            rejection_code: 'ADVERTISER_REJECTED',
-            rejection_message: rejectionMessage.substring(0, 500),
-            raw_payload: body,
-          });
-        console.log('Recorded advertiser rejection in affiliate_submission_failures');
-      } catch (recordErr) {
-        console.error('Failed to record rejection:', recordErr);
-      }
-      
+      const rejectionMessage = distributionResult?.advertiser_response || distributionResult?.message || 'No eligible advertisers available';
+
+      await supabase
+        .from('leads')
+        .update({ status: 'rejected' })
+        .eq('id', newLead.id);
+
+      console.log(`Lead ${newLead.id} marked as rejected: ${rejectionMessage}`);
+
       return new Response(
         JSON.stringify({
           success: false,
           message: 'Lead rejected by advertiser',
-          rejection: { 
-            code: 'ADVERTISER_REJECTED', 
-            message: rejectionMessage
-          }
+          lead_id: newLead.id,
+          rejection: {
+            code: 'ADVERTISER_REJECTED',
+            message: rejectionMessage,
+          },
         }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // === STEP 9: Distribution succeeded - lead was already created by distribute-lead ===
-    // Return success response with immediate confirmation
+    // === STEP 10: Distribution succeeded — distribute-lead already updated lead to "contacted" ===
     const responseData: Record<string, unknown> = {
-      lead_id: distributionResult.lead_id,
-      request_id: null, // Will be set by the lead record
+      lead_id: newLead.id,
+      request_id: null,
     };
-    
-    // Add autologin URL if present in distribution result
+
     if (distributionResult?.autologin_url) {
       responseData.autologin_url = distributionResult.autologin_url;
     }
@@ -419,7 +432,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Lead submitted successfully',
-        data: responseData
+        data: responseData,
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
