@@ -476,7 +476,7 @@ export default function AdvertiserConfig() {
       >
         <DialogContent className="top-0 sm:top-1/2 left-0 sm:left-1/2 translate-x-0 sm:-translate-x-1/2 translate-y-0 sm:-translate-y-1/2 w-full sm:max-w-5xl h-screen sm:h-auto rounded-none sm:rounded-lg p-0 gap-0 overflow-hidden">
           {selectedAdvertiser && (
-            <div className="h-full sm:h-[88vh] flex flex-col">
+            <div className="flex flex-col h-screen sm:h-[88vh] overflow-hidden">
               <AdvertiserConfigPanel
                 key={selectedAdvertiser.id}
                 advertiser={{

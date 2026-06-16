@@ -160,7 +160,7 @@ export function AdvertiserConfigPanel({
           : "secondary";
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Panel header — pr-10 sm:pr-14 keeps content clear of the Dialog's absolute X button */}
       <div className="pl-4 sm:pl-6 pr-10 sm:pr-14 py-3 sm:py-4 border-b flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div>
@@ -178,7 +178,7 @@ export function AdvertiserConfigPanel({
         </div>
       </div>
 
-      <Tabs defaultValue="caps" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs defaultValue="caps" className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* TabsList in a scrollable row so all 4 tabs fit on narrow screens */}
         <div className="px-3 sm:px-6 mt-3 sm:mt-4 overflow-x-auto shrink-0">
           <TabsList className="w-max">
@@ -201,7 +201,7 @@ export function AdvertiserConfigPanel({
           </TabsList>
         </div>
 
-        <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {/* Caps & Pacing tab */}
           <TabsContent value="caps" className="m-3 sm:m-6 space-y-4">
             <Card>
@@ -354,16 +354,16 @@ export function AdvertiserConfigPanel({
             />
           </TabsContent>
 
-        </ScrollArea>
-      </Tabs>
+          {/* Save footer — sticky so it stays at the bottom of the scroll area */}
+          <div className="sticky bottom-0 z-10 bg-background border-t px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-end">
+            <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+              <Save className="h-4 w-4 mr-1" />
+              {isSaving ? "Saving…" : "Save"}
+            </Button>
+          </div>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t flex items-center justify-end shrink-0">
-        <Button size="sm" onClick={handleSave} disabled={isSaving}>
-          <Save className="h-4 w-4 mr-1" />
-          {isSaving ? "Saving…" : "Save"}
-        </Button>
-      </div>
+        </div>
+      </Tabs>
     </div>
   );
 }
