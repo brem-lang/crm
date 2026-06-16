@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { format, toZonedTime, fromZonedTime } from "date-fns-tz";
 import {
   startOfDay as dateFnsStartOfDay,
@@ -11,8 +11,9 @@ import {
   subWeeks as dateFnsSubWeeks,
   subMonths as dateFnsSubMonths,
 } from "date-fns";
+import { useSystemSettings, SYSTEM_SETTINGS_DEFAULTS } from "./useSystemSettings";
 
-const SETTINGS_STORAGE_KEY = "crm-settings";
+export const SETTINGS_STORAGE_KEY = "crm-settings";
 
 export interface CRMSettings {
   defaultPageSize: number;
@@ -24,61 +25,29 @@ export interface CRMSettings {
   crmName: string;
 }
 
-const DEFAULT_SETTINGS: CRMSettings = {
-  defaultPageSize: 25,
-  showLeadId: true,
-  compactMode: false,
-  autoRefreshInterval: 0,
-  dateFormat: "yyyy-MM-dd HH:mm:ss",
-  timezone: "UTC",
-  crmName: "CRM",
+export const DEFAULT_SETTINGS: CRMSettings = {
+  defaultPageSize: SYSTEM_SETTINGS_DEFAULTS.default_page_size,
+  showLeadId: SYSTEM_SETTINGS_DEFAULTS.show_lead_id,
+  compactMode: SYSTEM_SETTINGS_DEFAULTS.compact_mode,
+  autoRefreshInterval: SYSTEM_SETTINGS_DEFAULTS.auto_refresh_interval,
+  dateFormat: SYSTEM_SETTINGS_DEFAULTS.date_format,
+  timezone: SYSTEM_SETTINGS_DEFAULTS.timezone,
+  crmName: SYSTEM_SETTINGS_DEFAULTS.crm_name,
 };
 
 export function useCRMSettings() {
-  const [settings, setSettings] = useState<CRMSettings>(() => {
-    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (saved) {
-      try {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
-      } catch {
-        return DEFAULT_SETTINGS;
-      }
-    }
-    return DEFAULT_SETTINGS;
-  });
+  const { data: dbSettings } = useSystemSettings();
 
-  // Fetch authoritative crmName from server on startup so all browsers stay in sync
-  useEffect(() => {
-    fetch('/get-crm-config.php')
-      .then(r => r.json())
-      .then(data => {
-        if (data.crmName) {
-          setSettings(prev => {
-            if (prev.crmName === data.crmName) return prev;
-            const updated = { ...prev, crmName: data.crmName };
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
-            return updated;
-          });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Listen for storage changes from other tabs/windows
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === SETTINGS_STORAGE_KEY && e.newValue) {
-        try {
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(e.newValue) });
-        } catch {
-          // ignore parse errors
-        }
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  // Merge DB values over defaults — DB is authoritative when available
+  const settings: CRMSettings = {
+    defaultPageSize: dbSettings?.default_page_size ?? DEFAULT_SETTINGS.defaultPageSize,
+    showLeadId: dbSettings?.show_lead_id ?? DEFAULT_SETTINGS.showLeadId,
+    compactMode: dbSettings?.compact_mode ?? DEFAULT_SETTINGS.compactMode,
+    autoRefreshInterval: dbSettings?.auto_refresh_interval ?? DEFAULT_SETTINGS.autoRefreshInterval,
+    dateFormat: dbSettings?.date_format ?? DEFAULT_SETTINGS.dateFormat,
+    timezone: dbSettings?.timezone ?? DEFAULT_SETTINGS.timezone,
+    crmName: dbSettings?.crm_name ?? DEFAULT_SETTINGS.crmName,
+  };
 
   // Format a date using the configured format and timezone
   const formatDate = useCallback(
@@ -228,4 +197,3 @@ export function useCRMSettings() {
   };
 }
 
-export { SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS };

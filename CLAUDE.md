@@ -213,3 +213,5 @@ Always import from `@/integrations/supabase/client`, not from `@supabase/supabas
 
 MAKE SURE TO FOLLOW REACT JS STYLE CODE GUIDELINES AND SUPABASE CODE GUIDELINES
 PREVENT N+1 QUERIES
+
+MAKE SURE TO BE RESPONSIVE IN THE UI
