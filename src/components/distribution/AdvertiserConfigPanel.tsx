@@ -449,7 +449,13 @@ function CountriesCard({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           Countries allow-list
-          <Badge variant="secondary">{selected.length || "All"}</Badge>
+          <Badge variant="secondary" className="max-w-[240px] truncate block text-right">
+            {selected.length === 0
+              ? "All"
+              : selected.length <= 6
+              ? selected.join(", ")
+              : `${selected.slice(0, 6).join(", ")} +${selected.length - 6} more`}
+          </Badge>
         </CardTitle>
         <CardDescription>
           Leave empty to accept all countries. Search to restrict.
