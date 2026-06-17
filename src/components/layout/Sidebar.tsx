@@ -33,6 +33,7 @@ import {
   GitMerge,
   Network,
   ShieldCheck,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -98,6 +99,7 @@ const navItems: NavItem[] = [
     ]
   },
   { title: "API Docs", href: "/api-docs", icon: FileText },
+  { title: "Help & Guides", href: "/help", icon: HelpCircle },
   { 
     title: "Injections", 
     href: "/injections", 

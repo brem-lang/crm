@@ -54,6 +54,7 @@ const SendHistory = lazy(() => import("./pages/SendHistory"));
 const AffiliateRejectedLeads = lazy(() => import("./pages/AffiliateRejectedLeads"));
 const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const RolesPermissions = lazy(() => import("./pages/RolesPermissions"));
+const HelpDesk = lazy(() => import("./pages/HelpDesk"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageLoader = () => (
@@ -120,6 +121,7 @@ const App = () => (
                 <Route path="/roles" element={<RolesPermissions />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/api-docs" element={<ApiDocs />} />
+                <Route path="/help" element={<HelpDesk />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
