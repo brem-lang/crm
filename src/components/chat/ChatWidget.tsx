@@ -41,7 +41,7 @@ export function ChatWidget() {
   const { roles } = useAuth();
   const userRoles = roles.length > 0 ? (roles as string[]) : [];
 
-  const { sessionId, createSession, updateVisitorInfo, markWaiting, addToQueue } = useChatSession();
+  const { sessionId, createSession, updateVisitorInfo, markWaiting, addToQueue, clearSession } = useChatSession();
   const { messages: dbMessages, loading: msgLoading, insertMessage } = useChatMessages(sessionId);
   const { isWaiting, isActive, isClosed, queuePosition, sessionStatus } = useChatHandoff(sessionId);
 
@@ -56,6 +56,15 @@ export function ChatWidget() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const greeting = getGreeting(userRoles);
+
+  function startNewChat() {
+    clearSession();
+    setBotStep({ name: "menu" });
+    setAgentJoined(false);
+    setQrMap(new Map());
+    setInput("");
+    setUnread(0);
+  }
 
   const displayMessages = sessionId
     ? dbMessages
@@ -131,6 +140,12 @@ export function ChatWidget() {
 
         await insertMessage(sid, "user", text);
 
+        // Once an agent has joined or the session is active/waiting for an agent,
+        // the visitor is talking directly to a human — skip bot response entirely.
+        if (agentJoined || isActive || isWaiting || botStep.name === "awaiting_agent") {
+          return;
+        }
+
         const resp = getBotResponse(text, botStep, userRoles);
         setBotStep(resp.nextStep);
 
@@ -191,6 +206,7 @@ export function ChatWidget() {
     },
     [
       sessionId, botStep, userRoles, sending, open,
+      agentJoined, isActive, isWaiting,
       createSession, insertMessage, markWaiting, addToQueue,
       updateVisitorInfo, greeting.message,
     ]
@@ -375,10 +391,19 @@ export function ChatWidget() {
           {/* Input */}
           <div className="shrink-0 flex gap-2 items-center p-3 border-t">
             {isClosed ? (
-              <p className="flex-1 text-xs text-muted-foreground flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                This session has ended
-              </p>
+              <div className="flex-1 flex flex-col items-center gap-2 py-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  This chat has ended
+                </p>
+                <Button
+                  size="sm"
+                  className="rounded-full h-8 text-xs px-4"
+                  onClick={startNewChat}
+                >
+                  Start New Chat
+                </Button>
+              </div>
             ) : (
               <>
                 <Input
