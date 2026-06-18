@@ -21,6 +21,7 @@ interface AuthContextType {
   isManager: boolean;
   isAgent: boolean;
   isAffiliate: boolean;
+  isChatSupport: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -202,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = roles.includes('manager');
   const isAgent = roles.includes('agent');
   const isAffiliate = roles.includes('affiliate');
+  const isChatSupport = customRoleNames.includes('Chat Support');
 
   return (
     <AuthContext.Provider value={{
@@ -219,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isManager,
       isAgent,
       isAffiliate,
+      isChatSupport,
     }}>
       {children}
     </AuthContext.Provider>

@@ -117,6 +117,144 @@ export type Database = {
           },
         ]
       }
+      chat_agents: {
+        Row: {
+          created_at: string
+          id: string
+          is_online: boolean
+          max_chats: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_online?: boolean
+          max_chats?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_online?: boolean
+          max_chats?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          sender_id: string | null
+          sender_type: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id?: string | null
+          sender_type: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id?: string | null
+          sender_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_queue: {
+        Row: {
+          id: string
+          joined_at: string
+          position: number
+          session_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          position: number
+          session_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          position?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          agent_id: string | null
+          closed_at: string | null
+          created_at: string
+          id: string
+          queue_position: number | null
+          status: string
+          transcript_text: string | null
+          updated_at: string
+          visitor_email: string | null
+          visitor_name: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          queue_position?: number | null
+          status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          queue_position?: number | null
+          status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "chat_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distribution_rule_targets: {
         Row: {
           advertiser_id: string

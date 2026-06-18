@@ -55,6 +55,9 @@ const AffiliateRejectedLeads = lazy(() => import("./pages/AffiliateRejectedLeads
 const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const RolesPermissions = lazy(() => import("./pages/RolesPermissions"));
 const HelpDesk = lazy(() => import("./pages/HelpDesk"));
+const AgentLogin = lazy(() => import("./pages/AgentLogin"));
+const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
+const ChatSessions = lazy(() => import("./pages/ChatSessions"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageLoader = () => (
@@ -122,6 +125,9 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="/help" element={<HelpDesk />} />
+                <Route path="/agent/login" element={<AgentLogin />} />
+                <Route path="/agent/dashboard" element={<AgentDashboard />} />
+                <Route path="/chat-sessions" element={<ChatSessions />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

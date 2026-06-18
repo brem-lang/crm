@@ -34,6 +34,7 @@ import {
   Network,
   ShieldCheck,
   HelpCircle,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -42,6 +43,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
+  customRoles?: string[];
   children?: NavItem[];
 }
 
@@ -100,6 +102,16 @@ const navItems: NavItem[] = [
   },
   { title: "API Docs", href: "/api-docs", icon: FileText },
   { title: "Help & Guides", href: "/help", icon: HelpCircle },
+  {
+    title: "Support Chat",
+    href: "/agent/dashboard",
+    icon: MessageCircle,
+    roles: ["super_admin", "manager", "agent"],
+    customRoles: ["Chat Support"],
+    children: [
+      { title: "Chat Sessions", href: "/chat-sessions", icon: MessageCircle, roles: ["super_admin", "manager"] },
+    ],
+  },
   { 
     title: "Injections", 
     href: "/injections", 
@@ -122,7 +134,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { signOut, roles, customRoleNames, user, username } = useAuth();
+  const { signOut, roles, customRoleNames, user, username, isChatSupport } = useAuth();
   const { isCollapsed, toggleCollapsed } = useSidebarState();
   const { formatDate, crmName } = useCRMSettings();
   const crmInitials = crmName
@@ -144,8 +156,11 @@ export function Sidebar() {
   }, []);
 
   const hasAccess = (item: NavItem) => {
-    if (!item.roles) return true;
-    return item.roles.some((role) => roles.includes(role as any));
+    const noRestrictions = !item.roles && !item.customRoles;
+    if (noRestrictions) return true;
+    const systemMatch = item.roles?.some((role) => roles.includes(role as any)) ?? false;
+    const customMatch = item.customRoles?.some((name) => customRoleNames.includes(name)) ?? false;
+    return systemMatch || customMatch;
   };
 
   const filteredNavItems = navItems.filter(hasAccess);
