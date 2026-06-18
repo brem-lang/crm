@@ -62,6 +62,15 @@ export function useChatSession() {
   }
 
   async function addToQueue(id: string): Promise<number> {
+    // If already in queue, return existing position (idempotent)
+    const { data: existing } = await supabase
+      .from("chat_queue")
+      .select("position")
+      .eq("session_id", id)
+      .maybeSingle();
+
+    if (existing) return existing.position;
+
     // Get next available position (max + 1)
     const { data: top } = await supabase
       .from("chat_queue")
