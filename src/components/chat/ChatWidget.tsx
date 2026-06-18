@@ -83,8 +83,12 @@ export function ChatWidget() {
     if (sessionStatus === "waiting" && botStep.name !== "awaiting_agent") {
       setBotStep({ name: "awaiting_agent" });
     }
-    if (sessionStatus === "active" || sessionStatus === "closed") {
+    if (sessionStatus === "active") {
       setAgentJoined(true);
+    }
+    // When agent closes the chat, clear the "agent joined" banner
+    if (sessionStatus === "closed") {
+      setAgentJoined(false);
     }
   }, [sessionStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
