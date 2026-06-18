@@ -36,7 +36,12 @@ export function useChatMessages(sessionId: string | null) {
       .select("id, sender_type, content, created_at")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[useChatMessages] fetch error:", error);
+          setLoading(false);
+          return;
+        }
         const fetched = (data as ChatMsg[]) ?? [];
         setMessages(prev => {
           // No existing messages — use DB result directly (returning user / page reload / agent view)
@@ -49,6 +54,10 @@ export function useChatMessages(sessionId: string | null) {
             (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
         });
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("[useChatMessages] network error:", err);
         setLoading(false);
       });
 
@@ -64,8 +73,11 @@ export function useChatMessages(sessionId: string | null) {
         },
         payload => {
           const incoming = payload.new as ChatMsg & { session_id?: string };
-          // Defensive: ignore events from other sessions in case server-side filter is bypassed
-          if (incoming.session_id && incoming.session_id !== sessionId) return;
+          // Strict equality: if session_id is missing or different, drop the event.
+          // This guards against Supabase bypassing the server-side filter when
+          // the RLS policy uses USING (true) — which allows all subscribers to
+          // receive all inserts regardless of their filter clause.
+          if (incoming.session_id !== sessionId) return;
           setMessages(prev =>
             prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]
           );
