@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ChatMsg {
@@ -11,12 +11,24 @@ export interface ChatMsg {
 export function useChatMessages(sessionId: string | null) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
+  // Track previous sessionId to detect session switches vs new session creation
+  const prevSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
       setMessages([]);
+      prevSessionIdRef.current = null;
       return;
     }
+
+    // Switching between two real sessions (agent changing active chat) — clear immediately
+    // so the old session's messages don't bleed into the new one.
+    // When transitioning from null → value (visitor creating their first session), we keep
+    // any optimistic messages already added by insertMessage.
+    if (prevSessionIdRef.current !== null && prevSessionIdRef.current !== sessionId) {
+      setMessages([]);
+    }
+    prevSessionIdRef.current = sessionId;
 
     setLoading(true);
     supabase
@@ -27,9 +39,9 @@ export function useChatMessages(sessionId: string | null) {
       .then(({ data }) => {
         const fetched = (data as ChatMsg[]) ?? [];
         setMessages(prev => {
-          // No existing messages — just use DB result (returning user / page reload)
+          // No existing messages — use DB result directly (returning user / page reload / agent view)
           if (prev.length === 0) return fetched;
-          // Existing optimistic/confirmed messages — merge: add any from DB not already present
+          // Optimistic messages exist (visitor's new session) — merge without wiping them
           const prevIds = new Set(prev.map(m => m.id));
           const newFromDb = fetched.filter(m => !prevIds.has(m.id));
           if (newFromDb.length === 0) return prev;
@@ -51,7 +63,9 @@ export function useChatMessages(sessionId: string | null) {
           filter: `session_id=eq.${sessionId}`,
         },
         payload => {
-          const incoming = payload.new as ChatMsg;
+          const incoming = payload.new as ChatMsg & { session_id?: string };
+          // Defensive: ignore events from other sessions in case server-side filter is bypassed
+          if (incoming.session_id && incoming.session_id !== sessionId) return;
           setMessages(prev =>
             prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]
           );
