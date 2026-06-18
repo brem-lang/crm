@@ -101,6 +101,15 @@ export default function AgentDashboard() {
     prevMsgCount.current = messages.length;
   }, [messages]);
 
+  // If the active session disappears from the list (accepted by another agent), deselect it
+  useEffect(() => {
+    if (activeId && !sessions.some(s => s.id === activeId)) {
+      setActiveId(null);
+      setMobileView("list");
+      toast.info("This chat was accepted by another agent.");
+    }
+  }, [sessions, activeId]);
+
   if (authLoading || agentLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -115,6 +124,8 @@ export default function AgentDashboard() {
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
   const waitingCount = sessions.filter(s => s.status === "waiting").length;
   const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
+  // Only the agent who accepted the chat can reply
+  const isMyActiveChat = activeSession?.status === "active" && activeSession?.agent_id === agentId;
 
   function handleSelect(id: string) {
     setActiveId(id);
@@ -153,7 +164,7 @@ export default function AgentDashboard() {
 
   async function handleSend() {
     const text = reply.trim();
-    if (!text || !activeId || !user) return;
+    if (!text || !activeId || !user || !isMyActiveChat) return;
     setSending(true);
     try {
       await insertMessage(activeId, "agent", text, user.id);
@@ -348,7 +359,11 @@ export default function AgentDashboard() {
                     <div className={cn("flex flex-col max-w-[78%]", msg.sender_type === "agent" ? "items-end" : "items-start")}>
                       <div className="flex items-baseline gap-2 mb-0.5">
                         <span className="text-[10px] font-semibold text-muted-foreground capitalize">
-                          {msg.sender_type === "agent" ? "You" : msg.sender_type}
+                          {msg.sender_type === "agent"
+                            ? "You"
+                            : msg.sender_type === "user"
+                            ? (activeSession.visitor_name ?? "Visitor")
+                            : "Bot"}
                         </span>
                         <span className="text-[10px] text-muted-foreground/60">{formatTime(msg.created_at)}</span>
                       </div>
@@ -378,6 +393,11 @@ export default function AgentDashboard() {
               <p className="flex-1 text-sm text-muted-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4 shrink-0" />
                 Accept the chat to start replying
+              </p>
+            ) : !isMyActiveChat ? (
+              <p className="flex-1 text-sm text-muted-foreground flex items-center gap-2">
+                <Headphones className="h-4 w-4 shrink-0" />
+                This chat is assigned to another agent
               </p>
             ) : (
               <>

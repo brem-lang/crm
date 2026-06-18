@@ -38,8 +38,11 @@ async function checkAgentsOnline(): Promise<boolean> {
 }
 
 export function ChatWidget() {
-  const { roles } = useAuth();
+  const { user, roles, username } = useAuth();
   const userRoles = roles.length > 0 ? (roles as string[]) : [];
+  // Pre-fill visitor info for authenticated users so agents see their name immediately
+  const authVisitorName = username ?? user?.email?.split("@")[0] ?? undefined;
+  const authVisitorEmail = user?.email ?? undefined;
 
   const { sessionId, createSession, updateVisitorInfo, markWaiting, addToQueue, clearSession } = useChatSession();
   const { messages: dbMessages, loading: msgLoading, insertMessage } = useChatMessages(sessionId);
@@ -138,7 +141,7 @@ export function ChatWidget() {
 
         // First ever message → create session and persist the greeting
         if (!sid) {
-          sid = await createSession();
+          sid = await createSession(authVisitorName, authVisitorEmail);
           await insertMessage(sid, "bot", greeting.message);
         }
 
@@ -161,10 +164,12 @@ export function ChatWidget() {
             setTyping(true);
             setTimeout(async () => {
               setTyping(false);
-              const offlineMsg =
-                "Our agents are currently offline. Let me take your details so we can follow up with you.\n\nWhat's your name?";
-              await insertMessage(sid!, "bot", offlineMsg);
-              setBotStep({ name: "collect_name" });
+              await insertMessage(
+                sid!,
+                "bot",
+                "All agents are currently offline. Please try again later or check back soon."
+              );
+              setBotStep({ name: "menu" });
             }, 700);
           } else {
             await markWaiting(sid);
@@ -211,6 +216,7 @@ export function ChatWidget() {
     [
       sessionId, botStep, userRoles, sending, open,
       agentJoined, isActive, isWaiting,
+      authVisitorName, authVisitorEmail,
       createSession, insertMessage, markWaiting, addToQueue,
       updateVisitorInfo, greeting.message,
     ]
