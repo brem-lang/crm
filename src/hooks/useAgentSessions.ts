@@ -52,10 +52,13 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
   }
 
   async function fetchSessions(isInitial = false) {
+    // Show all waiting sessions (any agent can accept) but only active sessions
+    // assigned to this agent — prevents other agents from seeing or interfering
+    // with chats another agent has already accepted.
     const { data, error } = await supabase
       .from("chat_sessions")
       .select("id, visitor_name, visitor_email, status, agent_id, created_at, updated_at")
-      .in("status", ["waiting", "active"])
+      .or(`status.eq.waiting,and(status.eq.active,agent_id.eq.${agentId})`)
       .order("updated_at", { ascending: false });
 
     if (error) { console.error("[useAgentSessions] fetch error:", error); return; }
