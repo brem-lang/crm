@@ -8,62 +8,61 @@ export interface ChatMsg {
   created_at: string;
 }
 
+const POLL_INTERVAL = 3000;
+
 export function useChatMessages(sessionId: string | null) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
-  // Track previous sessionId to detect session switches vs new session creation
   const prevSessionIdRef = useRef<string | null>(null);
+  // Track whether realtime is working so polling only runs as a fallback
+  const realtimeOkRef = useRef(false);
+
+  function mergeMessages(prev: ChatMsg[], fetched: ChatMsg[]): ChatMsg[] {
+    if (prev.length === 0) return fetched;
+    const prevIds = new Set(prev.map(m => m.id));
+    const fresh = fetched.filter(m => !prevIds.has(m.id));
+    if (fresh.length === 0) return prev;
+    return [...prev, ...fresh].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }
+
+  async function fetchMessages(sid: string, isInitial = false) {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("id, sender_type, content, created_at")
+      .eq("session_id", sid)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("[useChatMessages] fetch error:", error);
+      if (isInitial) setLoading(false);
+      return;
+    }
+
+    const fetched = (data as ChatMsg[]) ?? [];
+    setMessages(prev => isInitial && prev.length === 0 ? fetched : mergeMessages(prev, fetched));
+    if (isInitial) setLoading(false);
+  }
 
   useEffect(() => {
     if (!sessionId) {
       setMessages([]);
       prevSessionIdRef.current = null;
+      realtimeOkRef.current = false;
       return;
     }
 
-    // Switching between two real sessions (agent changing active chat) — clear immediately
-    // so the old session's messages don't bleed into the new one.
-    // When transitioning from null → value (visitor creating their first session), we keep
-    // any optimistic messages already added by insertMessage.
     if (prevSessionIdRef.current !== null && prevSessionIdRef.current !== sessionId) {
       setMessages([]);
+      realtimeOkRef.current = false;
     }
     prevSessionIdRef.current = sessionId;
 
     setLoading(true);
-    supabase
-      .from("chat_messages")
-      .select("id, sender_type, content, created_at")
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("[useChatMessages] fetch error:", error);
-          setLoading(false);
-          return;
-        }
-        const fetched = (data as ChatMsg[]) ?? [];
-        setMessages(prev => {
-          // No existing messages — use DB result directly (returning user / page reload / agent view)
-          if (prev.length === 0) return fetched;
-          // Optimistic messages exist (visitor's new session) — merge without wiping them
-          const prevIds = new Set(prev.map(m => m.id));
-          const newFromDb = fetched.filter(m => !prevIds.has(m.id));
-          if (newFromDb.length === 0) return prev;
-          return [...prev, ...newFromDb].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-        });
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("[useChatMessages] network error:", err);
-        setLoading(false);
-      });
+    fetchMessages(sessionId, true);
 
-    // No server-side filter: Supabase keeps subscriptions with filters in
-    // "SUBSCRIBING" (pending) state when the role lacks SELECT privilege.
-    // All session isolation is handled client-side below.
+    // Realtime — primary path
     const channel = supabase
       .channel(`chat_messages:${sessionId}`)
       .on(
@@ -72,17 +71,31 @@ export function useChatMessages(sessionId: string | null) {
         payload => {
           const incoming = payload.new as ChatMsg & { session_id?: string };
           if (incoming.session_id !== sessionId) return;
+          realtimeOkRef.current = true;
           setMessages(prev =>
             prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]
           );
         }
       )
       .subscribe((status, err) => {
-        if (err) console.error("[useChatMessages] subscription error:", status, err);
+        if (status === "SUBSCRIBED") {
+          realtimeOkRef.current = true;
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          realtimeOkRef.current = false;
+          if (err) console.warn("[useChatMessages] realtime unavailable, using polling:", status);
+        }
       });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [sessionId]);
+    // Polling fallback — runs every 3 s; skipped when realtime confirmed working
+    const poll = setInterval(() => {
+      if (!realtimeOkRef.current) fetchMessages(sessionId);
+    }, POLL_INTERVAL);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function insertMessage(
     sid: string,
@@ -97,7 +110,6 @@ export function useChatMessages(sessionId: string | null) {
       content,
       created_at: new Date().toISOString(),
     };
-    // Optimistic update — show immediately
     setMessages(prev => [...prev, optimistic]);
 
     const { data, error } = await supabase
@@ -107,13 +119,11 @@ export function useChatMessages(sessionId: string | null) {
       .single();
 
     if (error) {
-      // Roll back optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== optimisticId));
       throw error;
     }
 
     const confirmed = data as ChatMsg;
-    // Replace optimistic entry with confirmed one (dedup realtime event too)
     setMessages(prev =>
       prev
         .filter(m => m.id !== optimisticId)

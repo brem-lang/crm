@@ -9,6 +9,7 @@ import { useChatMessages } from "@/hooks/useChatMessages";
 import { useChatHandoff } from "@/hooks/useChatHandoff";
 import { getBotResponse, getGreeting, BotStep } from "@/components/chat/botEngine";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type QRMap = Map<string, string[]>;
 const GREETING_ID = "local-greeting";
@@ -138,17 +139,15 @@ export function ChatWidget() {
           const available = await checkAgentsOnline();
 
           if (!available) {
-            // No agents online → collect visitor info instead
             setTyping(true);
             setTimeout(async () => {
               setTyping(false);
-              const msg =
+              const offlineMsg =
                 "Our agents are currently offline. Let me take your details so we can follow up with you.\n\nWhat's your name?";
-              await insertMessage(sid!, "bot", msg);
+              await insertMessage(sid!, "bot", offlineMsg);
               setBotStep({ name: "collect_name" });
             }, 700);
           } else {
-            // Agents available → enter queue
             await markWaiting(sid);
             const position = await addToQueue(sid);
             setTyping(true);
@@ -180,6 +179,12 @@ export function ChatWidget() {
           }
           if (!open) setUnread(n => n + 1);
         }, 900);
+      } catch (err: unknown) {
+        const errMsg =
+          err && typeof err === "object" && "message" in err
+            ? (err as { message: string }).message
+            : "Could not send message. Please try again.";
+        toast.error(errMsg);
       } finally {
         setSending(false);
       }

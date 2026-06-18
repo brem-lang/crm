@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const SESSION_KEY = "chat_session_id";
@@ -8,6 +8,25 @@ export function useChatSession() {
     localStorage.getItem(SESSION_KEY)
   );
   const [creating, setCreating] = useState(false);
+
+  // Validate the stored session ID still exists in the DB.
+  // If the DB was reset (TRUNCATE chat_sessions), the stored ID is stale —
+  // clear it so a fresh session is created on the next message.
+  useEffect(() => {
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (!stored) return;
+    supabase
+      .from("chat_sessions")
+      .select("id")
+      .eq("id", stored)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) {
+          localStorage.removeItem(SESSION_KEY);
+          setSessionId(null);
+        }
+      });
+  }, []);
 
   async function createSession(visitorName?: string, visitorEmail?: string): Promise<string> {
     setCreating(true);
