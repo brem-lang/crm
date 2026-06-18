@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type SessionStatus = "bot" | "waiting" | "active" | "closed" | null;
@@ -11,36 +11,33 @@ export interface HandoffState {
   isClosed: boolean;
 }
 
+const POLL_INTERVAL = 3000;
+
 export function useChatHandoff(sessionId: string | null): HandoffState {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const realtimeOkRef = useRef(false);
+
+  async function fetchStatus(sid: string) {
+    const [sessionRes, queueRes] = await Promise.all([
+      supabase.from("chat_sessions").select("status").eq("id", sid).single(),
+      supabase.from("chat_queue").select("position").eq("session_id", sid).maybeSingle(),
+    ]);
+    if (sessionRes.data) setSessionStatus(sessionRes.data.status as SessionStatus);
+    if (queueRes.data) setQueuePosition(queueRes.data.position);
+    else if (sessionRes.data?.status !== "waiting") setQueuePosition(null);
+  }
 
   useEffect(() => {
     if (!sessionId) {
       setSessionStatus(null);
       setQueuePosition(null);
+      realtimeOkRef.current = false;
       return;
     }
 
-    // Load current state on mount / session change
-    Promise.all([
-      supabase
-        .from("chat_sessions")
-        .select("status")
-        .eq("id", sessionId)
-        .single(),
-      supabase
-        .from("chat_queue")
-        .select("position")
-        .eq("session_id", sessionId)
-        .maybeSingle(),
-    ]).then(([sessionRes, queueRes]) => {
-      if (sessionRes.data) setSessionStatus(sessionRes.data.status as SessionStatus);
-      if (queueRes.data) setQueuePosition(queueRes.data.position);
-    });
+    fetchStatus(sessionId);
 
-    // No server-side filters: filtered postgres_changes subscriptions stay
-    // "pending" when the role lacks SELECT privilege. Filter client-side instead.
     const sessionCh = supabase
       .channel(`handoff:session:${sessionId}`)
       .on(
@@ -49,11 +46,18 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
         payload => {
           const updated = payload.new as { id?: string; status: string };
           if (updated.id !== sessionId) return;
+          realtimeOkRef.current = true;
           setSessionStatus(updated.status as SessionStatus);
           if (updated.status !== "waiting") setQueuePosition(null);
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") realtimeOkRef.current = true;
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          realtimeOkRef.current = false;
+          if (err) console.warn("[useChatHandoff] realtime unavailable, using polling");
+        }
+      });
 
     const queueCh = supabase
       .channel(`handoff:queue:${sessionId}`)
@@ -63,20 +67,24 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
         payload => {
           const row = (payload.new ?? payload.old) as { session_id?: string; position?: number };
           if (row.session_id !== sessionId) return;
-          if (payload.eventType === "DELETE") {
-            setQueuePosition(null);
-          } else {
-            setQueuePosition((payload.new as { position: number }).position);
-          }
+          realtimeOkRef.current = true;
+          if (payload.eventType === "DELETE") setQueuePosition(null);
+          else setQueuePosition((payload.new as { position: number }).position);
         }
       )
       .subscribe();
 
+    // Polling fallback — only runs when realtime is down
+    const poll = setInterval(() => {
+      if (!realtimeOkRef.current) fetchStatus(sessionId);
+    }, POLL_INTERVAL);
+
     return () => {
       supabase.removeChannel(sessionCh);
       supabase.removeChannel(queueCh);
+      clearInterval(poll);
     };
-  }, [sessionId]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     sessionStatus,
