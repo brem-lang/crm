@@ -6,6 +6,7 @@ export interface ChatMsg {
   sender_type: "bot" | "user" | "agent";
   content: string;
   created_at: string;
+  sender_id: string | null;
 }
 
 const POLL_INTERVAL = 3000;
@@ -14,55 +15,74 @@ export function useChatMessages(sessionId: string | null) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
   const prevSessionIdRef = useRef<string | null>(null);
-  // Track whether realtime is working so polling only runs as a fallback
   const realtimeOkRef = useRef(false);
-
-  function mergeMessages(prev: ChatMsg[], fetched: ChatMsg[]): ChatMsg[] {
-    if (prev.length === 0) return fetched;
-    const prevIds = new Set(prev.map(m => m.id));
-    const fresh = fetched.filter(m => !prevIds.has(m.id));
-    if (fresh.length === 0) return prev;
-    return [...prev, ...fresh].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-  }
-
-  async function fetchMessages(sid: string, isInitial = false) {
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .select("id, sender_type, content, created_at")
-      .eq("session_id", sid)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("[useChatMessages] fetch error:", error);
-      if (isInitial) setLoading(false);
-      return;
-    }
-
-    const fetched = (data as ChatMsg[]) ?? [];
-    setMessages(prev => isInitial && prev.length === 0 ? fetched : mergeMessages(prev, fetched));
-    if (isInitial) setLoading(false);
-  }
+  const lastFetchedAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
       setMessages([]);
       prevSessionIdRef.current = null;
       realtimeOkRef.current = false;
+      lastFetchedAtRef.current = null;
       return;
     }
 
     if (prevSessionIdRef.current !== null && prevSessionIdRef.current !== sessionId) {
       setMessages([]);
       realtimeOkRef.current = false;
+      lastFetchedAtRef.current = null;
     }
     prevSessionIdRef.current = sessionId;
 
-    setLoading(true);
-    fetchMessages(sessionId, true);
+    // Full fetch on initial load — establish baseline and cursor
+    async function fetchAll() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("id, sender_type, content, created_at, sender_id")
+        .eq("session_id", sessionId!)
+        .order("created_at", { ascending: true });
 
-    // Realtime — primary path
+      if (error) {
+        console.error("[useChatMessages] fetch error:", error);
+        setLoading(false);
+        return;
+      }
+
+      const fetched = (data as ChatMsg[]) ?? [];
+      setMessages(fetched);
+      if (fetched.length > 0) {
+        lastFetchedAtRef.current = fetched[fetched.length - 1].created_at;
+      }
+      setLoading(false);
+    }
+
+    // Incremental fetch — only rows newer than cursor, used by polling fallback
+    async function fetchIncremental() {
+      const since = lastFetchedAtRef.current;
+      let q = supabase
+        .from("chat_messages")
+        .select("id, sender_type, content, created_at, sender_id")
+        .eq("session_id", sessionId!)
+        .order("created_at", { ascending: true });
+
+      if (since) q = q.gt("created_at", since);
+
+      const { data, error } = await q;
+      if (error || !data || data.length === 0) return;
+
+      const fresh = data as ChatMsg[];
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        const newMsgs = fresh.filter(m => !existingIds.has(m.id));
+        if (newMsgs.length === 0) return prev;
+        return [...prev, ...newMsgs];
+      });
+      lastFetchedAtRef.current = fresh[fresh.length - 1].created_at;
+    }
+
+    fetchAll();
+
     const channel = supabase
       .channel(`chat_messages:${sessionId}`)
       .on(
@@ -72,6 +92,7 @@ export function useChatMessages(sessionId: string | null) {
           const incoming = payload.new as ChatMsg & { session_id?: string };
           if (incoming.session_id !== sessionId) return;
           realtimeOkRef.current = true;
+          lastFetchedAtRef.current = incoming.created_at;
           setMessages(prev =>
             prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]
           );
@@ -86,16 +107,15 @@ export function useChatMessages(sessionId: string | null) {
         }
       });
 
-    // Polling fallback — runs every 3 s; skipped when realtime confirmed working
     const poll = setInterval(() => {
-      if (!realtimeOkRef.current) fetchMessages(sessionId);
+      if (!realtimeOkRef.current) fetchIncremental();
     }, POLL_INTERVAL);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
     };
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   async function insertMessage(
     sid: string,
@@ -109,13 +129,14 @@ export function useChatMessages(sessionId: string | null) {
       sender_type: senderType,
       content,
       created_at: new Date().toISOString(),
+      sender_id: senderId ?? null,
     };
     setMessages(prev => [...prev, optimistic]);
 
     const { data, error } = await supabase
       .from("chat_messages")
       .insert({ session_id: sid, sender_type: senderType, content, sender_id: senderId ?? null })
-      .select("id, sender_type, content, created_at")
+      .select("id, sender_type, content, created_at, sender_id")
       .single();
 
     if (error) {

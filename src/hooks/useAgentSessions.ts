@@ -14,6 +14,30 @@ export interface AgentSession {
 
 const POLL_INTERVAL = 3000;
 
+// Pure merge utility — no captured state, safe outside effect
+function mergeSessions(prev: AgentSession[], fetched: AgentSession[]): AgentSession[] {
+  const map = new Map(prev.map(s => [s.id, s]));
+  let changed = false;
+  for (const s of fetched) {
+    const existing = map.get(s.id);
+    if (!existing || existing.updated_at < s.updated_at) {
+      map.set(s.id, s);
+      changed = true;
+    }
+  }
+  const fetchedIds = new Set(fetched.map(s => s.id));
+  for (const id of map.keys()) {
+    if (!fetchedIds.has(id)) {
+      map.delete(id);
+      changed = true;
+    }
+  }
+  if (!changed) return prev;
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
+}
+
 export function useAgentSessions(agentId: string | null, activeSessionId: string | null) {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,86 +47,75 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
   const activeRef = useRef<string | null>(activeSessionId);
   useEffect(() => { activeRef.current = activeSessionId; }, [activeSessionId]);
 
-  // Track whether realtime is working — polling only runs as fallback
   const realtimeOkRef = useRef(false);
-
-  function mergeSessions(prev: AgentSession[], fetched: AgentSession[]): AgentSession[] {
-    const map = new Map(prev.map(s => [s.id, s]));
-    let changed = false;
-    for (const s of fetched) {
-      const existing = map.get(s.id);
-      // Add new sessions or update ones with a newer updated_at
-      if (!existing || existing.updated_at < s.updated_at) {
-        map.set(s.id, s);
-        changed = true;
-      }
-    }
-    // Remove sessions that are no longer waiting/active
-    const fetchedIds = new Set(fetched.map(s => s.id));
-    for (const id of map.keys()) {
-      if (!fetchedIds.has(id)) {
-        map.delete(id);
-        changed = true;
-      }
-    }
-    if (!changed) return prev;
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    );
-  }
-
-  async function fetchSessions(isInitial = false) {
-    // Show all waiting sessions (any agent can accept) but only active sessions
-    // assigned to this agent — prevents other agents from seeing or interfering
-    // with chats another agent has already accepted.
-    const { data, error } = await supabase
-      .from("chat_sessions")
-      .select("id, visitor_name, visitor_email, status, agent_id, created_at, updated_at")
-      .or(`status.eq.waiting,and(status.eq.active,agent_id.eq.${agentId})`)
-      .order("updated_at", { ascending: false });
-
-    if (error) { console.error("[useAgentSessions] fetch error:", error); return; }
-    const fetched = (data as AgentSession[]) ?? [];
-
-    if (isInitial) {
-      setSessions(fetched);
-      setLoading(false);
-    } else {
-      setSessions(prev => mergeSessions(prev, fetched));
-    }
-  }
-
-  async function fetchLastMessages() {
-    // Pull the most recent non-agent message per active/waiting session for preview + unread
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("session_id, sender_type, content, created_at")
-      .neq("sender_type", "agent")
-      .order("created_at", { ascending: false });
-
-    if (!data) return;
-
-    const seen = new Set<string>();
-    for (const msg of data) {
-      if (seen.has(msg.session_id)) continue;
-      seen.add(msg.session_id);
-      setLastMsgMap(prev => {
-        if (prev[msg.session_id] === msg.content) return prev;
-        return { ...prev, [msg.session_id]: msg.content };
-      });
-    }
-  }
 
   useEffect(() => {
     if (!agentId) return;
 
-    setLoading(true);
-    fetchSessions(true);
-    fetchLastMessages();
+    // Fetch sessions visible to this agent:
+    // - All waiting (any agent can accept)
+    // - Active only if assigned to this agent
+    async function fetchSessions(isInitial = false): Promise<AgentSession[]> {
+      const { data, error } = await supabase
+        .from("chat_sessions")
+        .select("id, visitor_name, visitor_email, status, agent_id, created_at, updated_at")
+        .or(`status.eq.waiting,and(status.eq.active,agent_id.eq.${agentId})`)
+        .order("updated_at", { ascending: false });
 
-    // Realtime — session changes (primary path)
+      if (error) {
+        console.error("[useAgentSessions] fetch error:", error);
+        return [];
+      }
+
+      const fetched = (data as AgentSession[]) ?? [];
+      if (isInitial) {
+        setSessions(fetched);
+        setLoading(false);
+      } else {
+        setSessions(prev => mergeSessions(prev, fetched));
+      }
+      return fetched;
+    }
+
+    // Fetch latest non-agent message per session for sidebar preview.
+    // Filtered to visible session IDs only — never pulls the full table.
+    async function fetchLastMessages(sessionIds: string[]) {
+      if (sessionIds.length === 0) return;
+
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("session_id, content, created_at")
+        .in("session_id", sessionIds)
+        .neq("sender_type", "agent")
+        .order("created_at", { ascending: false })
+        .limit(sessionIds.length * 5); // enough to get at least 1 per session
+
+      if (!data) return;
+
+      // Build the full update map first, then apply in a single setState call
+      const update: Record<string, string> = {};
+      const seen = new Set<string>();
+      for (const msg of data) {
+        if (seen.has(msg.session_id)) continue;
+        seen.add(msg.session_id);
+        update[msg.session_id] = msg.content;
+      }
+
+      setLastMsgMap(prev => {
+        const hasChange = Object.keys(update).some(k => prev[k] !== update[k]);
+        return hasChange ? { ...prev, ...update } : prev;
+      });
+    }
+
+    // Initial load
+    setLoading(true);
+    fetchSessions(true).then(fetched => {
+      fetchLastMessages(fetched.map(s => s.id));
+    });
+
+    // Realtime — session changes (unique channel name per agent to avoid collisions)
     const sessionCh = supabase
-      .channel("agent:sessions")
+      .channel(`agent:sessions:${agentId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chat_sessions" },
@@ -116,7 +129,11 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
           } else if (payload.eventType === "UPDATE") {
             const s = payload.new as AgentSession;
             setSessions(prev => {
-              if (!["waiting", "active"].includes(s.status)) return prev.filter(x => x.id !== s.id);
+              // Remove if no longer visible to this agent
+              const isVisible =
+                s.status === "waiting" ||
+                (s.status === "active" && s.agent_id === agentId);
+              if (!isVisible) return prev.filter(x => x.id !== s.id);
               const idx = prev.findIndex(x => x.id === s.id);
               if (idx < 0) return [s, ...prev];
               const next = [...prev];
@@ -137,15 +154,19 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
         }
       });
 
-    // Realtime — message inserts (unread + preview)
+    // Realtime — new messages for unread badge + sidebar preview
     const msgCh = supabase
-      .channel("agent:messages")
+      .channel(`agent:messages:${agentId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
         payload => {
           realtimeOkRef.current = true;
-          const msg = payload.new as { session_id: string; sender_type: string; content: string };
+          const msg = payload.new as {
+            session_id: string;
+            sender_type: string;
+            content: string;
+          };
           if (msg.sender_type !== "agent") {
             setLastMsgMap(prev => ({ ...prev, [msg.session_id]: msg.content }));
           }
@@ -159,11 +180,11 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
       )
       .subscribe();
 
-    // Polling fallback — only runs when realtime is down
-    const poll = setInterval(() => {
+    // Polling fallback — only runs when realtime is confirmed down
+    const poll = setInterval(async () => {
       if (!realtimeOkRef.current) {
-        fetchSessions();
-        fetchLastMessages();
+        const fetched = await fetchSessions();
+        fetchLastMessages(fetched.map(s => s.id));
       }
     }, POLL_INTERVAL);
 
@@ -172,7 +193,7 @@ export function useAgentSessions(agentId: string | null, activeSessionId: string
       supabase.removeChannel(msgCh);
       clearInterval(poll);
     };
-  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agentId]);
 
   function markViewed(sessionId: string) {
     setUnreadMap(prev => ({ ...prev, [sessionId]: 0 }));

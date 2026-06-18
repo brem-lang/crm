@@ -10,13 +10,26 @@ export function useChatAgent() {
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const agentIdRef = useRef<string | null>(null);
+  // Cache access token synchronously so beforeunload handler doesn't need async
+  const accessTokenRef = useRef<string | null>(null);
+
+  // Keep access token ref fresh whenever the auth session changes
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      accessTokenRef.current = data.session?.access_token ?? null;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      accessTokenRef.current = session?.access_token ?? null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
 
-    // sessionStorage survives page refreshes but is cleared when the tab is closed.
-    // If the flag exists → this is a refresh (agent intentionally went online) → keep DB status.
-    // If the flag is absent → fresh tab/browser open → reset to offline to avoid stale state.
+    // sessionStorage survives page refreshes but clears on tab close.
+    // Flag present → page refresh (preserve online status).
+    // Flag absent → fresh tab/window (reset to offline).
     const isPageRefresh = sessionStorage.getItem(SESSION_ALIVE_KEY) === "true";
 
     supabase
@@ -31,16 +44,10 @@ export function useChatAgent() {
         if (data) {
           id = data.id;
           if (isPageRefresh) {
-            // Keep whatever status the agent had — they refreshed the page
             online = data.is_online;
           } else {
-            // Fresh tab/window: reset stale online status so visitors aren't
-            // routed to an absent agent after a browser crash or close.
             if (data.is_online) {
-              await supabase
-                .from("chat_agents")
-                .update({ is_online: false })
-                .eq("id", id);
+              await supabase.from("chat_agents").update({ is_online: false }).eq("id", id);
             }
             online = false;
           }
@@ -60,46 +67,37 @@ export function useChatAgent() {
         }
         setIsOnline(online);
         setLoading(false);
-
-        // Mark this tab as active so the next mount (page refresh) preserves status
         sessionStorage.setItem(SESSION_ALIVE_KEY, "true");
       });
 
-    // Best-effort offline on tab/window close via keepalive fetch
     const handleUnload = () => {
-      // Clear the session flag so the next open starts offline
       sessionStorage.removeItem(SESSION_ALIVE_KEY);
-
       const id = agentIdRef.current;
       if (!id) return;
       const url = import.meta.env.VITE_SUPABASE_URL;
       const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       if (!url || !key) return;
-      supabase.auth.getSession().then(({ data }) => {
-        const accessToken = data.session?.access_token ?? key;
-        fetch(`${url}/rest/v1/chat_agents?id=eq.${id}`, {
-          method: "PATCH",
-          keepalive: true,
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": key,
-            "Authorization": `Bearer ${accessToken}`,
-            "Prefer": "return=minimal",
-          },
-          body: JSON.stringify({ is_online: false }),
-        }).catch(() => {/* best-effort */});
-      });
+      // Use cached token — no async needed inside unload handler
+      const token = accessTokenRef.current ?? key;
+      fetch(`${url}/rest/v1/chat_agents?id=eq.${id}`, {
+        method: "PATCH",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": key,
+          "Authorization": `Bearer ${token}`,
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ is_online: false }),
+      }).catch(() => { /* best-effort */ });
     };
+
     window.addEventListener("beforeunload", handleUnload);
 
     return () => {
       window.removeEventListener("beforeunload", handleUnload);
-      // Best-effort offline on React unmount (e.g. navigating away)
       if (agentIdRef.current) {
-        supabase
-          .from("chat_agents")
-          .update({ is_online: false })
-          .eq("id", agentIdRef.current);
+        supabase.from("chat_agents").update({ is_online: false }).eq("id", agentIdRef.current);
       }
     };
   }, [user]);
@@ -107,10 +105,7 @@ export function useChatAgent() {
   async function setOnline(online: boolean) {
     if (!agentId) return;
     setIsOnline(online);
-    await supabase
-      .from("chat_agents")
-      .update({ is_online: online })
-      .eq("id", agentId);
+    await supabase.from("chat_agents").update({ is_online: online }).eq("id", agentId);
   }
 
   return { agentId, isOnline, setOnline, loading };

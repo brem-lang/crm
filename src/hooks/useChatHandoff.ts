@@ -18,16 +18,6 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const realtimeOkRef = useRef(false);
 
-  async function fetchStatus(sid: string) {
-    const [sessionRes, queueRes] = await Promise.all([
-      supabase.from("chat_sessions").select("status").eq("id", sid).single(),
-      supabase.from("chat_queue").select("position").eq("session_id", sid).maybeSingle(),
-    ]);
-    if (sessionRes.data) setSessionStatus(sessionRes.data.status as SessionStatus);
-    if (queueRes.data) setQueuePosition(queueRes.data.position);
-    else if (sessionRes.data?.status !== "waiting") setQueuePosition(null);
-  }
-
   useEffect(() => {
     if (!sessionId) {
       setSessionStatus(null);
@@ -36,10 +26,22 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
       return;
     }
 
-    fetchStatus(sessionId);
+    // Defined inside effect — no stale closure risk
+    async function fetchStatus() {
+      const [sessionRes, queueRes] = await Promise.all([
+        supabase.from("chat_sessions").select("status").eq("id", sessionId!).single(),
+        supabase.from("chat_queue").select("position").eq("session_id", sessionId!).maybeSingle(),
+      ]);
+      if (sessionRes.data) setSessionStatus(sessionRes.data.status as SessionStatus);
+      if (queueRes.data) setQueuePosition(queueRes.data.position);
+      else if (sessionRes.data?.status !== "waiting") setQueuePosition(null);
+    }
 
-    const sessionCh = supabase
-      .channel(`handoff:session:${sessionId}`)
+    fetchStatus();
+
+    // Single channel with two listeners — one for session status, one for queue
+    const channel = supabase
+      .channel(`handoff:${sessionId}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_sessions" },
@@ -51,16 +53,6 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
           if (updated.status !== "waiting") setQueuePosition(null);
         }
       )
-      .subscribe((status, err) => {
-        if (status === "SUBSCRIBED") realtimeOkRef.current = true;
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          realtimeOkRef.current = false;
-          if (err) console.warn("[useChatHandoff] realtime unavailable, using polling");
-        }
-      });
-
-    const queueCh = supabase
-      .channel(`handoff:queue:${sessionId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chat_queue" },
@@ -72,19 +64,23 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
           else setQueuePosition((payload.new as { position: number }).position);
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") realtimeOkRef.current = true;
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          realtimeOkRef.current = false;
+          if (err) console.warn("[useChatHandoff] realtime unavailable, using polling");
+        }
+      });
 
-    // Polling fallback — only runs when realtime is down
     const poll = setInterval(() => {
-      if (!realtimeOkRef.current) fetchStatus(sessionId);
+      if (!realtimeOkRef.current) fetchStatus();
     }, POLL_INTERVAL);
 
     return () => {
-      supabase.removeChannel(sessionCh);
-      supabase.removeChannel(queueCh);
+      supabase.removeChannel(channel);
       clearInterval(poll);
     };
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   return {
     sessionStatus,
