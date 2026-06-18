@@ -25,7 +25,18 @@ export function useChatMessages(sessionId: string | null) {
       .eq("session_id", sessionId)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
-        setMessages((data as ChatMsg[]) ?? []);
+        const fetched = (data as ChatMsg[]) ?? [];
+        setMessages(prev => {
+          // No existing messages — just use DB result (returning user / page reload)
+          if (prev.length === 0) return fetched;
+          // Existing optimistic/confirmed messages — merge: add any from DB not already present
+          const prevIds = new Set(prev.map(m => m.id));
+          const newFromDb = fetched.filter(m => !prevIds.has(m.id));
+          if (newFromDb.length === 0) return prev;
+          return [...prev, ...newFromDb].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
         setLoading(false);
       });
 

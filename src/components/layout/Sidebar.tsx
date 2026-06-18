@@ -156,6 +156,10 @@ export function Sidebar() {
   }, []);
 
   const hasAccess = (item: NavItem) => {
+    // chat_support users only see items that explicitly list them
+    if (isChatSupport && roles.length === 0) {
+      return item.customRoles?.some((name) => customRoleNames.includes(name)) ?? false;
+    }
     const noRestrictions = !item.roles && !item.customRoles;
     if (noRestrictions) return true;
     const systemMatch = item.roles?.some((role) => roles.includes(role as any)) ?? false;

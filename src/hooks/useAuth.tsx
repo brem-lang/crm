@@ -111,11 +111,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  async function getPostLoginPath(userId: string): Promise<string> {
+    const { data } = await supabase
+      .from("user_custom_roles")
+      .select("roles(slug)")
+      .eq("user_id", userId);
+    const hasChatSupport = (data ?? []).some((r: any) => r.roles?.slug === "chat_support");
+    return hasChatSupport ? "/agent/dashboard" : "/dashboard";
+  }
+
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     toast.success("Signed in successfully");
-    navigate("/dashboard");
+    navigate(await getPostLoginPath(data.user.id));
   };
 
   const toSafeAuthError = (error: unknown) => {
@@ -142,10 +151,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // If user typed an email, skip the username lookup.
     if (identifier.includes("@")) {
-      const { error } = await supabase.auth.signInWithPassword({ email: identifier, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: identifier, password });
       if (error) throw toSafeAuthError(error);
       toast.success("Signed in successfully");
-      navigate("/dashboard");
+      navigate(await getPostLoginPath(data.user.id));
       return;
     }
 
@@ -157,10 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Invalid username or password");
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw toSafeAuthError(error);
     toast.success("Signed in successfully");
-    navigate("/dashboard");
+    navigate(await getPostLoginPath(data.user.id));
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {

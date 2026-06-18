@@ -305,12 +305,12 @@ export function ChatWidget() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
-            {msgLoading ? (
+            {msgLoading && displayMessages.length === 0 ? (
               <div className="flex justify-center py-8">
                 <TypingDots />
               </div>
-            ) : (
-              displayMessages.map(msg => {
+            ) : null}
+            {displayMessages.map(msg => {
                 const qr = qrMap.get(msg.id) ?? [];
                 // Don't show quick reply chips while waiting or after agent joined (except for agent)
                 const showQR = qr.length > 0 && !isWaiting && !isClosed;
@@ -361,8 +361,7 @@ export function ChatWidget() {
                     )}
                   </div>
                 );
-              })
-            )}
+              })}
 
             {typing && <TypingDots />}
             <div ref={bottomRef} />
