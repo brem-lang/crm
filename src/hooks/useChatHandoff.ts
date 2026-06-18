@@ -39,43 +39,34 @@ export function useChatHandoff(sessionId: string | null): HandoffState {
       if (queueRes.data) setQueuePosition(queueRes.data.position);
     });
 
-    // Realtime: session status changes
+    // No server-side filters: filtered postgres_changes subscriptions stay
+    // "pending" when the role lacks SELECT privilege. Filter client-side instead.
     const sessionCh = supabase
       .channel(`handoff:session:${sessionId}`)
       .on(
         "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chat_sessions",
-          filter: `id=eq.${sessionId}`,
-        },
+        { event: "UPDATE", schema: "public", table: "chat_sessions" },
         payload => {
-          const updated = payload.new as { status: string };
+          const updated = payload.new as { id?: string; status: string };
+          if (updated.id !== sessionId) return;
           setSessionStatus(updated.status as SessionStatus);
-          // Queue position is irrelevant once we leave waiting state
           if (updated.status !== "waiting") setQueuePosition(null);
         }
       )
       .subscribe();
 
-    // Realtime: queue position updates (other sessions accepted ahead of us)
     const queueCh = supabase
       .channel(`handoff:queue:${sessionId}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_queue",
-          filter: `session_id=eq.${sessionId}`,
-        },
+        { event: "*", schema: "public", table: "chat_queue" },
         payload => {
+          const row = (payload.new ?? payload.old) as { session_id?: string; position?: number };
+          if (row.session_id !== sessionId) return;
           if (payload.eventType === "DELETE") {
             setQueuePosition(null);
           } else {
-            const q = payload.new as { position: number };
-            setQueuePosition(q.position);
+            setQueuePosition((payload.new as { position: number }).position);
           }
         }
       )

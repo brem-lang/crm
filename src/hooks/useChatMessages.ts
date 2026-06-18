@@ -61,29 +61,25 @@ export function useChatMessages(sessionId: string | null) {
         setLoading(false);
       });
 
+    // No server-side filter: Supabase keeps subscriptions with filters in
+    // "SUBSCRIBING" (pending) state when the role lacks SELECT privilege.
+    // All session isolation is handled client-side below.
     const channel = supabase
       .channel(`chat_messages:${sessionId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `session_id=eq.${sessionId}`,
-        },
+        { event: "INSERT", schema: "public", table: "chat_messages" },
         payload => {
           const incoming = payload.new as ChatMsg & { session_id?: string };
-          // Strict equality: if session_id is missing or different, drop the event.
-          // This guards against Supabase bypassing the server-side filter when
-          // the RLS policy uses USING (true) — which allows all subscribers to
-          // receive all inserts regardless of their filter clause.
           if (incoming.session_id !== sessionId) return;
           setMessages(prev =>
             prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]
           );
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error("[useChatMessages] subscription error:", status, err);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [sessionId]);

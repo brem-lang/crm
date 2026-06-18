@@ -18,33 +18,57 @@ export function useChatAgent() {
       .eq("user_id", user.id)
       .maybeSingle()
       .then(async ({ data }) => {
+        let id: string | null = null;
+
         if (data) {
-          setAgentId(data.id);
-          agentIdRef.current = data.id;
-          setIsOnline(data.is_online);
+          id = data.id;
+          // Always start offline on mount — prevents stale is_online=true rows
+          // from routing visitors to an absent agent after a browser crash/close.
+          if (data.is_online) {
+            await supabase
+              .from("chat_agents")
+              .update({ is_online: false })
+              .eq("id", id);
+          }
         } else {
           const { data: created } = await supabase
             .from("chat_agents")
-            .insert({ user_id: user.id })
-            .select("id, is_online")
+            .insert({ user_id: user.id, is_online: false })
+            .select("id")
             .single();
-          if (created) {
-            setAgentId(created.id);
-            agentIdRef.current = created.id;
-            setIsOnline(created.is_online);
-          }
+          if (created) id = created.id;
         }
+
+        if (id) {
+          setAgentId(id);
+          agentIdRef.current = id;
+        }
+        setIsOnline(false);
         setLoading(false);
       });
 
-    // Set offline on tab/window close
+    // Best-effort offline on tab/window close via keepalive fetch
     const handleUnload = () => {
-      if (agentIdRef.current) {
-        navigator.sendBeacon(
-          "/api/noop", // best-effort only — Supabase call below for normal unmount
-          JSON.stringify({ agentId: agentIdRef.current })
-        );
-      }
+      const id = agentIdRef.current;
+      if (!id) return;
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!url || !key) return;
+      const token = supabase.auth.getSession().then(({ data }) => {
+        const accessToken = data.session?.access_token ?? key;
+        fetch(`${url}/rest/v1/chat_agents?id=eq.${id}`, {
+          method: "PATCH",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": key,
+            "Authorization": `Bearer ${accessToken}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({ is_online: false }),
+        }).catch(() => {/* best-effort */});
+      });
+      void token;
     };
     window.addEventListener("beforeunload", handleUnload);
     return () => {
