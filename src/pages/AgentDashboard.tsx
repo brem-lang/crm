@@ -58,7 +58,7 @@ export default function AgentDashboard() {
   // Mobile: "list" shows the sessions panel, "chat" shows the conversation panel
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
-  const { agentId, isOnline, setOnline, loading: agentLoading } = useChatAgent();
+  const { agentId, isOnline, loading: agentLoading } = useChatAgent();
   const { sessions, loading: sessionsLoading, unreadMap, lastMsgMap, markViewed, acceptChat, closeChat } =
     useAgentSessions(agentId, activeId);
   const { messages, loading: msgsLoading, insertMessage } = useChatMessages(activeId);
@@ -205,9 +205,7 @@ export default function AgentDashboard() {
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2 px-4">
             <Headphones className="h-8 w-8 opacity-20" />
             <p className="text-sm text-center">No active chats</p>
-            {!isOnline && (
-              <p className="text-xs text-center opacity-70">Go online to receive incoming chats</p>
-            )}
+            <p className="text-xs text-center opacity-70">Waiting for incoming chats...</p>
           </div>
         )}
 
@@ -445,18 +443,10 @@ export default function AgentDashboard() {
           )}
         </div>
 
-        <button
-          onClick={() => setOnline(!isOnline)}
-          className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-colors shrink-0",
-            isOnline
-              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-              : "bg-muted border-border text-muted-foreground"
-          )}
-        >
-          <Circle className={cn("h-2 w-2 fill-current shrink-0", isOnline ? "text-emerald-500" : "text-muted-foreground")} />
-          <span className="hidden sm:inline">{isOnline ? "Online" : "Offline"}</span>
-        </button>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shrink-0">
+          <Circle className="h-2 w-2 fill-current text-emerald-500 shrink-0" />
+          <span className="hidden sm:inline">Online</span>
+        </div>
 
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleSound}
           title={isSoundOn ? "Mute notifications" : "Unmute notifications"}>

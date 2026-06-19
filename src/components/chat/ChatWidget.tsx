@@ -106,6 +106,22 @@ export function ChatWidget() {
     }
   }, [dbMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Detect "waiting → bot" transition (last agent went offline) ──────────
+  const prevStatusRef = useRef<import("@/hooks/useChatHandoff").SessionStatus>(null);
+  useEffect(() => {
+    if (prevStatusRef.current === "waiting" && sessionStatus === "bot") {
+      setBotStep({ name: "menu" });
+      if (sessionId) {
+        insertMessage(
+          sessionId,
+          "bot",
+          "All agents have gone offline. Please try again later or feel free to continue chatting."
+        );
+      }
+    }
+    prevStatusRef.current = sessionStatus;
+  }, [sessionStatus, sessionId, insertMessage]);
+
   // ── When status flips to active notify the visitor ────────────────────────
   useEffect(() => {
     if (isActive && botStep.name === "awaiting_agent") {

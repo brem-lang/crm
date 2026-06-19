@@ -3,9 +3,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 
 export default function Login() {
-  const { user, loading } = useAuth();
+  const { user, loading, isChatSupport } = useAuth();
 
   if (loading) return null;
+  if (user && isChatSupport) return <Navigate to="/agent/dashboard" replace />;
   if (user) return <Navigate to="/dashboard" replace />;
 
   return (

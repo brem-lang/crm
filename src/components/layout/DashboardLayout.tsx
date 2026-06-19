@@ -13,7 +13,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, loading, isSuperAdmin } = useAuth();
+  const { user, loading, isSuperAdmin, isChatSupport } = useAuth();
   const { isCollapsed } = useSidebarState();
   const { data: systemSettings } = useSystemSettings();
   const showMaintenanceBanner = !isSuperAdmin && systemSettings?.maintenance_mode === true;
@@ -28,6 +28,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isChatSupport) {
+    return <Navigate to="/agent/dashboard" replace />;
   }
 
   return (

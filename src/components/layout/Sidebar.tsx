@@ -33,7 +33,6 @@ import {
   GitMerge,
   Network,
   ShieldCheck,
-  HelpCircle,
   MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -101,12 +100,11 @@ const navItems: NavItem[] = [
     ]
   },
   { title: "API Docs", href: "/api-docs", icon: FileText },
-  { title: "Help & Guides", href: "/help", icon: HelpCircle },
   {
     title: "Support Chat",
     href: "/agent/dashboard",
     icon: MessageCircle,
-    roles: ["super_admin", "manager", "agent"],
+    roles: ["manager", "agent"],
     customRoles: ["Chat Support"],
     children: [
       { title: "Chat Sessions", href: "/chat-sessions", icon: MessageCircle, roles: ["super_admin", "manager"] },
