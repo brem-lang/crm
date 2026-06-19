@@ -261,6 +261,8 @@ export function ChatWidget() {
   const inputPlaceholder =
     botStep.name === "collect_name" ? "Enter your name…"
     : botStep.name === "collect_email" ? "Enter your email address…"
+    : botStep.name === "api_guide_auth" || botStep.name === "api_guide_fields" || botStep.name === "api_guide_example"
+      ? "Type your question or pick an option above…"
     : agentJoined ? "Reply to agent…"
     : "Type a message…";
 

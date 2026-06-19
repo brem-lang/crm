@@ -6,7 +6,10 @@ export type BotStep =
   | { name: "article"; articleId: string }
   | { name: "collect_name" }
   | { name: "collect_email"; visitorName: string }
-  | { name: "awaiting_agent" };
+  | { name: "awaiting_agent" }
+  | { name: "api_guide_auth" }
+  | { name: "api_guide_fields" }
+  | { name: "api_guide_example" };
 
 export interface BotResponse {
   message: string;
@@ -81,7 +84,7 @@ export function getGreeting(userRoles: string[]): BotResponse {
   return {
     message:
       "👋 Hi there! I can help you find answers from our Help & Guides. What topic do you need help with?",
-    quickReplies: [...cats.slice(0, 5).map(c => c.title), "Talk to Agent"],
+    quickReplies: [...cats.slice(0, 4).map(c => c.title), "Submit Leads via API", "Talk to Agent"],
     nextStep: { name: "menu" },
   };
 }
@@ -111,6 +114,64 @@ export function getBotResponse(
   // ── Back to menu ──────────────────────────────────────────────────────────
   if (lower === "back to menu" || lower === "menu" || lower === "back" || lower === "start over") {
     return getGreeting(userRoles);
+  }
+
+  // ── API guide flow ────────────────────────────────────────────────────────
+  if (lower === "submit leads via api" || lower === "submit leads" || lower === "api guide") {
+    return {
+      message:
+        "I'll walk you through submitting leads via the API.\n\n" +
+        "📡 Endpoint:\nPOST /functions/v1/submit-lead\n\n" +
+        "🔑 Authentication:\nInclude your affiliate API key in the request header:\n" +
+        "Api-Key: YOUR_API_KEY\n\n" +
+        "You can find your API key in the Affiliates section of the CRM.",
+      quickReplies: ["Next: Required Fields", "Back to Menu"],
+      nextStep: { name: "api_guide_auth" },
+    };
+  }
+
+  if (step.name === "api_guide_auth" || lower === "next: required fields") {
+    return {
+      message:
+        "📋 Required fields (JSON body):\n\n" +
+        "• firstname — 2–50 characters\n" +
+        "• lastname — 2–50 characters\n" +
+        "• email — valid email address\n" +
+        "• mobile — digits only, 7–15 digits\n" +
+        "• country_code — 2-letter ISO code (e.g. US, GB, DE)\n\n" +
+        "Optional: custom1, custom2, custom3, offer_name, comment",
+      quickReplies: ["See Example Request", "Back to Menu"],
+      nextStep: { name: "api_guide_fields" },
+    };
+  }
+
+  if (step.name === "api_guide_fields" || lower === "see example request") {
+    return {
+      message:
+        "📦 Example request:\n\n" +
+        "POST /functions/v1/submit-lead\n" +
+        "Content-Type: application/json\n" +
+        "Api-Key: YOUR_API_KEY\n\n" +
+        "{\n" +
+        '  "firstname": "John",\n' +
+        '  "lastname": "Doe",\n' +
+        '  "email": "john@example.com",\n' +
+        '  "mobile": "1234567890",\n' +
+        '  "country_code": "US"\n' +
+        "}\n\n" +
+        "✅ A successful response returns HTTP 201 with a lead_id.",
+      quickReplies: ["View Full API Docs", "Back to Menu"],
+      nextStep: { name: "api_guide_example" },
+    };
+  }
+
+  if (step.name === "api_guide_example" || lower === "view full api docs") {
+    return {
+      message:
+        "You can find the full API documentation — including all optional fields, response codes, and error handling — in the API Docs section. Navigate there from the sidebar.",
+      quickReplies: ["Back to Menu", "Talk to Agent"],
+      nextStep: { name: "menu" },
+    };
   }
 
   // ── Browse all categories ─────────────────────────────────────────────────
