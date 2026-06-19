@@ -58,7 +58,7 @@ export default function AgentDashboard() {
   // Mobile: "list" shows the sessions panel, "chat" shows the conversation panel
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
-  const { agentId, isOnline, loading: agentLoading } = useChatAgent();
+  const { agentId, isOnline, loading: agentLoading, logout: agentLogout } = useChatAgent();
   const { sessions, loading: sessionsLoading, unreadMap, lastMsgMap, markViewed, acceptChat, closeChat } =
     useAgentSessions(agentId, activeId);
   const { messages, loading: msgsLoading, insertMessage } = useChatMessages(activeId);
@@ -453,7 +453,7 @@ export default function AgentDashboard() {
           {isSoundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sign out">
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={async () => { await agentLogout(); signOut(); }} title="Sign out">
           <LogOut className="h-4 w-4" />
         </Button>
       </header>
