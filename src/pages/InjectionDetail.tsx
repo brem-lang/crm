@@ -926,7 +926,7 @@ export default function InjectionDetail() {
 
 
           <TabsContent value="settings">
-            <InjectionSettingsForm injection={injection} />
+            <InjectionSettingsForm injection={injection} leads={leads} />
           </TabsContent>
         </Tabs>
       </div>

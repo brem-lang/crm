@@ -14,19 +14,19 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Save, AlertCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { useUpdateInjection, useInjectionLeads, type Injection } from "@/hooks/useInjections";
+import { useUpdateInjection, type Injection, type InjectionLead } from "@/hooks/useInjections";
 import { useAdvertisers } from "@/hooks/useAdvertisers";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface InjectionSettingsFormProps {
   injection: Injection;
+  leads?: InjectionLead[];
 }
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-export function InjectionSettingsForm({ injection }: InjectionSettingsFormProps) {
+export function InjectionSettingsForm({ injection, leads: injectionLeads = [] }: InjectionSettingsFormProps) {
   const updateInjection = useUpdateInjection();
-  const { data: injectionLeads } = useInjectionLeads(injection.id);
   const { data: advertisers } = useAdvertisers();
   
   const isRunning = injection.status === 'running';
