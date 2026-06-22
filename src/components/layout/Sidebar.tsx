@@ -50,22 +50,24 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Leads", href: "/leads", icon: Users },
-  { 
-    title: "Affiliates", 
-    href: "/affiliates", 
-    icon: UserPlus, 
+  {
+    title: "Affiliates",
+    href: "/affiliates",
+    icon: UserPlus,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Performance", href: "/affiliate-performance", icon: TrendingUp, roles: ["super_admin", "manager"] },
+      { title: "Performance", href: "/affiliate-performance", icon: TrendingUp, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
-  { 
-    title: "Advertisers", 
-    href: "/advertisers", 
-    icon: Building2, 
+  {
+    title: "Advertisers",
+    href: "/advertisers",
+    icon: Building2,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Performance", href: "/advertiser-performance", icon: TrendingUp, roles: ["super_admin", "manager"] },
+      { title: "Performance", href: "/advertiser-performance", icon: TrendingUp, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
   {
@@ -73,31 +75,34 @@ const navItems: NavItem[] = [
     href: "/advertiser-config",
     icon: Network,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Advertiser Config", href: "/advertiser-config", icon: Sliders, roles: ["super_admin", "manager"] },
-      { title: "Distribution Rules", href: "/distribution-rules", icon: GitMerge, roles: ["super_admin", "manager"] },
-      { title: "History", href: "/distributions", icon: Send, roles: ["super_admin", "manager"] },
+      { title: "Advertiser Config", href: "/advertiser-config", icon: Sliders, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Distribution Rules", href: "/distribution-rules", icon: GitMerge, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "History", href: "/distributions", icon: Send, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ],
   },
-  { 
-    title: "Rejected Leads", 
-    href: "/rejected-leads", 
-    icon: XCircle, 
+  {
+    title: "Rejected Leads",
+    href: "/rejected-leads",
+    icon: XCircle,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Affiliate Rejections", href: "/affiliate-rejected", icon: XCircle, roles: ["super_admin", "manager"] },
+      { title: "Affiliate Rejections", href: "/affiliate-rejected", icon: XCircle, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
-  { title: "Test Logs", href: "/test-logs", icon: TestTube2, roles: ["super_admin", "manager"] },
-  { 
-    title: "Reports", 
-    href: "/reports", 
-    icon: BarChart3, 
+  { title: "Test Logs", href: "/test-logs", icon: TestTube2, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+  {
+    title: "Reports",
+    href: "/reports",
+    icon: BarChart3,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Conversions", href: "/conversions", icon: DollarSign, roles: ["super_admin", "manager"] },
-      { title: "Country Performance", href: "/country-performance", icon: Globe, roles: ["super_admin", "manager"] },
-      
+      { title: "Conversions", href: "/conversions", icon: DollarSign, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Country Performance", href: "/country-performance", icon: Globe, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+
     ]
   },
   { title: "API Docs", href: "/api-docs", icon: FileText },
@@ -108,28 +113,29 @@ const navItems: NavItem[] = [
     roles: ["manager", "agent"],
     customRoles: ["Chat Support"],
     children: [
-      { title: "Chat Sessions", href: "/chat-sessions", icon: MessageCircle, roles: ["super_admin", "manager"] },
+      { title: "Chat Sessions", href: "/chat-sessions", icon: MessageCircle, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ],
   },
-  { 
-    title: "Injections", 
-    href: "/injections", 
-    icon: Syringe, 
+  {
+    title: "Injections",
+    href: "/injections",
+    icon: Syringe,
     roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
     children: [
-      { title: "Injection Jobs", href: "/injections/jobs", icon: Syringe, roles: ["super_admin", "manager"] },
-      { title: "Lead Pools", href: "/lead-pools", icon: Box, roles: ["super_admin", "manager"] },
-      { title: "All Injection Leads", href: "/injections/leads", icon: Users, roles: ["super_admin", "manager"] },
-      { title: "Send History", href: "/injections/send-history", icon: Clock, roles: ["super_admin", "manager"] },
-      { title: "Failed Leads", href: "/injections/failed", icon: XCircle, roles: ["super_admin", "manager"] },
+      { title: "Injection Jobs", href: "/injections/jobs", icon: Syringe, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Lead Pools", href: "/lead-pools", icon: Box, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "All Injection Leads", href: "/injections/leads", icon: Users, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Send History", href: "/injections/send-history", icon: Clock, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Failed Leads", href: "/injections/failed", icon: XCircle, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
-  { title: "Monitoring", href: "/monitoring", icon: Activity, roles: ["super_admin"] },
-  { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"] },
-  { title: "Users", href: "/users", icon: UsersRound, roles: ["super_admin"] },
-  { title: "Roles & Permissions", href: "/roles", icon: ShieldCheck, roles: ["super_admin"] },
+  { title: "Monitoring", href: "/monitoring", icon: Activity, roles: ["super_admin"], customRoles: ["Admin"] },
+  { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"], customRoles: ["Admin"] },
+  { title: "Users", href: "/users", icon: UsersRound, roles: ["super_admin"], customRoles: ["Admin"] },
+  { title: "Roles & Permissions", href: "/roles", icon: ShieldCheck, roles: ["super_admin"], customRoles: ["Admin"] },
   { title: "CRM Integrations", href: "/crm-settings", icon: Plug, roles: ["super_admin"] },
-  { title: "Settings", href: "/settings", icon: Settings, roles: ["super_admin"] },
+  { title: "Settings", href: "/settings", icon: Settings, roles: ["super_admin"], customRoles: ["Admin"] },
 ];
 
 export function Sidebar() {
