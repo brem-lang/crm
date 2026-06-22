@@ -43,6 +43,7 @@ const SYSTEM_TYPES = [
   { code: "reacto",      name: "Reacto Trading",   description: "Internal mTLS-secured trading platform integration",      request_format: "json",             auth_type: "header",      required_fields: ["url", "api_key"] },
   { code: "streamline11",name: "Streamline11",     description: "Form-urlencoded, auth via affid + funnel slug in body",   request_format: "form-urlencoded",  auth_type: "body",        required_fields: ["url", "affid", "funnel", "token"] },
   { code: "saxo",        name: "SAXO LTD",         description: "SAXO provider API — JSON POST, x-api-key header, camelCase field names", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
+  { code: "noxwealth",  name: "NoxWealth",        description: "NoxWealth Forex CRM — Bearer token, affiliate_id required, JSON POST to /leads/add", request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "affiliate_id"] },
   { code: "custom",      name: "Custom",           description: "User-defined fields and auth",                            request_format: "json",             auth_type: "none",        required_fields: [] },
 ];
 

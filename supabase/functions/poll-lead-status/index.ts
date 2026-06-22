@@ -1664,6 +1664,184 @@ async function pollElnopyInjectionLeads(
   return { updated, errors };
 }
 
+// Poll NoxWealth using their bulk GET /leads endpoint
+async function pollNoxWealthLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const config = advertiser.config as Record<string, unknown> || {};
+  const affiliateId = config.affiliate_id ? parseInt(String(config.affiliate_id), 10) : null;
+  if (!affiliateId) {
+    console.log(`NoxWealth advertiser ${advertiser.name} missing affiliate_id in config`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const url = new URL(`${baseUrl}/leads`);
+  url.searchParams.set('affiliate_id', String(affiliateId));
+  url.searchParams.set('date_from', fmt(fromDate));
+  url.searchParams.set('date_to', fmt(toDate));
+  url.searchParams.set('per_page', '100');
+
+  console.log(`NoxWealth bulk poll URL: ${url.toString()}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${advertiser.api_key || ''}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`NoxWealth bulk poll failed: ${response.status}, body: ${errorText}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const leads: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
+    console.log(`NoxWealth returned ${leads.length} leads`);
+
+    // Build lookup maps by lead_id and email
+    const byLeadId = new Map<string, Record<string, unknown>>();
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const l of leads) {
+      if (l.lead_id) byLeadId.set(String(l.lead_id), l);
+      if (l.email)   byEmail.set(String(l.email).toLowerCase(), l);
+    }
+
+    for (const dist of distributions) {
+      // Update last_polled_at regardless
+      await supabase
+        .from('lead_distributions')
+        .update({ last_polled_at: new Date().toISOString() })
+        .eq('id', dist.id);
+
+      let noxLead = dist.external_lead_id ? byLeadId.get(dist.external_lead_id) : undefined;
+      if (!noxLead && (dist.leads as any)?.email) {
+        noxLead = byEmail.get(String((dist.leads as any).email).toLowerCase());
+      }
+
+      if (noxLead) {
+        const callStatus = noxLead.call_status as string | undefined;
+        console.log(`NoxWealth match for ${dist.external_lead_id}: call_status=${callStatus}, pipeline_stage=${noxLead.pipeline_stage}`);
+
+        const leadUpdates: Record<string, unknown> = {};
+        const oldSaleStatus = (dist.leads as any).sale_status;
+        if (callStatus && callStatus !== oldSaleStatus) {
+          leadUpdates.sale_status = callStatus;
+          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, callStatus);
+        }
+
+        if (Object.keys(leadUpdates).length > 0) {
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+          updated++;
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error polling NoxWealth: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
+// Poll NoxWealth for injection_leads
+async function pollNoxWealthInjectionLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: { id: string; name: string; api_key: string; url: string | null; config?: Record<string, unknown> },
+  injectionLeads: { id: string; email: string; external_lead_id: string | null; is_ftd: boolean; sale_status: string | null }[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const config = advertiser.config || {};
+  const affiliateId = config.affiliate_id ? parseInt(String(config.affiliate_id), 10) : null;
+  if (!affiliateId) {
+    console.log(`NoxWealth advertiser ${advertiser.name} missing affiliate_id for injection polling`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+  const url = new URL(`${baseUrl}/leads`);
+  url.searchParams.set('affiliate_id', String(affiliateId));
+  url.searchParams.set('date_from', fmt(fromDate));
+  url.searchParams.set('date_to', fmt(toDate));
+  url.searchParams.set('per_page', '100');
+
+  console.log(`NoxWealth injection poll URL: ${url.toString()}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${advertiser.api_key || ''}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`NoxWealth injection poll failed: ${response.status}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const leads: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
+    console.log(`NoxWealth returned ${leads.length} leads for injection polling`);
+
+    const byEmail = new Map<string, Record<string, unknown>>();
+    const byLeadId = new Map<string, Record<string, unknown>>();
+    for (const l of leads) {
+      if (l.email)   byEmail.set(String(l.email).toLowerCase(), l);
+      if (l.lead_id) byLeadId.set(String(l.lead_id), l);
+    }
+
+    for (const injLead of injectionLeads) {
+      let noxLead = byEmail.get(injLead.email.toLowerCase());
+      if (!noxLead && injLead.external_lead_id) noxLead = byLeadId.get(injLead.external_lead_id);
+
+      if (noxLead) {
+        const callStatus = noxLead.call_status as string | undefined;
+        console.log(`NoxWealth match for ${injLead.email}: call_status=${callStatus}`);
+
+        const leadUpdates: Record<string, unknown> = {};
+        if (callStatus && callStatus !== injLead.sale_status) {
+          leadUpdates.sale_status = callStatus;
+          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, callStatus);
+        }
+
+        if (Object.keys(leadUpdates).length > 0) {
+          await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
+          await supabase.from('leads').update({ sale_status: callStatus }).eq('email', injLead.email);
+          updated++;
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error polling NoxWealth for injections: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -1879,6 +2057,50 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
         ftd_date: data.ftd_date || data.deposit_date,
       };
     } catch {
+      return null;
+    }
+  },
+
+  // NoxWealth — GET /leads/status by email or lead_id
+  noxwealth: async (distribution) => {
+    const advertiser = distribution.advertisers;
+    const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
+
+    // Prefer email lookup; fall back to external lead_id
+    const url = new URL(`${baseUrl}/leads/status`);
+    const email = (distribution.leads as any)?.email;
+    if (email) {
+      url.searchParams.set('email', email);
+    } else if (distribution.external_lead_id) {
+      url.searchParams.set('lead_id', distribution.external_lead_id);
+    } else {
+      return null;
+    }
+
+    console.log(`NoxWealth status check: ${url.toString()}`);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${advertiser.api_key || ''}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (!data.success || !data.data) return null;
+
+      const lead = data.data as Record<string, unknown>;
+      return {
+        status: lead.call_status as string | undefined,
+        is_ftd: false,
+        ftd_date: undefined,
+      };
+    } catch (err) {
+      console.error(`NoxWealth status check error: ${err}`);
       return null;
     }
   },
@@ -2101,6 +2323,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // NoxWealth uses bulk GET /leads API
+      if (advertiserType === 'noxwealth') {
+        const result = await pollNoxWealthLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
       // Other advertisers use per-lead polling
       const poller = statusPollers[advertiserType] || statusPollers.custom;
       
@@ -2281,6 +2511,21 @@ Deno.serve(async (req) => {
           const result = await pollEnigmaInjectionLeads(
             supabase,
             adv,
+            advLeads.map((l: any) => ({
+              id: l.id,
+              email: l.email,
+              external_lead_id: l.external_lead_id,
+              is_ftd: l.is_ftd,
+              sale_status: l.sale_status,
+            }))
+          );
+          totalUpdated += result.updated;
+          totalErrors += result.errors;
+        } else if (adv.advertiser_type === 'noxwealth') {
+          console.log(`Polling ${advLeads.length} injection leads for NoxWealth advertiser ${adv.name}`);
+          const result = await pollNoxWealthInjectionLeads(
+            supabase,
+            { ...adv, config: adv.config || {} },
             advLeads.map((l: any) => ({
               id: l.id,
               email: l.email,

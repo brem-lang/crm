@@ -30,6 +30,7 @@ interface AdvertiserConfig {
   affid?: string;
   funnel?: string;
   token?: string;
+  affiliate_id?: string;
 }
 
 interface FormData {
@@ -466,6 +467,34 @@ export function AdvertiserFormDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Overrides the lead's source field when sending to SAXO
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* === NoxWealth === */}
+          {formData.advertiser_type === 'noxwealth' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">NoxWealth Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>API Key (Bearer Token) <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="nox_live_sk_..."
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Affiliate ID <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. 2945"
+                  value={formData.config.affiliate_id || ''}
+                  onChange={(e) => updateConfig('affiliate_id', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Numeric affiliate ID sent with every lead submission
                 </p>
               </div>
             </>

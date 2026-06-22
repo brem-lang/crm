@@ -81,6 +81,12 @@ const advertiserTypes = [
     description: "SAXO LTD provider API — JSON POST with x-api-key header, camelCase fields",
     fields: ["url", "api_key"],
   },
+  {
+    value: "noxwealth",
+    label: "NoxWealth",
+    description: "NoxWealth Forex CRM — Bearer token auth, affiliate_id required, JSON POST",
+    fields: ["url", "api_key", "affiliate_id"],
+  },
 ];
 
 interface AdvertiserConfig {

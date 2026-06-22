@@ -1024,6 +1024,64 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     }
   },
 
+  // NoxWealth — Forex CRM, Bearer token auth, affiliate_id required
+  noxwealth: async (lead, advertiser) => {
+    const config = advertiser.config || {};
+    const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/leads/add`;
+
+    const affiliateId = config.affiliate_id ? parseInt(String(config.affiliate_id), 10) : null;
+
+    const payload: Record<string, unknown> = {
+      first_name: lead.firstname || '',
+      last_name:  lead.lastname  || '',
+      email:      lead.email     || '',
+      phone:      lead.mobile    || '',
+      country:    lead.country_code || lead.country || '',
+      affiliate_id: affiliateId,
+    };
+    if (lead.offer_name) payload.campaign = lead.offer_name;
+    if (lead.custom1)    payload.source   = lead.custom1;
+
+    console.log(`NoxWealth: sending lead to ${endpoint}`);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${advertiser.api_key || ''}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('NoxWealth: network error', err);
+      return { success: false, response: JSON.stringify({ error: 'Network error contacting NoxWealth' }) };
+    }
+
+    const text = await response.text();
+    console.log(`NoxWealth: status ${response.status}, body:`, text);
+
+    let json: Record<string, unknown> | null = null;
+    try { json = JSON.parse(text); } catch { /* non-JSON response */ }
+
+    // 200 with already_exists = duplicate lead, treat as success
+    if (response.status === 200 && json?.status === 'already_exists') {
+      const externalLeadId = json?.data ? String((json.data as Record<string, unknown>)?.lead_id ?? '') : undefined;
+      return { success: true, response: text, externalLeadId: externalLeadId || undefined };
+    }
+
+    // 201 = created successfully
+    if (response.status === 201) {
+      const externalLeadId = json?.data ? String((json.data as Record<string, unknown>)?.lead_id ?? '') : undefined;
+      return { success: true, response: text, externalLeadId: externalLeadId || undefined };
+    }
+
+    // All other statuses (400, 401, 409, 422, 429, 500) = failure
+    return { success: false, response: text };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');
