@@ -1686,7 +1686,7 @@ async function pollNoxWealthLeads(
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  const url = new URL(`${baseUrl}/leads`);
+  const url = new URL(`${baseUrl}/leads/`);
   url.searchParams.set('affiliate_id', String(affiliateId));
   url.searchParams.set('date_from', fmt(fromDate));
   url.searchParams.set('date_to', fmt(toDate));
@@ -1780,7 +1780,7 @@ async function pollNoxWealthInjectionLeads(
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
-  const url = new URL(`${baseUrl}/leads`);
+  const url = new URL(`${baseUrl}/leads/`);
   url.searchParams.set('affiliate_id', String(affiliateId));
   url.searchParams.set('date_from', fmt(fromDate));
   url.searchParams.set('date_to', fmt(toDate));
@@ -2067,7 +2067,7 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
     const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
 
     // Prefer email lookup; fall back to external lead_id
-    const url = new URL(`${baseUrl}/leads/status`);
+    const url = new URL(`${baseUrl}/leads/status/`);
     const email = (distribution.leads as any)?.email;
     if (email) {
       url.searchParams.set('email', email);

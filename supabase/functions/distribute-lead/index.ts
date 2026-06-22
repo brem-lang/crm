@@ -1028,7 +1028,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
   noxwealth: async (lead, advertiser) => {
     const config = advertiser.config || {};
     const baseUrl = (advertiser.url || 'https://noxwealth.com/api/v1').replace(/\/$/, '');
-    const endpoint = `${baseUrl}/leads/add`;
+    const endpoint = `${baseUrl}/leads/add/`;
 
     const affiliateId = config.affiliate_id ? parseInt(String(config.affiliate_id), 10) : null;
 
