@@ -966,6 +966,64 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     return { success: isSuccess, response: text };
   },
 
+  // SAXO LTD — provider API integration
+  saxo: async (lead, advertiser) => {
+    const config = advertiser.config || {};
+    const baseUrl = (advertiser.url || 'https://platform.saxoltd.com/api/external').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/leads`;
+
+    const payload: Record<string, unknown> = {
+      phone: lead.mobile,
+      firstName: lead.firstname || '',
+      lastName: lead.lastname || '',
+    };
+    if (lead.email)      payload.email        = lead.email;
+    if (lead.country)    payload.country      = lead.country;
+    if (lead.custom1)    payload.source       = lead.custom1;
+    if (lead.offer_name) payload.campaign     = lead.offer_name;
+    if (lead.comment)    payload.agentComment = lead.comment;
+    if (config.source)   payload.source       = String(config.source);
+
+    console.log(`SAXO: sending lead to ${endpoint}`);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': advertiser.api_key || '',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('SAXO: network error', err);
+      return { success: false, response: JSON.stringify({ error: 'Network error contacting SAXO' }) };
+    }
+
+    const text = await response.text();
+    console.log(`SAXO: status ${response.status}, body:`, text);
+
+    if (!response.ok && response.status !== 409) {
+      return { success: false, response: text };
+    }
+
+    let externalLeadId: string | undefined;
+    try {
+      const json = JSON.parse(text);
+      if (json?.data?.lead?.id) externalLeadId = String(json.data.lead.id);
+      // 409 duplicate = lead already exists on SAXO side — treat as success
+      if (response.status === 409) {
+        const dupId = json?.data?.leadId;
+        externalLeadId = dupId ? String(dupId) : externalLeadId;
+        return { success: true, response: text, externalLeadId };
+      }
+      return { success: json?.success === true, response: text, externalLeadId };
+    } catch {
+      return { success: response.ok, response: text };
+    }
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');

@@ -87,6 +87,7 @@ export function AdvertiserFormDialog({
       gsi: "https://www.gsimarkets.com/api_add2.php",
       elnopy: "https://tracking.mpowertraffic2.com/api/v3/integration",
       streamline11: "https://gpapi.org/leads",
+      saxo: "https://platform.saxoltd.com/api/external",
       custom: "",
     };
     
@@ -437,6 +438,34 @@ export function AdvertiserFormDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Default landing page URL sent as source parameter with each lead
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* === SAXO LTD === */}
+          {formData.advertiser_type === 'saxo' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">SAXO LTD Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>API Key <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="Your SAXO x-api-key"
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Default Source (optional)</Label>
+                <Input
+                  placeholder="e.g. Facebook Ads"
+                  value={formData.config.source || ''}
+                  onChange={(e) => updateConfig('source', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Overrides the lead's source field when sending to SAXO
                 </p>
               </div>
             </>

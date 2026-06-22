@@ -34,6 +34,7 @@ import {
   Network,
   ShieldCheck,
   MessageCircle,
+  Plug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -127,6 +128,7 @@ const navItems: NavItem[] = [
   { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"] },
   { title: "Users", href: "/users", icon: UsersRound, roles: ["super_admin"] },
   { title: "Roles & Permissions", href: "/roles", icon: ShieldCheck, roles: ["super_admin"] },
+  { title: "CRM Integrations", href: "/crm-settings", icon: Plug, roles: ["super_admin"] },
   { title: "Settings", href: "/settings", icon: Settings, roles: ["super_admin"] },
 ];
 

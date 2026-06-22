@@ -14,28 +14,28 @@ export default function ApiDocs() {
 
   const handleDownloadPDF = async () => {
     if (!contentRef.current) return;
-    
+
     setIsGenerating(true);
-    
+
     try {
       const element = contentRef.current;
       const opt = {
         margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: 'MegaTronCRM-API-Documentation.pdf',
         image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { 
+        html2canvas: {
           scale: 2,
           useCORS: true,
           letterRendering: true,
         },
-        jsPDF: { 
-          unit: 'mm' as const, 
-          format: 'a4' as const, 
-          orientation: 'portrait' as const 
+        jsPDF: {
+          unit: 'mm' as const,
+          format: 'a4' as const,
+          orientation: 'portrait' as const
         },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as ('avoid-all' | 'css' | 'legacy')[] }
       };
-      
+
       await html2pdf().set(opt).from(element).save();
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -55,8 +55,8 @@ export default function ApiDocs() {
               Complete guide to integrate with our lead management system
             </p>
           </div>
-          <Button 
-            onClick={handleDownloadPDF} 
+          <Button
+            onClick={handleDownloadPDF}
             disabled={isGenerating}
             className="self-start print:hidden"
           >

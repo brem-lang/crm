@@ -14,6 +14,7 @@ import { AdvertiserCardGrid } from "@/components/advertisers/AdvertiserCardGrid"
 import { AdvertiserFormDialog } from "@/components/advertisers/AdvertiserFormDialog";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
+import { useCRMTypes } from "@/hooks/useCRMTypes";
 
 type Advertiser = Database['public']['Tables']['advertisers']['Row'];
 type StatusFilter = "all" | "active" | "inactive";
@@ -74,6 +75,12 @@ const advertiserTypes = [
     description: "Streamline11 (gpapi.org) - form-urlencoded, auth via affid + funnel slug in body",
     fields: ["url", "affid", "funnel", "token"],
   },
+  {
+    value: "saxo",
+    label: "SAXO LTD",
+    description: "SAXO LTD provider API — JSON POST with x-api-key header, camelCase fields",
+    fields: ["url", "api_key"],
+  },
 ];
 
 interface AdvertiserConfig {
@@ -93,6 +100,7 @@ const initialFormData = {
 
 export default function Advertisers() {
   const { data: advertisers, isLoading, error } = useAdvertisers();
+  const { data: customCRMTypes = [] } = useCRMTypes();
   const createAdvertiser = useCreateAdvertiser();
   const updateAdvertiser = useUpdateAdvertiser();
   const deleteAdvertiser = useDeleteAdvertiser();
@@ -390,7 +398,18 @@ export default function Advertisers() {
           formData={formData}
           setFormData={setFormData}
           updateConfig={updateConfig}
-          advertiserTypes={advertiserTypes}
+          advertiserTypes={[
+            ...advertiserTypes,
+            ...customCRMTypes
+              .filter((ct) => ct.is_active)
+              .filter((ct) => !advertiserTypes.some((st) => st.value === ct.code))
+              .map((ct) => ({
+                value: ct.code,
+                label: `${ct.name} (custom)`,
+                description: ct.description ?? "",
+                fields: ct.required_fields,
+              })),
+          ]}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           isPending={createAdvertiser.isPending || updateAdvertiser.isPending}

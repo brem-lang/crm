@@ -49,6 +49,11 @@ export type UserPermission =
   | 'delete_affiliate_submissions'
   // Test Leads
   | 'delete_test_leads'
+  // CRM Integration Settings
+  | 'view_crm_types'
+  | 'create_crm_types'
+  | 'edit_crm_types'
+  | 'delete_crm_types'
   // Reports & System
   | 'view_reports'
   | 'view_audit_logs'
@@ -115,6 +120,11 @@ export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; descrip
   { group: 'Rejected Leads', id: 'delete_affiliate_submissions', label: 'Delete Affiliate Submissions', description: 'Can bulk delete affiliate submission failure records' },
   // Test Leads
   { group: 'Test Leads', id: 'delete_test_leads', label: 'Delete Test Leads', description: 'Can bulk delete test lead log records' },
+  // CRM Integration Settings
+  { group: 'CRM Settings', id: 'view_crm_types', label: 'View CRM Integrations', description: 'Can access the CRM Integrations settings page' },
+  { group: 'CRM Settings', id: 'create_crm_types', label: 'Create CRM Types', description: 'Can create new custom CRM integration types' },
+  { group: 'CRM Settings', id: 'edit_crm_types', label: 'Edit CRM Types', description: 'Can edit existing custom CRM integration types' },
+  { group: 'CRM Settings', id: 'delete_crm_types', label: 'Delete CRM Types', description: 'Can delete custom CRM integration types' },
   // Reports & System
   { group: 'Reports & System', id: 'view_reports', label: 'View Reports', description: 'Can access the Reports & Analytics page' },
   { group: 'Reports & System', id: 'view_audit_logs', label: 'View Audit Logs', description: 'Can access the Audit Logs page' },
@@ -281,6 +291,11 @@ export function useCurrentUserPermissions() {
     canDeleteAffiliateSubmissions: hasPermission('delete_affiliate_submissions'),
     // Test Leads
     canDeleteTestLeads: hasPermission('delete_test_leads'),
+    // CRM Settings
+    canViewCRMTypes: hasPermission('view_crm_types'),
+    canCreateCRMTypes: hasPermission('create_crm_types'),
+    canEditCRMTypes: hasPermission('edit_crm_types'),
+    canDeleteCRMTypes: hasPermission('delete_crm_types'),
     // Reports & System
     canViewReports: hasPermission('view_reports'),
     canViewAuditLogs: hasPermission('view_audit_logs'),
