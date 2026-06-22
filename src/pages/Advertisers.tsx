@@ -98,8 +98,6 @@ const initialFormData = {
   advertiser_type: "enigma",
   url: "",
   api_key: "",
-  daily_cap: 100,
-  hourly_cap: null as number | null,
   is_active: true,
   config: {} as AdvertiserConfig,
 };
@@ -243,8 +241,6 @@ export default function Advertisers() {
       advertiser_type: advertiser.advertiser_type,
       url: advertiser.url || "",
       api_key: advertiser.api_key || "",
-      daily_cap: advertiser.daily_cap || 100,
-      hourly_cap: advertiser.hourly_cap || null,
       is_active: advertiser.is_active,
       config: {
         username: config.username || "",
@@ -277,8 +273,6 @@ export default function Advertisers() {
       advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11",
       url: formData.url,
       api_key: formData.api_key,
-      daily_cap: formData.daily_cap,
-      hourly_cap: formData.hourly_cap,
       is_active: formData.is_active,
       config: formData.config,
     };

@@ -38,8 +38,6 @@ interface FormData {
   advertiser_type: string;
   url: string;
   api_key: string;
-  daily_cap: number;
-  hourly_cap: number | null;
   is_active: boolean;
   config: AdvertiserConfig;
 }
@@ -152,28 +150,6 @@ export function AdvertiserFormDialog({
               value={formData.url}
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
             />
-          </div>
-
-          {/* Caps */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Daily Cap</Label>
-              <Input
-                type="number"
-                placeholder="100"
-                value={formData.daily_cap}
-                onChange={(e) => setFormData({ ...formData, daily_cap: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Hourly Cap</Label>
-              <Input
-                type="number"
-                placeholder="No limit"
-                value={formData.hourly_cap || ""}
-                onChange={(e) => setFormData({ ...formData, hourly_cap: e.target.value ? parseInt(e.target.value) : null })}
-              />
-            </div>
           </div>
 
           {/* === TIMELOCAL === */}
