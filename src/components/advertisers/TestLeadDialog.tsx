@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Send, RefreshCw, CheckCircle2, XCircle, Copy } from "lucide-react";
+import { Loader2, Send, RefreshCw, CheckCircle2, XCircle, Copy, Wand2, PenLine } from "lucide-react";
 import { countryData, generateTestData } from "./countryData";
 
 interface TestLeadDialogProps {
@@ -24,11 +24,12 @@ interface TestResult {
 }
 
 export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName }: TestLeadDialogProps) {
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [selectedCountry, setSelectedCountry] = useState("US");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedData, setGeneratedData] = useState(() => generateTestData("US"));
   const [testResult, setTestResult] = useState<TestResult | null>(null);
-  
+
   // Additional fields
   const [offerName, setOfferName] = useState("");
   const [custom1, setCustom1] = useState("");
@@ -46,6 +47,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
 
   const resetDialog = () => {
     setTestResult(null);
+    setMode("auto");
     setGeneratedData(generateTestData(selectedCountry));
   };
 
@@ -179,62 +181,199 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         ) : (
           // Show form view
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Select Country/Geo</Label>
-                <Select value={selectedCountry} onValueChange={handleCountryChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] z-[100] bg-popover">
-                    {sortedCountries.map(([code, data]) => (
-                      <SelectItem key={code} value={code}>
-                        {data.name} ({code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Country Code</Label>
-                <Input
-                  value={generatedData.country_code}
-                  onChange={(e) => {
-                    const code = e.target.value.toUpperCase();
-                    setGeneratedData({ ...generatedData, country_code: code });
-                    // If the code matches a known country, select it and regenerate data
-                    if (countryData[code]) {
-                      setSelectedCountry(code);
-                      setGeneratedData(generateTestData(code));
-                    }
-                  }}
-                  placeholder="US"
-                  maxLength={3}
-                />
-              </div>
+            {/* Mode toggle */}
+            <div className="flex rounded-lg border p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setMode("auto")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  mode === "auto"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Wand2 className="h-4 w-4" />
+                Auto Generate
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("manual")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  mode === "manual"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <PenLine className="h-4 w-4" />
+                Manual Input
+              </button>
             </div>
 
-            {/* Phone + IP overrides (required by some advertiser validations) */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Phone (editable)</Label>
-                <Input
-                  value={generatedData.mobile}
-                  onChange={(e) => setGeneratedData({ ...generatedData, mobile: e.target.value })}
-                  placeholder="e.g., +19058304680 or 9058304680"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>IP Address (editable)</Label>
-                <Input
-                  value={generatedData.ip_address}
-                  onChange={(e) => setGeneratedData({ ...generatedData, ip_address: e.target.value })}
-                  placeholder="e.g., 99.248.165.193"
-                />
-              </div>
-            </div>
+            {mode === "auto" ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Select Country/Geo</Label>
+                    <Select value={selectedCountry} onValueChange={handleCountryChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px] z-[100] bg-popover">
+                        {sortedCountries.map(([code, data]) => (
+                          <SelectItem key={code} value={code}>
+                            {data.name} ({code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Country Code</Label>
+                    <Input
+                      value={generatedData.country_code}
+                      onChange={(e) => {
+                        const code = e.target.value.toUpperCase();
+                        setGeneratedData({ ...generatedData, country_code: code });
+                        if (countryData[code]) {
+                          setSelectedCountry(code);
+                          setGeneratedData(generateTestData(code));
+                        }
+                      }}
+                      placeholder="US"
+                      maxLength={3}
+                    />
+                  </div>
+                </div>
 
-            {/* Offer Name */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Phone (editable)</Label>
+                    <Input
+                      value={generatedData.mobile}
+                      onChange={(e) => setGeneratedData({ ...generatedData, mobile: e.target.value })}
+                      placeholder="e.g., +19058304680"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IP Address (editable)</Label>
+                    <Input
+                      value={generatedData.ip_address}
+                      onChange={(e) => setGeneratedData({ ...generatedData, ip_address: e.target.value })}
+                      placeholder="e.g., 99.248.165.193"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-muted rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between items-center mb-3">
+                    <Label className="text-sm font-medium">Generated Lead Data</Label>
+                    <Button variant="outline" size="sm" onClick={regenerateData}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">First Name:</span>
+                      <p className="font-medium">{generatedData.firstname}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Last Name:</span>
+                      <p className="font-medium">{generatedData.lastname}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Email:</span>
+                      <p className="font-medium text-xs break-all">{generatedData.email}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Phone:</span>
+                      <p className="font-medium">{generatedData.mobile}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Country:</span>
+                      <p className="font-medium">{generatedData.country_code}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">IP Address:</span>
+                      <p className="font-medium">{generatedData.ip_address}</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Manual Input mode — all fields editable */
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>First Name</Label>
+                    <Input
+                      value={generatedData.firstname}
+                      onChange={(e) => setGeneratedData({ ...generatedData, firstname: e.target.value })}
+                      placeholder="John"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last Name</Label>
+                    <Input
+                      value={generatedData.lastname}
+                      onChange={(e) => setGeneratedData({ ...generatedData, lastname: e.target.value })}
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    value={generatedData.email}
+                    onChange={(e) => setGeneratedData({ ...generatedData, email: e.target.value })}
+                    placeholder="john.doe@example.com"
+                    type="email"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={generatedData.mobile}
+                      onChange={(e) => setGeneratedData({ ...generatedData, mobile: e.target.value })}
+                      placeholder="+19058304680"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IP Address</Label>
+                    <Input
+                      value={generatedData.ip_address}
+                      onChange={(e) => setGeneratedData({ ...generatedData, ip_address: e.target.value })}
+                      placeholder="99.248.165.193"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Country Code</Label>
+                    <Input
+                      value={generatedData.country_code}
+                      onChange={(e) => setGeneratedData({ ...generatedData, country_code: e.target.value.toUpperCase() })}
+                      placeholder="US"
+                      maxLength={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Country Name</Label>
+                    <Input
+                      value={generatedData.country}
+                      onChange={(e) => setGeneratedData({ ...generatedData, country: e.target.value })}
+                      placeholder="United States"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Offer Name — shared between both modes */}
             <div className="space-y-2">
               <Label>Offer Name (optional)</Label>
               <Input
@@ -244,7 +383,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               />
             </div>
 
-            {/* Custom Fields */}
+            {/* Custom Fields — shared between both modes */}
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Custom Parameters (optional)</Label>
               <div className="grid grid-cols-3 gap-2">
@@ -263,43 +402,6 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                   onChange={(e) => setCustom3(e.target.value)}
                   placeholder="custom3"
                 />
-              </div>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4 space-y-2">
-              <div className="flex justify-between items-center mb-3">
-                <Label className="text-sm font-medium">Generated Lead Data</Label>
-                <Button variant="outline" size="sm" onClick={regenerateData}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Regenerate
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">First Name:</span>
-                  <p className="font-medium">{generatedData.firstname}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Last Name:</span>
-                  <p className="font-medium">{generatedData.lastname}</p>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Email:</span>
-                  <p className="font-medium text-xs break-all">{generatedData.email}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone:</span>
-                  <p className="font-medium">{generatedData.mobile}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Country:</span>
-                  <p className="font-medium">{generatedData.country_code}</p>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">IP Address:</span>
-                  <p className="font-medium">{generatedData.ip_address}</p>
-                </div>
               </div>
             </div>
           </div>
