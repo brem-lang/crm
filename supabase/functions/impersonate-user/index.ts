@@ -105,9 +105,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Audit log
+    try {
+      await supabaseAdmin.from("audit_logs").insert({
+        user_id: caller.id,
+        user_email: caller.email ?? null,
+        action: "impersonate_user",
+        table_name: "auth.users",
+        record_id: userId,
+        new_data: { target_email: targetUser.user.email, target_user_id: userId },
+        changes_summary: `Impersonated user ${targetUser.user.email}`,
+      });
+    } catch { /* non-critical */ }
+
     // Return the hashed token which can be used to verify OTP
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         email: targetUser.user.email,
         token: linkData.properties?.hashed_token,

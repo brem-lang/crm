@@ -21,6 +21,7 @@ interface AuditLogsFilters {
   action?: string;
   tableName?: string;
   userEmail?: string;
+  recordId?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -28,10 +29,10 @@ interface AuditLogsFilters {
 }
 
 export function useAuditLogs(filters: AuditLogsFilters = {}) {
-  const { action, tableName, userEmail, dateFrom, dateTo, page = 1, pageSize = 50 } = filters;
+  const { action, tableName, userEmail, recordId, dateFrom, dateTo, page = 1, pageSize = 50 } = filters;
 
   return useQuery({
-    queryKey: ['audit-logs', action, tableName, userEmail, dateFrom, dateTo, page, pageSize],
+    queryKey: ['audit-logs', action, tableName, userEmail, recordId, dateFrom, dateTo, page, pageSize],
     staleTime: 60 * 1000,
     queryFn: async () => {
       let query = supabase
@@ -47,6 +48,9 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
       }
       if (userEmail) {
         query = query.ilike('user_email', `%${userEmail}%`);
+      }
+      if (recordId) {
+        query = query.ilike('record_id', `%${recordId}%`);
       }
       if (dateFrom) {
         query = query.gte('created_at', dateFrom);
