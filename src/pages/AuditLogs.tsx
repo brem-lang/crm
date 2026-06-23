@@ -16,8 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function AuditLogs() {
-  const { isSuperAdmin } = useAuth();
-  const { canViewAuditLogs } = useCurrentUserPermissions();
+  const { isSuperAdmin, loading: authLoading } = useAuth();
+  const { canViewAuditLogs, isLoading: permLoading } = useCurrentUserPermissions();
 
   const [action, setAction] = useState<string>("");
   const [tableName, setTableName] = useState<string>("");
@@ -111,7 +111,9 @@ export default function AuditLogs() {
     ? new Set(data.logs.map((l) => l.user_email || "system").filter(Boolean)).size
     : 0;
 
-  if (!isSuperAdmin && !canViewAuditLogs) {
+  // Only gate after both auth and permissions have finished loading
+  const stillLoading = authLoading || permLoading;
+  if (!stillLoading && !isSuperAdmin && !canViewAuditLogs) {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
