@@ -28,6 +28,7 @@ export default function Affiliates() {
     canCreateAffiliates,
     canEditAffiliates,
     canDeleteAffiliates,
+    canManageAffiliateIpWhitelist,
   } = useCurrentUserPermissions();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -356,45 +357,47 @@ export default function Affiliates() {
                   Autologin URLs will be sent here after successful distribution
                 </p>
               </div>
-              <div className="space-y-3 border rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <Label>IP Whitelist Required</Label>
-                  </div>
-                  <Switch
-                    checked={formData.ip_whitelist_required}
-                    onCheckedChange={(v) => setFormData({ ...formData, ip_whitelist_required: v })}
-                  />
-                </div>
-                {formData.ip_whitelist_required && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="e.g. 192.168.1.1"
-                        value={ipInput}
-                        onChange={(e) => setIpInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
-                        className="text-xs"
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
+              {canManageAffiliateIpWhitelist && (
+                <div className="space-y-3 border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <Label>IP Whitelist Required</Label>
                     </div>
-                    {formData.allowed_ips.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {formData.allowed_ips.map(ip => (
-                          <Badge key={ip} variant="secondary" className="gap-1 text-xs">
-                            {ip}
-                            <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <Switch
+                      checked={formData.ip_whitelist_required}
+                      onCheckedChange={(v) => setFormData({ ...formData, ip_whitelist_required: v })}
+                    />
                   </div>
-                )}
-              </div>
+                  {formData.ip_whitelist_required && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g. 192.168.1.1"
+                          value={ipInput}
+                          onChange={(e) => setIpInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
+                          className="text-xs"
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
+                      </div>
+                      {formData.allowed_ips.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {formData.allowed_ips.map(ip => (
+                            <Badge key={ip} variant="secondary" className="gap-1 text-xs">
+                              {ip}
+                              <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -465,45 +468,47 @@ export default function Affiliates() {
                   Autologin URLs will be sent here after successful distribution
                 </p>
               </div>
-              <div className="space-y-3 border rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <Label>IP Whitelist Required</Label>
-                  </div>
-                  <Switch
-                    checked={formData.ip_whitelist_required}
-                    onCheckedChange={(v) => setFormData({ ...formData, ip_whitelist_required: v })}
-                  />
-                </div>
-                {formData.ip_whitelist_required && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="e.g. 192.168.1.1"
-                        value={ipInput}
-                        onChange={(e) => setIpInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
-                        className="text-xs"
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
+              {canManageAffiliateIpWhitelist && (
+                <div className="space-y-3 border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <Label>IP Whitelist Required</Label>
                     </div>
-                    {formData.allowed_ips.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {formData.allowed_ips.map(ip => (
-                          <Badge key={ip} variant="secondary" className="gap-1 text-xs">
-                            {ip}
-                            <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <Switch
+                      checked={formData.ip_whitelist_required}
+                      onCheckedChange={(v) => setFormData({ ...formData, ip_whitelist_required: v })}
+                    />
                   </div>
-                )}
-              </div>
+                  {formData.ip_whitelist_required && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g. 192.168.1.1"
+                          value={ipInput}
+                          onChange={(e) => setIpInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
+                          className="text-xs"
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
+                      </div>
+                      {formData.allowed_ips.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {formData.allowed_ips.map(ip => (
+                            <Badge key={ip} variant="secondary" className="gap-1 text-xs">
+                              {ip}
+                              <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>

@@ -9,11 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAffiliateApiLogs } from "@/hooks/useAffiliateApiLogs";
 import { useAffiliates } from "@/hooks/useAffiliates";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
+import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Shield } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, Lock } from "lucide-react";
 
 export default function AffiliateApiLogs() {
+  const { isSuperAdmin } = useAuth();
+  const { canViewAffiliateApiLogs } = useCurrentUserPermissions();
+
   const [page, setPage] = useState(1);
   const [affiliateId, setAffiliateId] = useState("");
   const [status, setStatus] = useState<'accepted' | 'rejected' | ''>("");
@@ -35,6 +40,18 @@ export default function AffiliateApiLogs() {
     setIpSearch(ipInput);
     setPage(1);
   };
+
+  if (!isSuperAdmin && !canViewAffiliateApiLogs) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+          <Lock className="h-10 w-10" />
+          <p className="text-lg font-medium">Access Denied</p>
+          <p className="text-sm">You don't have permission to view Affiliate API Logs.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
