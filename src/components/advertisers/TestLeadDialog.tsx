@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Send, RefreshCw, CheckCircle2, XCircle, Copy, Wand2, PenLine } from "lucide-react";
 import { countryData, generateTestData } from "./countryData";
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 
 interface TestLeadDialogProps {
   open: boolean;
@@ -132,10 +133,11 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
     }
   };
 
-  // Sort countries alphabetically by name
-  const sortedCountries = Object.entries(countryData).sort(([, a], [, b]) => 
-    a.name.localeCompare(b.name)
-  );
+  const { isRestricted } = useRestrictedCountries();
+  // Sort countries alphabetically by name, excluding restricted ones
+  const sortedCountries = Object.entries(countryData)
+    .filter(([code]) => !isRestricted(code))
+    .sort(([, a], [, b]) => a.name.localeCompare(b.name));
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

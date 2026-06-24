@@ -41,6 +41,7 @@ const Conversions = lazy(() => import("./pages/Conversions"));
 const CountryPerformance = lazy(() => import("./pages/CountryPerformance"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const Settings = lazy(() => import("./pages/Settings"));
+const SettingsSection = lazy(() => import("./pages/SettingsSection"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const Users = lazy(() => import("./pages/Users"));
 const LeadPools = lazy(() => import("./pages/LeadPools"));
@@ -124,6 +125,7 @@ const App = () => (
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/roles" element={<RolesPermissions />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/:section" element={<SettingsSection />} />
                 <Route path="/crm-settings" element={<CRMSettings />} />
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="/help" element={<HelpDesk />} />

@@ -1,4 +1,5 @@
 import { getCountryList } from "@/components/advertisers/countryData";
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,7 +184,8 @@ export function RuleBuilderSheet({
     targets.map((t) => t.advertiser_id).filter(Boolean),
   );
 
-  const countryOptions = getCountryList().map((c) => ({
+  const { filterCountries } = useRestrictedCountries();
+  const countryOptions = filterCountries(getCountryList()).map((c) => ({
     value: c.code,
     label: `${c.code} – ${c.name}`,
   }));

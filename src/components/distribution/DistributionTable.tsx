@@ -8,6 +8,7 @@ import { Save, Settings2, Search, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { countryData } from "@/components/advertisers/countryData";
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 import { WeeklyScheduleSelector, WeeklySchedule, parseWeeklySchedule } from "./WeeklyScheduleSelector";
 
 interface Advertiser {
@@ -220,15 +221,17 @@ export function DistributionTable({ advertisers, affiliates, settings, onSave, i
 
 function CountrySelector({ selected, onChange }: { selected: string[]; onChange: (countries: string[]) => void }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { isRestricted } = useRestrictedCountries();
 
   const filteredCountries = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return Object.entries(countryData);
-    return Object.entries(countryData).filter(([code, country]) => 
-      code.toLowerCase().includes(query) || 
+    const entries = Object.entries(countryData).filter(([code]) => !isRestricted(code));
+    if (!query) return entries;
+    return entries.filter(([code, country]) =>
+      code.toLowerCase().includes(query) ||
       country.name.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, isRestricted]);
 
   const toggle = (code: string) => {
     if (selected.includes(code)) {

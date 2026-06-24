@@ -6,10 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Settings2, Search } from "lucide-react";
 import { countryData } from "@/components/advertisers/countryData";
-
-// Hoisted outside component — computed once at module load, never again
-const ALL_COUNTRY_ENTRIES = Object.entries(countryData);
-const ALL_COUNTRY_CODES = Object.keys(countryData);
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 
 interface AffiliateCountrySelectorProps {
   selected: string[] | null;
@@ -20,6 +17,7 @@ interface AffiliateCountrySelectorProps {
 export function AffiliateCountrySelector({ selected, onChange, compact = false }: AffiliateCountrySelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const { isRestricted } = useRestrictedCountries();
 
   // null means all countries, empty array means none, array means specific countries
   const isAllCountries = selected === null;
@@ -28,24 +26,30 @@ export function AffiliateCountrySelector({ selected, onChange, compact = false }
   // O(1) lookup instead of O(n) includes()
   const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
 
+  const allowedEntries = useMemo(
+    () => Object.entries(countryData).filter(([code]) => !isRestricted(code)),
+    [isRestricted],
+  );
+  const allowedCodes = useMemo(() => allowedEntries.map(([code]) => code), [allowedEntries]);
+
   const filteredCountries = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return ALL_COUNTRY_ENTRIES;
-    return ALL_COUNTRY_ENTRIES.filter(([code, country]) =>
+    if (!query) return allowedEntries;
+    return allowedEntries.filter(([code, country]) =>
       code.toLowerCase().includes(query) ||
       country.name.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, allowedEntries]);
 
   const toggle = useCallback((code: string) => {
     if (isAllCountries) {
-      onChange(ALL_COUNTRY_CODES.filter(c => c !== code));
+      onChange(allowedCodes.filter(c => c !== code));
     } else if (selectedSet.has(code)) {
       onChange(selectedCodes.filter(c => c !== code));
     } else {
       onChange([...selectedCodes, code]);
     }
-  }, [isAllCountries, selectedSet, selectedCodes, onChange]);
+  }, [isAllCountries, selectedSet, selectedCodes, allowedCodes, onChange]);
 
   const selectAllFiltered = useCallback(() => {
     if (isAllCountries) return;

@@ -31,6 +31,8 @@ export interface SystemSettings {
   maintenance_mode: boolean;
   maintenance_message: string;
   audit_log_retention_days: number;
+  // Restricted Countries
+  restricted_countries: string[];
   updated_at: string;
   updated_by: string | null;
 }
@@ -56,6 +58,7 @@ export const SYSTEM_SETTINGS_DEFAULTS: Omit<SystemSettings, "id" | "updated_at" 
   maintenance_mode: false,
   maintenance_message: "System is under maintenance. Please check back later.",
   audit_log_retention_days: 0,
+  restricted_countries: [],
 };
 
 export function useSystemSettings() {
