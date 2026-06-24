@@ -364,9 +364,12 @@ export default function Monitoring() {
       },
       body: JSON.stringify({ type }),
     });
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) throw new Error(`HTTP ${res.status} — function not deployed or unreachable`);
-    return res.json();
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Function not deployed or unreachable (HTTP ${res.status})`);
+    }
   };
 
   // VPS Health data
