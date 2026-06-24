@@ -353,41 +353,36 @@ export default function Monitoring() {
     refetchInterval: refetchMs,
   });
 
-  // VPS Health data
+  // VPS Health data — proxied via Edge Function to avoid CORS
   const { data: vpsHealth, isLoading: loadingVps, refetch: refetchVps } = useQuery({
     queryKey: ['vps-health', lastRefresh],
     queryFn: async () => {
-      try {
-        const response = await fetch('https://backend.marketlinkco.live/proxy/health.php');
-        if (!response.ok) throw new Error('VPS unreachable');
-        return await response.json();
-      } catch (error) {
+      const { data, error } = await supabase.functions.invoke('vps-health', {
+        body: { type: 'health' },
+      });
+      if (error) {
         return {
           overall_status: 'offline',
           services: {},
           system: {},
           recent_errors: [],
-          error: 'Could not reach VPS'
+          error: error.message,
         };
       }
+      return data;
     },
     refetchInterval: refetchMs,
   });
 
-  // VPS Forwarder Version
+  // VPS Forwarder Version — proxied via Edge Function to avoid CORS
   const { data: vpsVersion, isLoading: loadingVersion, refetch: refetchVersion } = useQuery({
     queryKey: ['vps-version', lastRefresh],
     queryFn: async () => {
-      try {
-        const response = await fetch('https://backend.marketlinkco.live/proxy/version.php', {
-          cache: 'no-store',
-        });
-        if (!response.ok) throw new Error('Version endpoint unreachable');
-        const data = await response.json();
-        return data.version || 'Unknown';
-      } catch (error) {
-        return 'Unknown';
-      }
+      const { data, error } = await supabase.functions.invoke('vps-health', {
+        body: { type: 'version' },
+      });
+      if (error || !data) return 'Unknown';
+      return data.version || 'Unknown';
     },
     refetchInterval: refetchMs,
   });
