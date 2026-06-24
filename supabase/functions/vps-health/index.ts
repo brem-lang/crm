@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VPS_BASE = "https://backend.marketlinkco.live/proxy";
+const VPS_BASE = "http://63.250.32.170/proxy";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
