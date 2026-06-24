@@ -352,6 +352,14 @@ export default function Monitoring() {
     refetchInterval: refetchMs,
   });
 
+  // VPS Forwarder version — stub since ping-only approach no longer returns version info
+  const { isLoading: loadingVersion, refetch: refetchVersion } = useQuery({
+    queryKey: ['vps-version', lastRefresh],
+    queryFn: async () => null,
+    refetchInterval: refetchMs,
+  });
+  const vpsVersion = 'N/A';
+
   // VPS Health data — simple reachability ping via Edge Function
   const { data: vpsHealth, isLoading: loadingVps, refetch: refetchVps } = useQuery({
     queryKey: ['vps-health', lastRefresh],
@@ -420,7 +428,8 @@ export default function Monitoring() {
 
   const getHealthBadge = (status: string) => {
     switch (status) {
-      case 'healthy': return <Badge className="bg-green-500">Healthy</Badge>;
+      case 'online':
+      case 'healthy': return <Badge className="bg-green-500">Online</Badge>;
       case 'warning': return <Badge className="bg-yellow-500">Warning</Badge>;
       case 'critical': return <Badge variant="destructive">Critical</Badge>;
       case 'degraded': return <Badge className="bg-yellow-500">Degraded</Badge>;
@@ -887,7 +896,7 @@ export default function Monitoring() {
               <div className="flex items-center gap-2">
                 <Server className="h-5 w-5 text-primary" />
                 <CardTitle className="text-base">VPS Server Health</CardTitle>
-                {getHealthBadge(vpsHealth?.overall_status || 'unknown')}
+                {!loadingVps && vpsHealth?.overall_status && getHealthBadge(vpsHealth.overall_status)}
               </div>
               <Button 
                 variant="outline" 
