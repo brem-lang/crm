@@ -4,18 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VPS_BASE = "https://backend.marketlinkco.live/proxy";
-
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Health endpoint is not returning JSON — check if health.php exists on the VPS");
-  }
-}
+const VPS_URL = "https://backend.marketlinkco.live";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -23,33 +12,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type } = await req.json() as { type?: string };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
-    if (type === "version") {
-      const data = await fetchJson(`${VPS_BASE}/version.php`) as Record<string, unknown>;
-      return new Response(JSON.stringify({ version: data.version || "Unknown" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let online = false;
+    let statusCode = 0;
+
+    try {
+      const res = await fetch(VPS_URL, { method: "HEAD", signal: controller.signal });
+      statusCode = res.status;
+      online = res.status < 500;
+    } catch {
+      online = false;
+    } finally {
+      clearTimeout(timeout);
     }
 
-    const data = await fetchJson(`${VPS_BASE}/health.php`);
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        overall_status: online ? "online" : "offline",
+        status_code: statusCode,
+        url: VPS_URL,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(
-      JSON.stringify({
-        overall_status: "offline",
-        services: {},
-        system: {},
-        recent_errors: [],
-        error: message,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ overall_status: "offline", error: message }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

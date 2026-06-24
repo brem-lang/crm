@@ -4,13 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Clock, CheckCircle2, Zap, TrendingUp, AlertTriangle, Bug, ServerCrash, RefreshCw, Server, HardDrive, Cpu, MemoryStick } from "lucide-react";
+import { Activity, Clock, CheckCircle2, Zap, TrendingUp, AlertTriangle, Bug, ServerCrash, RefreshCw, Server } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from "recharts";
 import { format, subMinutes, subHours, startOfMinute, startOfHour } from "date-fns";
 import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { EdgeFunctionStatusCard } from "@/components/monitoring/EdgeFunctionStatusCard";
 import { CallbackLogsTable } from "@/components/monitoring/CallbackLogsTable";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
@@ -353,47 +352,25 @@ export default function Monitoring() {
     refetchInterval: refetchMs,
   });
 
-  const vpsHealthFetch = async (type: 'health' | 'version') => {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vps-health`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      },
-      body: JSON.stringify({ type }),
-    });
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error(`Function not deployed or unreachable (HTTP ${res.status})`);
-    }
-  };
-
-  // VPS Health data
+  // VPS Health data — simple reachability ping via Edge Function
   const { data: vpsHealth, isLoading: loadingVps, refetch: refetchVps } = useQuery({
     queryKey: ['vps-health', lastRefresh],
     queryFn: async () => {
       try {
-        return await vpsHealthFetch('health');
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vps-health`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({}),
+        });
+        const text = await res.text();
+        return JSON.parse(text);
       } catch {
-        return { overall_status: 'offline', services: {}, system: {}, recent_errors: [], error: 'VPS unreachable' };
-      }
-    },
-    refetchInterval: refetchMs,
-  });
-
-  // VPS Forwarder Version
-  const { data: vpsVersion, isLoading: loadingVersion, refetch: refetchVersion } = useQuery({
-    queryKey: ['vps-version', lastRefresh],
-    queryFn: async () => {
-      try {
-        const data = await vpsHealthFetch('version');
-        return data?.version || 'Unknown';
-      } catch {
-        return 'Unknown';
+        return { overall_status: 'offline' };
       }
     },
     refetchInterval: refetchMs,
@@ -928,135 +905,23 @@ export default function Monitoring() {
           </CardHeader>
           <CardContent>
             {loadingVps ? (
-              <div className="grid gap-4 md:grid-cols-4">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-24" />
-                ))}
-              </div>
-            ) : vpsHealth?.error ? (
-              <div className="flex flex-col items-center justify-center py-8 text-red-500">
-                <ServerCrash className="h-12 w-12 mb-3" />
-                <p className="text-lg font-medium">VPS Unreachable</p>
-                <p className="text-sm text-muted-foreground">
-                  {vpsHealth.error?.includes('<!doctype') || vpsHealth.error?.includes('token')
-                    ? 'Health endpoint returned an invalid response'
-                    : vpsHealth.error || 'Could not reach VPS'}
-                </p>
+              <div className="flex items-center justify-center py-8">
+                <Skeleton className="h-16 w-64" />
               </div>
             ) : (
-              <div className="space-y-6">
-                {/* Services Status */}
-                <div>
-                  <h4 className="text-sm font-medium mb-3">Services</h4>
-                  <div className="grid gap-3 md:grid-cols-4">
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <div className={`h-2 w-2 rounded-full ${vpsHealth?.services?.apache?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm font-medium">Apache</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{vpsHealth?.services?.apache?.status}</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <div className={`h-2 w-2 rounded-full ${vpsHealth?.services?.php?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm font-medium">PHP</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{vpsHealth?.services?.php?.version}</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <div className={`h-2 w-2 rounded-full ${vpsHealth?.services?.proxy?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm font-medium">Proxy Forwarder</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{vpsHealth?.services?.proxy?.status}</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <div className={`h-2 w-2 rounded-full ${vpsHealth?.services?.logs?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm font-medium">Log Files</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{vpsHealth?.services?.logs?.ok ? 'Writable' : 'Error'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* System Resources */}
-                <div>
-                  <h4 className="text-sm font-medium mb-3">System Resources</h4>
-                  <div className="grid gap-4 md:grid-cols-4">
-                    {/* Disk Usage */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <HardDrive className="h-4 w-4 text-muted-foreground" />
-                          <span>Disk</span>
-                        </div>
-                        <span className="font-medium">{vpsHealth?.system?.disk_used_percent?.toFixed(1)}%</span>
-                      </div>
-                      <Progress 
-                        value={vpsHealth?.system?.disk_used_percent || 0} 
-                        className={`h-2 ${(vpsHealth?.system?.disk_used_percent || 0) > 80 ? '[&>div]:bg-red-500' : (vpsHealth?.system?.disk_used_percent || 0) > 60 ? '[&>div]:bg-yellow-500' : ''}`}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {vpsHealth?.system?.disk_free_gb?.toFixed(0)} GB free of {vpsHealth?.system?.disk_total_gb?.toFixed(0)} GB
-                      </p>
-                    </div>
-
-                    {/* Memory Usage */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <MemoryStick className="h-4 w-4 text-muted-foreground" />
-                          <span>Memory</span>
-                        </div>
-                        <span className="font-medium">{vpsHealth?.system?.memory_used_percent?.toFixed(1)}%</span>
-                      </div>
-                      <Progress 
-                        value={vpsHealth?.system?.memory_used_percent || 0} 
-                        className={`h-2 ${(vpsHealth?.system?.memory_used_percent || 0) > 80 ? '[&>div]:bg-red-500' : (vpsHealth?.system?.memory_used_percent || 0) > 60 ? '[&>div]:bg-yellow-500' : ''}`}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {((vpsHealth?.system?.memory_total_mb || 0) - (vpsHealth?.system?.memory_available_mb || 0)) / 1024 | 0} GB used of {((vpsHealth?.system?.memory_total_mb || 0) / 1024).toFixed(0)} GB
-                      </p>
-                    </div>
-
-                    {/* CPU Load */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Cpu className="h-4 w-4 text-muted-foreground" />
-                          <span>CPU Load</span>
-                        </div>
-                        <span className="font-medium">{vpsHealth?.system?.load_1min}</span>
-                      </div>
-                      <Progress 
-                        value={Math.min((vpsHealth?.system?.load_1min || 0) * 10, 100)} 
-                        className={`h-2 ${(vpsHealth?.system?.load_1min || 0) > 8 ? '[&>div]:bg-red-500' : (vpsHealth?.system?.load_1min || 0) > 4 ? '[&>div]:bg-yellow-500' : ''}`}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        1min: {vpsHealth?.system?.load_1min} | 5min: {vpsHealth?.system?.load_5min}
-                      </p>
-                    </div>
-
-                    {/* Uptime */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>Uptime</span>
-                        </div>
-                      </div>
-                      <div className="text-2xl font-bold text-green-500">{vpsHealth?.system?.uptime}</div>
-                      <p className="text-xs text-muted-foreground">Server running continuously</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recent VPS Errors */}
-                {vpsHealth?.recent_errors && vpsHealth.recent_errors.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      Recent Proxy Errors
-                    </h4>
-                    <div className="space-y-1 bg-muted/50 rounded-lg p-3">
-                      {vpsHealth.recent_errors.map((error: string, i: number) => (
-                        <p key={i} className="text-xs font-mono text-muted-foreground">{error}</p>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                {vpsHealth?.overall_status === 'online' ? (
+                  <>
+                    <CheckCircle2 className="h-12 w-12 text-green-500" />
+                    <p className="text-lg font-semibold text-green-500">VPS Online</p>
+                    <p className="text-sm text-muted-foreground">backend.marketlinkco.live is reachable</p>
+                  </>
+                ) : (
+                  <>
+                    <ServerCrash className="h-12 w-12 text-red-500" />
+                    <p className="text-lg font-semibold text-red-500">VPS Unreachable</p>
+                    <p className="text-sm text-muted-foreground">Could not connect to backend.marketlinkco.live</p>
+                  </>
                 )}
               </div>
             )}
