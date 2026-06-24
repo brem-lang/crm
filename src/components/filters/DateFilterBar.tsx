@@ -130,83 +130,85 @@ export function DateFilterBar({
 
   return (
     <div className="space-y-3">
-      {/* Date Preset Row — horizontally scrollable, single line */}
-      <div className="flex overflow-x-auto gap-1 pb-2 border-b">
-        {datePresets.map((preset) => (
-          <Button
-            key={preset.key}
-            variant={datePreset === preset.key ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handlePresetChange(preset.key)}
-            className="text-sm shrink-0"
-          >
-            {preset.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Date Range Row — From → To side by side */}
-      {datePreset !== "all" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                {formatDate(fromDate, "MMM d, yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onFromDateChange(getStartOfDay(date));
-                    setDatePreset("custom");
-                    onShowAllChange?.(false);
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-
-          <span className="text-muted-foreground text-xs">→</span>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
-                <CalendarIcon className="h-3 w-3" />
-                {formatDate(toDate, "MMM d, yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={toDate}
-                onSelect={(date) => {
-                  if (date) {
-                    onToDateChange(getEndOfDay(date));
-                    setDatePreset("custom");
-                    onShowAllChange?.(false);
-                  }
-                }}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-
-          <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("prev")}>
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <span className="text-xs text-muted-foreground min-w-[28px] text-center">{daysDiff}d</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("next")}>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+      {/* Date bar — presets left, date range right, single row */}
+      <div className="flex items-center justify-between gap-2 pb-2 border-b overflow-x-auto">
+        <div className="flex gap-1 shrink-0">
+          {datePresets.map((preset) => (
+            <button
+              key={preset.key}
+              onClick={() => handlePresetChange(preset.key)}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap",
+                datePreset === preset.key
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
-      )}
+
+        {datePreset !== "all" && (
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                  <CalendarIcon className="h-3 w-3" />
+                  From: {formatDate(fromDate, "yyyy-MM-dd HH:mm:ss")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={fromDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      onFromDateChange(getStartOfDay(date));
+                      setDatePreset("custom");
+                      onShowAllChange?.(false);
+                    }
+                  }}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                  <CalendarIcon className="h-3 w-3" />
+                  To: {formatDate(toDate, "yyyy-MM-dd HH:mm:ss")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={toDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      onToDateChange(getEndOfDay(date));
+                      setDatePreset("custom");
+                      onShowAllChange?.(false);
+                    }
+                  }}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <div className="flex items-center gap-0.5">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("prev")}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground min-w-[28px] text-center">{daysDiff}d</span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("next")}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Optional additional filters row */}
       {children && (
