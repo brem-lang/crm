@@ -5,7 +5,17 @@ const corsHeaders = {
 };
 
 const VPS_BASE = "https://backend.marketlinkco.live/proxy";
-const VPS_HEADERS = {};
+
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Health endpoint is not returning JSON — check if health.php exists on the VPS");
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,21 +26,13 @@ Deno.serve(async (req) => {
     const { type } = await req.json() as { type?: string };
 
     if (type === "version") {
-      const res = await fetch(`${VPS_BASE}/version.php`, {
-        headers: VPS_HEADERS,
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await fetchJson(`${VPS_BASE}/version.php`) as Record<string, unknown>;
       return new Response(JSON.stringify({ version: data.version || "Unknown" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Default: health
-    const res = await fetch(`${VPS_BASE}/health.php`, { headers: VPS_HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await fetchJson(`${VPS_BASE}/health.php`);
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

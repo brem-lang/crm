@@ -937,7 +937,11 @@ export default function Monitoring() {
               <div className="flex flex-col items-center justify-center py-8 text-red-500">
                 <ServerCrash className="h-12 w-12 mb-3" />
                 <p className="text-lg font-medium">VPS Unreachable</p>
-                <p className="text-sm text-muted-foreground">{vpsHealth.error}</p>
+                <p className="text-sm text-muted-foreground">
+                  {vpsHealth.error?.includes('<!doctype') || vpsHealth.error?.includes('token')
+                    ? 'Health endpoint returned an invalid response'
+                    : vpsHealth.error || 'Could not reach VPS'}
+                </p>
               </div>
             ) : (
               <div className="space-y-6">
