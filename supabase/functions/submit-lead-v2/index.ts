@@ -46,6 +46,13 @@ interface ApiResponse {
 
 const API_VERSION = '2.0';
 
+function getClientIp(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    ?? req.headers.get('cf-connecting-ip')
+    ?? req.headers.get('x-real-ip')
+    ?? 'unknown';
+}
+
 function createResponse(body: ApiResponse, status: number): Response {
   return new Response(
     JSON.stringify(body),
@@ -150,17 +157,50 @@ Deno.serve(async (req) => {
     // Validate API key and get affiliate
     const { data: affiliate, error: affiliateError } = await supabase
       .from('affiliates')
-      .select('id, name, is_active')
+      .select('id, name, is_active, ip_whitelist_required, allowed_ips')
       .eq('api_key', apiKey)
       .eq('is_active', true)
       .maybeSingle();
 
+    const clientIp = getClientIp(req);
+
     if (affiliateError || !affiliate) {
+      try {
+        await supabase.from('affiliate_api_logs').insert({
+          affiliate_id: null,
+          api_key_hint: apiKey.slice(-4),
+          request_ip: clientIp,
+          payload: body,
+          status: 'rejected',
+          reason: 'Invalid or inactive API key',
+        });
+      } catch { /* non-critical */ }
       return createResponse({
         success: false,
         message: 'Invalid or inactive API key',
         api_version: API_VERSION,
       }, 401);
+    }
+
+    // IP whitelist check
+    if (affiliate.ip_whitelist_required && affiliate.allowed_ips && affiliate.allowed_ips.length > 0) {
+      if (!affiliate.allowed_ips.includes(clientIp)) {
+        try {
+          await supabase.from('affiliate_api_logs').insert({
+            affiliate_id: affiliate.id,
+            api_key_hint: apiKey.slice(-4),
+            request_ip: clientIp,
+            payload: body,
+            status: 'rejected',
+            reason: `IP not whitelisted: ${clientIp}`,
+          });
+        } catch { /* non-critical */ }
+        return createResponse({
+          success: false,
+          message: 'IP not authorized',
+          api_version: API_VERSION,
+        }, 403);
+      }
     }
 
     // Body already parsed above for health check - cast to LeadData
@@ -232,6 +272,18 @@ Deno.serve(async (req) => {
         api_version: API_VERSION,
       }, 500);
     }
+
+    // Log accepted request
+    try {
+      await supabase.from('affiliate_api_logs').insert({
+        affiliate_id: affiliate.id,
+        api_key_hint: apiKey.slice(-4),
+        request_ip: clientIp,
+        payload: body,
+        status: 'accepted',
+        reason: null,
+      });
+    } catch { /* non-critical */ }
 
     // Distribution is now manual - use distribute-lead endpoint separately
 

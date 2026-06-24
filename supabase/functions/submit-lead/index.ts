@@ -95,6 +95,13 @@ function validatePhone(phone: string, countryCode: string): { valid: boolean; er
   return { valid: true, cleaned };
 }
 
+function getClientIp(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    ?? req.headers.get('cf-connecting-ip')
+    ?? req.headers.get('x-real-ip')
+    ?? 'unknown';
+}
+
 // NOTE: We intentionally do NOT pre-check caps/eligibility here.
 // The distribution function is the single source of truth for advertiser availability,
 // country/affiliate targeting, scheduling, and cap enforcement.
@@ -159,20 +166,57 @@ Deno.serve(async (req) => {
     // Validate API key and get affiliate
     const { data: affiliate, error: affiliateError } = await supabase
       .from('affiliates')
-      .select('id, name, is_active, allowed_countries')
+      .select('id, name, is_active, allowed_countries, ip_whitelist_required, allowed_ips')
       .eq('api_key', apiKey)
       .eq('is_active', true)
       .maybeSingle();
 
+    const clientIp = getClientIp(req);
+
     if (affiliateError || !affiliate) {
+      // Log rejected request with unknown affiliate
+      try {
+        await supabase.from('affiliate_api_logs').insert({
+          affiliate_id: null,
+          api_key_hint: apiKey.slice(-4),
+          request_ip: clientIp,
+          payload: body,
+          status: 'rejected',
+          reason: 'Invalid or inactive API key',
+        });
+      } catch { /* non-critical */ }
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           message: 'Invalid or inactive API key',
           rejection: { code: 'INVALID_API_KEY', message: 'API key is invalid or affiliate is inactive' }
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // IP whitelist check
+    if (affiliate.ip_whitelist_required && affiliate.allowed_ips && affiliate.allowed_ips.length > 0) {
+      if (!affiliate.allowed_ips.includes(clientIp)) {
+        try {
+          await supabase.from('affiliate_api_logs').insert({
+            affiliate_id: affiliate.id,
+            api_key_hint: apiKey.slice(-4),
+            request_ip: clientIp,
+            payload: body,
+            status: 'rejected',
+            reason: `IP not whitelisted: ${clientIp}`,
+          });
+        } catch { /* non-critical */ }
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'IP not authorized',
+            rejection: { code: 'IP_NOT_WHITELISTED', message: `Request IP ${clientIp} is not in the allowed list` }
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Body already parsed above for health check
@@ -315,11 +359,8 @@ Deno.serve(async (req) => {
     }
 
     // === STEP 6: Get client IP for distribution ===
-    // Prefer explicitly provided ip_address from body, then fall back to headers
-    const clientIp = body.ip_address?.trim() || 
-                     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-                     req.headers.get('x-real-ip') || 
-                     'unknown';
+    // Prefer explicitly provided ip_address from body, then use the already-extracted clientIp
+    const leadIp = (body as LeadData).ip_address?.trim() || clientIp;
 
     // === STEP 7: Insert lead into DB immediately (always stored regardless of distribution outcome) ===
     const { data: newLead, error: leadInsertError } = await supabase
@@ -331,7 +372,7 @@ Deno.serve(async (req) => {
         mobile: cleanedPhone,
         country_code: normalizedCountryCode,
         country: body.country?.trim() || null,
-        ip_address: clientIp,
+        ip_address: leadIp,
         affiliate_id: affiliate.id,
         offer_name: body.offer_name?.substring(0, 100) || null,
         custom1: body.custom1?.substring(0, 255) || null,
@@ -366,7 +407,7 @@ Deno.serve(async (req) => {
         record_id: newLead.id,
         new_data: { email: body.email.trim().toLowerCase(), country_code: normalizedCountryCode, affiliate_id: affiliate.id },
         changes_summary: `Lead submitted by affiliate "${affiliate.name}": ${body.email.trim().toLowerCase()}`,
-        ip_address: clientIp,
+        ip_address: leadIp,
       });
     } catch { /* non-critical */ }
 
@@ -417,6 +458,18 @@ Deno.serve(async (req) => {
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Log accepted request
+    try {
+      await supabase.from('affiliate_api_logs').insert({
+        affiliate_id: affiliate.id,
+        api_key_hint: apiKey.slice(-4),
+        request_ip: clientIp,
+        payload: body,
+        status: 'accepted',
+        reason: null,
+      });
+    } catch { /* non-critical */ }
 
     // === STEP 10: Distribution succeeded — distribute-lead already updated lead to "contacted" ===
     const responseData: Record<string, unknown> = {

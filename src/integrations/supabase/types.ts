@@ -785,13 +785,56 @@ export type Database = {
           },
         ]
       }
+      affiliate_api_logs: {
+        Row: {
+          id: string
+          affiliate_id: string | null
+          api_key_hint: string | null
+          request_ip: string | null
+          payload: Record<string, unknown> | null
+          status: 'accepted' | 'rejected'
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          affiliate_id?: string | null
+          api_key_hint?: string | null
+          request_ip?: string | null
+          payload?: Record<string, unknown> | null
+          status: 'accepted' | 'rejected'
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          affiliate_id?: string | null
+          api_key_hint?: string | null
+          request_ip?: string | null
+          payload?: Record<string, unknown> | null
+          status?: 'accepted' | 'rejected'
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_api_logs_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       affiliates: {
         Row: {
           allowed_countries: string[] | null
+          allowed_ips: string[]
           api_key: string
           callback_url: string | null
           created_at: string
           id: string
+          ip_whitelist_required: boolean
           is_active: boolean
           name: string
           test_mode: boolean
@@ -800,10 +843,12 @@ export type Database = {
         }
         Insert: {
           allowed_countries?: string[] | null
+          allowed_ips?: string[]
           api_key?: string
           callback_url?: string | null
           created_at?: string
           id?: string
+          ip_whitelist_required?: boolean
           is_active?: boolean
           name: string
           test_mode?: boolean
@@ -812,10 +857,12 @@ export type Database = {
         }
         Update: {
           allowed_countries?: string[] | null
+          allowed_ips?: string[]
           api_key?: string
           callback_url?: string | null
           created_at?: string
           id?: string
+          ip_whitelist_required?: boolean
           is_active?: boolean
           name?: string
           test_mode?: boolean

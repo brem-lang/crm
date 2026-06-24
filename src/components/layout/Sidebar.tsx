@@ -58,6 +58,7 @@ const navItems: NavItem[] = [
     customRoles: ["Admin"],
     children: [
       { title: "Performance", href: "/affiliate-performance", icon: TrendingUp, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "API Logs", href: "/affiliate-api-logs", icon: ShieldCheck, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
   {

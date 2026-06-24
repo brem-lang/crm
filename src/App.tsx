@@ -29,6 +29,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Leads = lazy(() => import("./pages/Leads"));
 const Affiliates = lazy(() => import("./pages/Affiliates"));
 const AffiliatePerformance = lazy(() => import("./pages/AffiliatePerformance"));
+const AffiliateApiLogs = lazy(() => import("./pages/AffiliateApiLogs"));
 const Advertisers = lazy(() => import("./pages/Advertisers"));
 const AdvertiserPerformance = lazy(() => import("./pages/AdvertiserPerformance"));
 const Distributions = lazy(() => import("./pages/Distributions"));
@@ -100,6 +101,7 @@ const App = () => (
                 <Route path="/leads" element={<Leads />} />
                 <Route path="/affiliates" element={<Affiliates />} />
                 <Route path="/affiliate-performance" element={<AffiliatePerformance />} />
+                <Route path="/affiliate-api-logs" element={<AffiliateApiLogs />} />
                 <Route path="/advertisers" element={<Advertisers />} />
                 <Route path="/advertiser-performance" element={<AdvertiserPerformance />} />
                 <Route path="/distributions" element={<Distributions />} />
