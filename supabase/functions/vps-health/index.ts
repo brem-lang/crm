@@ -4,7 +4,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VPS_BASE = "http://63.250.32.170/proxy";
+const VPS_HOST = "backend.marketlinkco.live";
+const VPS_BASE = `http://174.138.179.173/proxy`;
+const VPS_HEADERS = { "Host": VPS_HOST };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,7 +17,10 @@ Deno.serve(async (req) => {
     const { type } = await req.json() as { type?: string };
 
     if (type === "version") {
-      const res = await fetch(`${VPS_BASE}/version.php`, { cache: "no-store" });
+      const res = await fetch(`${VPS_BASE}/version.php`, {
+        headers: VPS_HEADERS,
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return new Response(JSON.stringify({ version: data.version || "Unknown" }), {
@@ -24,7 +29,7 @@ Deno.serve(async (req) => {
     }
 
     // Default: health
-    const res = await fetch(`${VPS_BASE}/health.php`);
+    const res = await fetch(`${VPS_BASE}/health.php`, { headers: VPS_HEADERS });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return new Response(JSON.stringify(data), {
