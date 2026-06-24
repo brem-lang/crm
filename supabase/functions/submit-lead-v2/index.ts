@@ -183,8 +183,13 @@ Deno.serve(async (req) => {
     }
 
     // IP whitelist check
-    if (affiliate.ip_whitelist_required && affiliate.allowed_ips && affiliate.allowed_ips.length > 0) {
-      if (!affiliate.allowed_ips.includes(clientIp)) {
+    if (affiliate.ip_whitelist_required) {
+      const allowed = affiliate.allowed_ips ?? [];
+      const ipBlocked = allowed.length === 0 || !allowed.includes(clientIp);
+      if (ipBlocked) {
+        const reason = allowed.length === 0
+          ? 'IP whitelist is enabled but no IPs are configured'
+          : `IP not whitelisted: ${clientIp}`;
         try {
           await supabase.from('affiliate_api_logs').insert({
             affiliate_id: affiliate.id,
@@ -192,14 +197,22 @@ Deno.serve(async (req) => {
             request_ip: clientIp,
             payload: body,
             status: 'rejected',
-            reason: `IP not whitelisted: ${clientIp}`,
+            reason,
           });
         } catch { /* non-critical */ }
-        return createResponse({
-          success: false,
-          message: 'IP not authorized',
-          api_version: API_VERSION,
-        }, 403);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'IP not authorized',
+            rejection: {
+              code: 'IP_NOT_WHITELISTED',
+              message: reason,
+              detected_ip: clientIp,
+            },
+            api_version: API_VERSION,
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
