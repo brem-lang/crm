@@ -357,19 +357,22 @@ export default function Monitoring() {
   const { data: vpsHealth, isLoading: loadingVps, refetch: refetchVps } = useQuery({
     queryKey: ['vps-health', lastRefresh],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('vps-health', {
-        body: { type: 'health' },
-      });
-      if (error) {
+      try {
+        const { data, error } = await supabase.functions.invoke('vps-health', {
+          body: { type: 'health' },
+        });
+        if (error) throw new Error(error.message);
+        if (!data || typeof data !== 'object') throw new Error('Invalid response');
+        return data;
+      } catch {
         return {
           overall_status: 'offline',
           services: {},
           system: {},
           recent_errors: [],
-          error: error.message,
+          error: 'Could not reach VPS health function — ensure it is deployed',
         };
       }
-      return data;
     },
     refetchInterval: refetchMs,
   });
@@ -378,11 +381,15 @@ export default function Monitoring() {
   const { data: vpsVersion, isLoading: loadingVersion, refetch: refetchVersion } = useQuery({
     queryKey: ['vps-version', lastRefresh],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('vps-health', {
-        body: { type: 'version' },
-      });
-      if (error || !data) return 'Unknown';
-      return data.version || 'Unknown';
+      try {
+        const { data, error } = await supabase.functions.invoke('vps-health', {
+          body: { type: 'version' },
+        });
+        if (error || !data) return 'Unknown';
+        return data.version || 'Unknown';
+      } catch {
+        return 'Unknown';
+      }
     },
     refetchInterval: refetchMs,
   });
