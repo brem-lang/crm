@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRMSettings } from "./useCRMSettings";
 
 export interface LiveTelemetry {
   leadsPerMin: number;
@@ -9,6 +10,9 @@ export interface LiveTelemetry {
 }
 
 export function useLiveTelemetry() {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery<LiveTelemetry>({
     queryKey: ["live-telemetry"],
     queryFn: async () => {
@@ -53,6 +57,6 @@ export function useLiveTelemetry() {
 
       return { leadsPerMin, lastHourCounts, rejectionRate, totalLastHour: totalSent };
     },
-    refetchInterval: 30_000,
+    refetchInterval: refetchMs,
   });
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRMSettings } from "./useCRMSettings";
 
 export interface CallbackLog {
   id: string;
@@ -22,6 +23,9 @@ export interface CallbackLog {
 }
 
 export function useCallbackLogs(limit: number = 100) {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery({
     queryKey: ['callback-logs', limit],
     queryFn: async () => {
@@ -35,11 +39,14 @@ export function useCallbackLogs(limit: number = 100) {
       return data as CallbackLog[];
     },
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: refetchMs,
   });
 }
 
 export function useCallbackLogsCount() {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery({
     queryKey: ['callback-logs-count'],
     staleTime: 30_000,
@@ -51,6 +58,6 @@ export function useCallbackLogsCount() {
       if (error) throw error;
       return count || 0;
     },
-    refetchInterval: 60_000,
+    refetchInterval: refetchMs,
   });
 }

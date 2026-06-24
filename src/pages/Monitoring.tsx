@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { EdgeFunctionStatusCard } from "@/components/monitoring/EdgeFunctionStatusCard";
 import { CallbackLogsTable } from "@/components/monitoring/CallbackLogsTable";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
 
 interface ThroughputData {
   time: string;
@@ -23,14 +24,16 @@ interface ThroughputData {
 
 export default function Monitoring() {
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
+    if (autoRefreshInterval <= 0) return;
     const interval = setInterval(() => {
       setLastRefresh(new Date());
-    }, 30000);
+    }, autoRefreshInterval * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [autoRefreshInterval]);
 
   // Real-time metrics - last 60 minutes by minute
   const { data: minuteData, isLoading: loadingMinute } = useQuery({
@@ -81,7 +84,7 @@ export default function Monitoring() {
 
       return Object.values(minuteMap);
     },
-    refetchInterval: 30000,
+    refetchInterval: refetchMs,
   });
 
   // Hourly data - last 24 hours
@@ -132,7 +135,7 @@ export default function Monitoring() {
 
       return Object.values(hourMap);
     },
-    refetchInterval: 60000,
+    refetchInterval: refetchMs,
   });
 
   // Current stats
@@ -194,7 +197,7 @@ export default function Monitoring() {
         lpm,
       };
     },
-    refetchInterval: 10000,
+    refetchInterval: refetchMs,
   });
 
   // System health indicators
@@ -260,7 +263,7 @@ export default function Monitoring() {
         pendingQueue: pendingQueue || 0,
       };
     },
-    refetchInterval: 15000,
+    refetchInterval: refetchMs,
   });
 
   // Error logs - distribution failures and queue errors
@@ -347,7 +350,7 @@ export default function Monitoring() {
 
       return errors.slice(0, 50);
     },
-    refetchInterval: 15000,
+    refetchInterval: refetchMs,
   });
 
   // VPS Health data
@@ -368,7 +371,7 @@ export default function Monitoring() {
         };
       }
     },
-    refetchInterval: 30000,
+    refetchInterval: refetchMs,
   });
 
   // VPS Forwarder Version
@@ -386,7 +389,7 @@ export default function Monitoring() {
         return 'Unknown';
       }
     },
-    refetchInterval: 60000,
+    refetchInterval: refetchMs,
   });
 
   // Traffic Simulation Stats
@@ -417,7 +420,7 @@ export default function Monitoring() {
         isActive: (injectionsWithState?.length || 0) > 0 || (leadsWithSim || 0) > 0,
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: refetchMs,
   });
 
   const getHealthColor = (status: string) => {

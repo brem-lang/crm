@@ -510,7 +510,7 @@ export default function SettingsSection() {
 
       {/* Fixed save bar — hidden for display section (theme is immediate) */}
       {!isDisplaySection && (
-        <div className={`fixed bottom-0 right-0 z-50 border-t bg-background px-4 py-3 flex items-center justify-end gap-2 shadow-md transition-all duration-300 ${isCollapsed ? "lg:left-16" : "lg:left-64"} left-0`}>
+        <div className={`fixed bottom-0 right-0 z-50 border-t bg-background pl-4 pr-20 py-3 flex items-center justify-end gap-2 shadow-md transition-all duration-300 ${isCollapsed ? "lg:left-16" : "lg:left-64"} left-0`}>
           <Button variant="outline" onClick={handleReset} disabled={!hasChanges || isSaving}>
             Discard Changes
           </Button>

@@ -23,7 +23,7 @@ type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" 
 
 export default function Dashboard() {
   const { isSuperAdmin, isManager } = useAuth();
-  const { 
+  const {
     formatDate,
     getNow,
     getStartOfDay,
@@ -35,7 +35,9 @@ export default function Dashboard() {
     tzSubDays,
     tzSubWeeks,
     tzSubMonths,
+    autoRefreshInterval,
   } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
   
   const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [showAllDates, setShowAllDates] = useState(false);
@@ -388,7 +390,7 @@ export default function Dashboard() {
 
       return alerts;
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: refetchMs,
   });
 
   const datePresets: { key: DatePreset; label: string }[] = [

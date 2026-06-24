@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 import { useEffect } from "react";
+import { useCRMSettings } from "./useCRMSettings";
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 type LeadInsert = Database['public']['Tables']['leads']['Insert'];
@@ -42,6 +43,9 @@ export function useLeads(options?: {
   filterAdvertiserIds?: string[];
   enabled?: boolean;
 }) {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery({
     queryKey: ['leads', options?.filterAffiliateIds, options?.filterAdvertiserIds],
     staleTime: 30 * 1000,
@@ -94,8 +98,7 @@ export function useLeads(options?: {
       if (error) throw error;
       return data;
     },
-    staleTime: 30 * 1000,
-    refetchInterval: 30000,
+    refetchInterval: refetchMs,
   });
 }
 

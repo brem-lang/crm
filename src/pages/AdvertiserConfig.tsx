@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { subHours, subMinutes } from "date-fns";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAdvertisers } from "@/hooks/useAdvertisers";
 import { useAffiliates } from "@/hooks/useAffiliates";
@@ -54,6 +55,9 @@ interface ThroughputData {
 }
 
 function useThroughput() {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery<ThroughputData>({
     queryKey: ["adv-config-throughput"],
     queryFn: async () => {
@@ -98,7 +102,7 @@ function useThroughput() {
 
       return { byAdv, totalSent, totalFailed, rejectionRate, lpm };
     },
-    refetchInterval: 30_000,
+    refetchInterval: refetchMs,
   });
 }
 

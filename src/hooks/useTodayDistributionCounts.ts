@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRMSettings } from "./useCRMSettings";
 
 export function useTodayDistributionCounts() {
+  const { autoRefreshInterval } = useCRMSettings();
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false;
+
   return useQuery({
     queryKey: ['today-distribution-counts'],
     queryFn: async () => {
@@ -23,6 +27,6 @@ export function useTodayDistributionCounts() {
       return counts;
     },
     staleTime: 30_000,
-    refetchInterval: 30_000,
+    refetchInterval: refetchMs,
   });
 }
