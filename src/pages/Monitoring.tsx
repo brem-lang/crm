@@ -353,40 +353,42 @@ export default function Monitoring() {
     refetchInterval: refetchMs,
   });
 
-  // VPS Health data — proxied via Edge Function to avoid CORS
+  const vpsHealthFetch = async (type: 'health' | 'version') => {
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vps-health`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ type }),
+    });
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) throw new Error(`HTTP ${res.status} — function not deployed or unreachable`);
+    return res.json();
+  };
+
+  // VPS Health data
   const { data: vpsHealth, isLoading: loadingVps, refetch: refetchVps } = useQuery({
     queryKey: ['vps-health', lastRefresh],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('vps-health', {
-          body: { type: 'health' },
-        });
-        if (error) throw new Error(error.message);
-        if (!data || typeof data !== 'object') throw new Error('Invalid response');
-        return data;
+        return await vpsHealthFetch('health');
       } catch {
-        return {
-          overall_status: 'offline',
-          services: {},
-          system: {},
-          recent_errors: [],
-          error: 'Could not reach VPS health function — ensure it is deployed',
-        };
+        return { overall_status: 'offline', services: {}, system: {}, recent_errors: [], error: 'VPS unreachable' };
       }
     },
     refetchInterval: refetchMs,
   });
 
-  // VPS Forwarder Version — proxied via Edge Function to avoid CORS
+  // VPS Forwarder Version
   const { data: vpsVersion, isLoading: loadingVersion, refetch: refetchVersion } = useQuery({
     queryKey: ['vps-version', lastRefresh],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('vps-health', {
-          body: { type: 'version' },
-        });
-        if (error || !data) return 'Unknown';
-        return data.version || 'Unknown';
+        const data = await vpsHealthFetch('version');
+        return data?.version || 'Unknown';
       } catch {
         return 'Unknown';
       }
