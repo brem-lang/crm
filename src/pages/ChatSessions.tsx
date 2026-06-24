@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -49,6 +50,7 @@ function duration(created: string, closed: string | null) {
 
 export default function ChatSessions() {
   useChatSessionsRealtime();
+  const { defaultPageSize } = useCRMSettings();
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [visitorSearch, setVisitorSearch] = useState("");
@@ -62,7 +64,7 @@ export default function ChatSessions() {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     page,
-    pageSize: 50,
+    pageSize: defaultPageSize,
   });
 
   const { data: stats } = useChatSessionStats();

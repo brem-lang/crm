@@ -6,7 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuditLogs, useAuditLogActions, useAuditLogTables } from "@/hooks/useAuditLogs";
+import { useAuditLogs, useAuditLogActions, useAuditLogTables, useAuditLogsRealtime } from "@/hooks/useAuditLogs";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
@@ -18,6 +19,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function AuditLogs() {
   const { isSuperAdmin, loading: authLoading } = useAuth();
   const { canViewAuditLogs, isLoading: permLoading } = useCurrentUserPermissions();
+  const { defaultPageSize } = useCRMSettings();
+  useAuditLogsRealtime();
 
   const [action, setAction] = useState<string>("");
   const [tableName, setTableName] = useState<string>("");
@@ -35,7 +38,7 @@ export default function AuditLogs() {
     dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
     dateTo: dateTo ? new Date(dateTo + "T23:59:59").toISOString() : undefined,
     page,
-    pageSize: 50,
+    pageSize: defaultPageSize,
   });
 
   const { data: actions } = useAuditLogActions();

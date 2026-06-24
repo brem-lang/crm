@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useRejectedLeads, useDeleteRejectedLeads } from "@/hooks/useRejectedLeads";
 import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 
@@ -74,10 +75,12 @@ function loadColumns(): ColumnConfig[] {
   }
 }
 
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 25, 50, 100];
+
 export default function RejectedLeads() {
   const { data: rejectedLeads, isLoading, error } = useRejectedLeads();
   const deleteRejectedLeads = useDeleteRejectedLeads();
-  const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+  const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay, defaultPageSize } = useCRMSettings();
   const { canDeleteLeads } = useCurrentUserPermissions();
 
   const [showAllDates, setShowAllDates] = useState(false);
@@ -85,6 +88,8 @@ export default function RejectedLeads() {
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
 
   const handleToggleColumn = (columnId: string) => {
     setColumns(prev => {
@@ -109,6 +114,15 @@ export default function RejectedLeads() {
       return rejectedDate >= fromStart && rejectedDate <= toEnd;
     }) || [];
   }, [rejectedLeads, showAllDates, fromDate, toDate]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [showAllDates, fromDate, toDate]);
+
+  const totalPages = Math.ceil(filteredLeads.length / pageSize);
+  const paginatedLeads = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLeads.slice(start, start + pageSize);
+  }, [filteredLeads, currentPage, pageSize]);
 
   const allSelected = filteredLeads.length > 0 && filteredLeads.every(lead => selectedIds.has(lead.id));
   const someSelected = filteredLeads.some(lead => selectedIds.has(lead.id)) && !allSelected;
@@ -375,6 +389,7 @@ export default function RejectedLeads() {
                 </p>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -393,7 +408,7 @@ export default function RejectedLeads() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredLeads.map((rejection) => (
+                    {paginatedLeads.map((rejection) => (
                       <TableRow
                         key={rejection.id}
                         className={selectedIds.has(rejection.id) ? "bg-muted/50" : ""}
@@ -416,6 +431,16 @@ export default function RejectedLeads() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                totalItems={filteredLeads.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              />
+              </>
             )}
           </CardContent>
         </Card>

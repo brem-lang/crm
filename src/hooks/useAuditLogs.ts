@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AuditLog {
@@ -114,4 +115,27 @@ export function useAuditLogTables() {
       return [...new Set(data?.map(d => d.table_name).filter(Boolean) || [])] as string[];
     },
   });
+}
+
+export function useAuditLogsRealtime() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('audit-logs-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'audit_logs' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+          queryClient.invalidateQueries({ queryKey: ['audit-log-actions'] });
+          queryClient.invalidateQueries({ queryKey: ['audit-log-tables'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }
