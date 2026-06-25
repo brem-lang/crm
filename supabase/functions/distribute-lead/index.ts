@@ -1774,7 +1774,7 @@ async function distributeLead(
   try {
     console.log(`Distributing lead ${lead.id} to ${advertiser.name} (${advertiser.advertiser_type})`);
     
-    const { success, response } = await adapter(lead, advertiserWithConfig);
+    const { success, response, requestMetadata } = await adapter(lead, advertiserWithConfig);
     
     // Extract external lead ID and autologin URL from response
     const externalLeadId = success ? extractExternalLeadId(response) : null;
@@ -1798,6 +1798,9 @@ async function distributeLead(
         external_lead_id: externalLeadId,
         autologin_url: autologinUrl,
         sent_at: new Date().toISOString(),
+        request_url: requestMetadata?.url || null,
+        request_headers: requestMetadata?.headers || null,
+        request_payload: requestMetadata?.payload || null,
       });
 
       // Update lead distributed_at
@@ -1840,6 +1843,9 @@ async function distributeLead(
         status: 'failed',
         response: response.substring(0, 1000),
         sent_at: new Date().toISOString(),
+        request_url: requestMetadata?.url || null,
+        request_headers: requestMetadata?.headers || null,
+        request_payload: requestMetadata?.payload || null,
       });
 
       // Also record in rejected_leads for detailed tracking

@@ -303,20 +303,27 @@ export function LeadsTable({
                                   <Copy className="h-4 w-4" />
                                 </Button>
                                 <ScrollArea className="max-h-[60vh] border rounded-lg bg-muted/50">
-                                  <div className="p-4 space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-xs text-muted-foreground font-medium mb-1">Target URL</p>
-                                      <code className="text-xs bg-background p-2 rounded block break-all">{dist?.request_url || "Not recorded"}</code>
+                                  {!dist ? (
+                                    <div className="p-4 text-sm text-muted-foreground text-center py-8">
+                                      <p className="font-medium">No distribution record found</p>
+                                      <p className="text-xs mt-1">This lead has not been sent to an advertiser yet.</p>
                                     </div>
-                                    <div>
-                                      <p className="text-xs text-muted-foreground font-medium mb-1">Headers</p>
-                                      <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist?.request_headers ? JSON.stringify(dist.request_headers, null, 2) : "Not recorded"}</pre>
+                                  ) : (
+                                    <div className="p-4 space-y-4 text-sm">
+                                      <div>
+                                        <p className="text-xs text-muted-foreground font-medium mb-1">Target URL</p>
+                                        <code className="text-xs bg-background p-2 rounded block break-all">{dist.request_url || "Not recorded"}</code>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground font-medium mb-1">Headers</p>
+                                        <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist.request_headers ? JSON.stringify(dist.request_headers, null, 2) : "Not recorded"}</pre>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground font-medium mb-1">Request Payload</p>
+                                        <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist.request_payload ? (() => { try { return JSON.stringify(JSON.parse(dist.request_payload), null, 2); } catch { return dist.request_payload; } })() : "Not recorded"}</pre>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <p className="text-xs text-muted-foreground font-medium mb-1">Request Payload</p>
-                                      <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist?.request_payload ? (() => { try { return JSON.stringify(JSON.parse(dist.request_payload), null, 2); } catch { return dist.request_payload; } })() : "Not recorded"}</pre>
-                                    </div>
-                                  </div>
+                                  )}
                                 </ScrollArea>
                               </div>
                             </DialogContent>
@@ -346,7 +353,14 @@ export function LeadsTable({
                                   <Copy className="h-4 w-4" />
                                 </Button>
                                 <ScrollArea className="max-h-[400px] border rounded-lg bg-muted/50">
-                                  <pre className="p-4 text-xs whitespace-pre-wrap break-all">{dist?.response ? (() => { try { return JSON.stringify(JSON.parse(dist.response), null, 2); } catch { return dist.response; } })() : "No response"}</pre>
+                                  {!dist ? (
+                                    <div className="p-4 text-sm text-muted-foreground text-center py-8">
+                                      <p className="font-medium">No distribution record found</p>
+                                      <p className="text-xs mt-1">This lead has not been sent to an advertiser yet.</p>
+                                    </div>
+                                  ) : (
+                                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">{dist.response ? (() => { try { return JSON.stringify(JSON.parse(dist.response), null, 2); } catch { return dist.response; } })() : "No response recorded"}</pre>
+                                  )}
                                 </ScrollArea>
                               </div>
                             </DialogContent>
