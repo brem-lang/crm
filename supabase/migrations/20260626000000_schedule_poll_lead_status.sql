@@ -11,7 +11,7 @@ $$;
 
 SELECT cron.schedule(
   'poll-lead-status-every-5min',
-  '*/5 * * * *',
+  '*/2 * * * *',
   $$
   SELECT net.http_post(
     url := 'https://xdwpyqpnuxvuvnzzwhcl.supabase.co/functions/v1/poll-lead-status',
