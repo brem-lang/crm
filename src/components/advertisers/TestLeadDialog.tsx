@@ -22,6 +22,7 @@ interface TestResult {
   success: boolean;
   message?: string;
   response?: any;
+  email?: string;
 }
 
 export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName }: TestLeadDialogProps) {
@@ -113,6 +114,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         success: !!funcData?.success,
         message: funcData?.message || (funcData?.success ? "Test lead sent successfully" : "Test failed"),
         response: funcData,
+        email: testLeadData.email,
       });
 
       if (funcData?.success) {
@@ -126,6 +128,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         success: false,
         message: error instanceof Error ? error.message : "Unknown error",
         response: { error: error instanceof Error ? error.message : error },
+        email: testLeadData.email,
       });
       toast.error("Failed to send test lead");
     } finally {
@@ -160,6 +163,13 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               )}
               <span className="font-medium">{testResult.message}</span>
             </div>
+
+            {testResult.email && (
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                <span className="font-medium">Email sent:</span>
+                <span className="font-mono break-all">{testResult.email}</span>
+              </div>
+            )}
 
             <div className="text-sm text-muted-foreground">
               <span className="font-medium">Test Mode:</span> No lead was created in the database
