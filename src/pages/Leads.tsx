@@ -94,8 +94,8 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "custom3", label: "Custom 3", visible: false },
   { id: "custom4", label: "Custom 4", visible: false },
   { id: "custom5", label: "Custom 5", visible: false },
-  { id: "live_lead_status", label: "Live Score", visible: false },
-  { id: "live_lead_score",  label: "Score",      visible: false },
+  { id: "live_lead_status", label: "Live Lead",  visible: false },
+  { id: "live_lead_score",  label: "Live Score", visible: false },
   { id: "created_at", label: "Created", visible: true },
 ];
 

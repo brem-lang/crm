@@ -343,9 +343,9 @@ export function LeadsFilterBar({
               { value: "light-red", label: "🟠 Light Red" },
               { value: "red",       label: "🔴 Red" },
             ]}
-            placeholder="All Live Scores"
-            searchPlaceholder="Search score..."
-            emptyMessage="No scores found"
+            placeholder="All Live Lead"
+            searchPlaceholder="Search..."
+            emptyMessage="No results found"
             className="w-full sm:w-[150px]"
           />
         )}
