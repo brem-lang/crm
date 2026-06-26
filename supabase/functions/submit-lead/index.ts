@@ -500,7 +500,7 @@ Deno.serve(async (req) => {
     };
 
     if (distributionResult?.autologin_url) {
-      responseData.autologin_url = `${trackingBase}/track?lead_id=${newLead.id}`;
+      responseData.autologin_url = `${trackingBase}/functions/v1/track-autologin?lead_id=${newLead.id}`;
     }
 
     return new Response(
