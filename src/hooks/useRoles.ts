@@ -34,7 +34,7 @@ export function useRoles() {
     queryFn: async () => {
       const { data: rolesData, error: rolesError } = await supabase
         .from("roles")
-        .select("*")
+        .select("id, name, slug, description, color, is_system, created_at")
         .order("is_system", { ascending: false })
         .order("created_at", { ascending: true });
 

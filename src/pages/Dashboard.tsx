@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -45,6 +45,18 @@ export default function Dashboard() {
   const [toDate, setToDate] = useState<Date>(() => getEndOfDay(getNow()));
   const [selectedAdvertiser, setSelectedAdvertiser] = useState<string>("all");
   const [selectedAffiliate, setSelectedAffiliate] = useState<string>("all");
+  const [debouncedAdvertiser, setDebouncedAdvertiser] = useState<string>("all");
+  const [debouncedAffiliate, setDebouncedAffiliate] = useState<string>("all");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedAdvertiser(selectedAdvertiser);
+      setDebouncedAffiliate(selectedAffiliate);
+    }, 300);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [selectedAdvertiser, selectedAffiliate]);
 
   // Handle date preset changes
   const handlePresetChange = (preset: DatePreset) => {
@@ -111,7 +123,7 @@ export default function Dashboard() {
 
   // Fetch dashboard stats - based on actual distributions (leads taken by advertisers)
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats', showAllDates, fromDate, toDate, selectedAdvertiser, selectedAffiliate],
+    queryKey: ['dashboard-stats', showAllDates, fromDate, toDate, debouncedAdvertiser, debouncedAffiliate],
     queryFn: async () => {
       // Build distribution query with filters
       let distBaseQuery = supabase
@@ -123,16 +135,16 @@ export default function Dashboard() {
           .lte('created_at', toDate.toISOString());
       }
 
-      if (selectedAdvertiser !== 'all') {
-        distBaseQuery = distBaseQuery.eq('advertiser_id', selectedAdvertiser);
+      if (debouncedAdvertiser !== 'all') {
+        distBaseQuery = distBaseQuery.eq('advertiser_id', debouncedAdvertiser);
       }
 
       const { data: distributions } = await distBaseQuery;
 
       // Filter by affiliate if needed (affiliate is on the lead, not the distribution)
       let filteredDistributions = distributions || [];
-      if (selectedAffiliate !== 'all') {
-        filteredDistributions = filteredDistributions.filter((d: any) => d.leads?.affiliate_id === selectedAffiliate);
+      if (debouncedAffiliate !== 'all') {
+        filteredDistributions = filteredDistributions.filter((d: any) => d.leads?.affiliate_id === debouncedAffiliate);
       }
 
       // Calculate stats from distributions
@@ -168,7 +180,7 @@ export default function Dashboard() {
 
   // Fetch chart data
   const { data: chartData } = useQuery({
-    queryKey: ['dashboard-chart', showAllDates, fromDate, toDate, selectedAdvertiser, selectedAffiliate],
+    queryKey: ['dashboard-chart', showAllDates, fromDate, toDate, debouncedAdvertiser, debouncedAffiliate],
     queryFn: async () => {
       let chartQuery = supabase
         .from('leads')

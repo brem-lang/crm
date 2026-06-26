@@ -31,7 +31,7 @@ export function useCallbackLogs(limit: number = 100) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('callback_logs')
-        .select('*')
+        .select('id, created_at, callback_type, processing_status, advertiser_id, advertiser_name, lead_id, injection_lead_id, matched_by, request_method, request_url, request_payload, request_headers, changes_applied, processing_error, processed_at, ip_address')
         .order('created_at', { ascending: false })
         .limit(limit);
 

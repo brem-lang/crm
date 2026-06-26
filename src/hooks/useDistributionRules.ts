@@ -42,7 +42,7 @@ export function useDistributionRules() {
     queryFn: async () => {
       const { data: rules, error } = await supabase
         .from("distribution_rules")
-        .select("*")
+        .select("id, name, rule_type, is_active, priority, conditions, created_at, updated_at")
         .order("priority", { ascending: true });
 
       if (error) throw error;
@@ -50,7 +50,7 @@ export function useDistributionRules() {
       const { data: targets, error: targetsError } = await supabase
         .from("distribution_rule_targets")
         .select(`
-          *,
+          id, rule_id, advertiser_id, weight, priority_order, is_fallback, is_enabled, daily_cap,
           advertisers(id, name)
         `);
 

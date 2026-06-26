@@ -321,11 +321,15 @@ export default function InjectionDetail() {
     ? Math.min(parseInt(customLimit) || 0, matchingLeadsCount)
     : matchingLeadsCount;
 
-  // Get unique countries from pool leads
-  const poolCountries = [...new Set(poolLeads.map(l => l.country_code))].sort();
-  
-  // Get unique affiliates from pool leads
-  const poolAffiliateIds = [...new Set(poolLeads.filter(l => l.source_affiliate_id).map(l => l.source_affiliate_id!))];
+  const poolCountries = useMemo(
+    () => [...new Set(poolLeads.map(l => l.country_code))].sort(),
+    [poolLeads]
+  );
+
+  const poolAffiliateIds = useMemo(
+    () => [...new Set(poolLeads.filter(l => l.source_affiliate_id).map(l => l.source_affiliate_id!))],
+    [poolLeads]
+  );
 
   const handleDelete = () => {
     deleteInjection.mutate(id!, {

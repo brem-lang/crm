@@ -10,13 +10,15 @@ type AffiliateUpdate = Database['public']['Tables']['affiliates']['Update'];
 export function useAffiliates() {
   return useQuery({
     queryKey: ['affiliates'],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('affiliates')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
