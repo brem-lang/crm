@@ -30,6 +30,9 @@ async function lookupIp(ip: string | null): Promise<IpApiResponse | null> {
   }
 }
 
+// Scoring weights (must sum to 100)
+const WEIGHTS = { IP_MATCH: 25, COUNTRY_MATCH: 20, NO_PROXY: 20, ASN_MATCH: 15, TIME_TO_CLICK: 10, UA_MATCH: 10 };
+
 function computeScore(params: {
   submissionIp: string | null;
   clickIp: string | null;
@@ -43,37 +46,12 @@ function computeScore(params: {
   clickUa: string | null;
 }): number {
   let score = 0;
-
-  // IP exact match: 25 pts
-  if (params.clickIp && params.submissionIp && params.clickIp === params.submissionIp) {
-    score += 25;
-  }
-
-  // Country match: 20 pts
-  if (params.clickCountry && params.submissionCountry && params.clickCountry === params.submissionCountry) {
-    score += 20;
-  }
-
-  // ASN/ISP match: 15 pts
-  if (params.clickAsn && params.submissionAsn && params.clickAsn === params.submissionAsn) {
-    score += 15;
-  }
-
-  // No VPN/proxy: 20 pts
-  if (!params.isProxy) {
-    score += 20;
-  }
-
-  // Time to click > 5 seconds: 10 pts
-  if (params.timeToClick !== null && params.timeToClick !== undefined && params.timeToClick > 5) {
-    score += 10;
-  }
-
-  // User agent match: 10 pts
-  if (params.clickUa && params.submissionUa && params.clickUa === params.submissionUa) {
-    score += 10;
-  }
-
+  if (params.clickIp && params.submissionIp && params.clickIp === params.submissionIp) score += WEIGHTS.IP_MATCH;
+  if (params.clickCountry && params.submissionCountry && params.clickCountry === params.submissionCountry) score += WEIGHTS.COUNTRY_MATCH;
+  if (params.clickAsn && params.submissionAsn && params.clickAsn === params.submissionAsn) score += WEIGHTS.ASN_MATCH;
+  if (!params.isProxy) score += WEIGHTS.NO_PROXY;
+  if (params.timeToClick !== null && params.timeToClick !== undefined && params.timeToClick > 5) score += WEIGHTS.TIME_TO_CLICK;
+  if (params.clickUa && params.submissionUa && params.clickUa === params.submissionUa) score += WEIGHTS.UA_MATCH;
   return score;
 }
 
