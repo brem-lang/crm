@@ -164,7 +164,12 @@ Deno.serve(async (req) => {
     // Create Supabase client with service role for database operations
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+    // TRACKING_BASE_URL: set to your domain (e.g. https://backend.marketlinkco.live).
+    // Falls back to PUBLIC_SUPABASE_URL, then the internal SUPABASE_URL.
+    const trackingBase = Deno.env.get('TRACKING_BASE_URL')
+      || Deno.env.get('PUBLIC_SUPABASE_URL')
+      || supabaseUrl;
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Validate API key and get affiliate
@@ -495,7 +500,7 @@ Deno.serve(async (req) => {
     };
 
     if (distributionResult?.autologin_url) {
-      responseData.autologin_url = `${supabaseUrl}/functions/v1/track-autologin?lead_id=${newLead.id}`;
+      responseData.autologin_url = `${trackingBase}/track?lead_id=${newLead.id}`;
     }
 
     return new Response(

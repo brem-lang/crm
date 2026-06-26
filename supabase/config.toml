@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.route-lead]
 verify_jwt = false
+
+[functions.track-autologin]
+verify_jwt = false
+
+[functions.score-lead]
+verify_jwt = false
