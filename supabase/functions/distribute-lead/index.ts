@@ -2056,6 +2056,9 @@ Deno.serve(async (req) => {
                 external_lead_id: externalLeadId,
                 autologin_url: autologinUrl,
                 sent_at: new Date().toISOString(),
+                request_url: requestMetadata?.url || null,
+                request_headers: requestMetadata?.headers || null,
+                request_payload: requestMetadata?.payload || null,
               });
               
               // Update conversion stats
@@ -2182,8 +2185,8 @@ Deno.serve(async (req) => {
           
           try {
             console.log(`[DISTRIBUTION-FIRST] Trying ${advertiser.name}...`);
-            const { success, response } = await adapter(mockLead, advertiser);
-            
+            const { success, response, requestMetadata } = await adapter(mockLead, advertiser);
+
             if (success) {
               // Create the lead now that we have success
               const { data: newLead, error: leadError } = await supabase
@@ -2206,7 +2209,7 @@ Deno.serve(async (req) => {
                 })
                 .select('id')
                 .single();
-              
+
               if (leadError || !newLead) {
                 console.error('Failed to create lead after successful distribution:', leadError);
                 return new Response(
@@ -2214,11 +2217,11 @@ Deno.serve(async (req) => {
                   { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                 );
               }
-              
+
               // Extract IDs and create distribution record
               const externalLeadId = extractExternalLeadId(response);
               const autologinUrl = extractAutologinUrl(response);
-              
+
               await supabase.from('lead_distributions').insert({
                 lead_id: newLead.id,
                 advertiser_id: advertiser.id,
@@ -2228,6 +2231,9 @@ Deno.serve(async (req) => {
                 external_lead_id: externalLeadId,
                 autologin_url: autologinUrl,
                 sent_at: new Date().toISOString(),
+                request_url: requestMetadata?.url || null,
+                request_headers: requestMetadata?.headers || null,
+                request_payload: requestMetadata?.payload || null,
               });
               
               // Update conversion stats
@@ -2290,8 +2296,8 @@ Deno.serve(async (req) => {
           
           try {
             console.log(`[DISTRIBUTION-FIRST] Trying fallback ${advertiser.name}...`);
-            const { success, response } = await adapter(mockLead, advertiser);
-            
+            const { success, response, requestMetadata } = await adapter(mockLead, advertiser);
+
             if (success) {
               // Create the lead now
               const { data: newLead, error: leadError } = await supabase
@@ -2314,7 +2320,7 @@ Deno.serve(async (req) => {
                 })
                 .select('id')
                 .single();
-              
+
               if (leadError || !newLead) {
                 console.error('Failed to create lead after successful distribution:', leadError);
                 return new Response(
@@ -2322,10 +2328,10 @@ Deno.serve(async (req) => {
                   { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                 );
               }
-              
+
               const externalLeadId = extractExternalLeadId(response);
               const autologinUrl = extractAutologinUrl(response);
-              
+
               await supabase.from('lead_distributions').insert({
                 lead_id: newLead.id,
                 advertiser_id: advertiser.id,
@@ -2335,6 +2341,9 @@ Deno.serve(async (req) => {
                 external_lead_id: externalLeadId,
                 autologin_url: autologinUrl,
                 sent_at: new Date().toISOString(),
+                request_url: requestMetadata?.url || null,
+                request_headers: requestMetadata?.headers || null,
+                request_payload: requestMetadata?.payload || null,
               });
               
               // Update conversion stats
