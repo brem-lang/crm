@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Loader2, Send, RefreshCw, CheckCircle2, XCircle, Copy, Wand2, PenLine } from "lucide-react";
 import { countryData, generateTestData } from "./countryData";
 import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
+import { useQuery } from "@tanstack/react-query";
 
 interface TestLeadDialogProps {
   open: boolean;
@@ -137,9 +138,42 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   };
 
   const { isRestricted } = useRestrictedCountries();
-  // Sort countries alphabetically by name, excluding restricted ones
+
+  // Fetch this advertiser's distribution settings to get its allowed countries
+  const { data: distSettings } = useQuery({
+    queryKey: ['advertiser-dist-settings', advertiserId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('advertiser_distribution_settings')
+        .select('countries')
+        .eq('advertiser_id', advertiserId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!advertiserId,
+  });
+
+  const advertiserCountries: string[] | null = distSettings?.countries ?? null;
+
+  const currentCode = generatedData.country_code?.toUpperCase();
+  const isCountryBlocked =
+    isRestricted(currentCode) ||
+    (advertiserCountries && advertiserCountries.length > 0 && !advertiserCountries.includes(currentCode));
+  const countryBlockReason = isRestricted(currentCode)
+    ? `${currentCode} is globally restricted`
+    : isCountryBlocked
+    ? `${currentCode} is not in this advertiser's allowed countries`
+    : null;
+
+  // Filter: exclude globally restricted + keep only advertiser-allowed countries (if set)
   const sortedCountries = Object.entries(countryData)
-    .filter(([code]) => !isRestricted(code))
+    .filter(([code]) => {
+      if (isRestricted(code)) return false;
+      if (advertiserCountries && advertiserCountries.length > 0) {
+        return advertiserCountries.includes(code);
+      }
+      return true;
+    })
     .sort(([, a], [, b]) => a.name.localeCompare(b.name));
 
   return (
@@ -223,6 +257,11 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
 
             {mode === "auto" ? (
               <>
+                {advertiserCountries && advertiserCountries.length > 0 && (
+                  <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
+                    Showing only countries allowed by this advertiser's distribution settings ({advertiserCountries.length} countries).
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Select Country/Geo</Label>
@@ -385,6 +424,14 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
+            {/* Country blocked warning — shown in both modes */}
+            {isCountryBlocked && countryBlockReason && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <XCircle className="h-4 w-4 shrink-0" />
+                {countryBlockReason}. Change the country to proceed.
+              </div>
+            )}
+
             {/* Offer Name — shared between both modes */}
             <div className="space-y-2">
               <Label>Offer Name (optional)</Label>
@@ -435,7 +482,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSendTestLead} disabled={isLoading}>
+              <Button onClick={handleSendTestLead} disabled={isLoading || !!isCountryBlocked}>
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
