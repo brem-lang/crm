@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
-import { CalendarIcon, AlertTriangle, Clock, TrendingUp, Users, Globe, Building2, Activity } from "lucide-react";
+import { CalendarIcon, AlertTriangle, Clock, TrendingUp, Users, Globe, Building2, Activity, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ConversionCharts } from "@/components/dashboard/ConversionCharts";
@@ -122,7 +122,17 @@ export default function Dashboard() {
   });
 
   // Fetch dashboard stats - based on actual distributions (leads taken by advertisers)
-  const { data: stats, isLoading } = useQuery({
+  const queryClient = useQueryClient();
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-chart'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-top-countries'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-top-advertisers'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-top-affiliates'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-alerts'] });
+  };
+
+  const { data: stats, isLoading, isFetching } = useQuery({
     queryKey: ['dashboard-stats', showAllDates, fromDate, toDate, debouncedAdvertiser, debouncedAffiliate],
     queryFn: async () => {
       // Build distribution query with filters
@@ -419,9 +429,15 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Performance overview and analytics</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Performance overview and analytics</p>
+          </div>
+          <Button variant="outline" onClick={handleRefresh} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
         </div>
 
         {/* Date Tabs & Filters */}
