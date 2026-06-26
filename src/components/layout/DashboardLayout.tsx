@@ -1,12 +1,13 @@
-import { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
-import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ReactNode, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { Navigate } from "react-router-dom";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const Sidebar = lazy(() => import("./Sidebar").then(m => ({ default: m.Sidebar })));
+const ChatWidget = lazy(() => import("@/components/chat/ChatWidget").then(m => ({ default: m.ChatWidget })));
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -36,7 +37,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar />
+      <Suspense fallback={null}>
+        <Sidebar />
+      </Suspense>
       {showMaintenanceBanner && (
         <div className={cn(
           "fixed top-0 z-50 w-full bg-amber-500 text-amber-950 px-4 py-2 flex items-center gap-2 text-sm font-medium",
@@ -51,7 +54,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
-      <ChatWidget />
+      <Suspense fallback={null}>
+        <ChatWidget />
+      </Suspense>
     </div>
   );
 }
