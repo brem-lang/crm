@@ -44,6 +44,7 @@ const SYSTEM_TYPES = [
   { code: "streamline11",name: "Streamline11",     description: "Form-urlencoded, auth via affid + funnel slug in body",   request_format: "form-urlencoded",  auth_type: "body",        required_fields: ["url", "affid", "funnel", "token"] },
   { code: "saxo",        name: "SAXO LTD",         description: "SAXO provider API — JSON POST, x-api-key header, camelCase field names", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
   { code: "noxwealth",  name: "NoxWealth",        description: "NoxWealth Forex CRM — Bearer token, affiliate_id required, JSON POST to /leads/add", request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "affiliate_id"] },
+  { code: "affilio",    name: "Affilio",          description: "JSON POST with username/password/apiKey header auth, lid + funnelName routing",          request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "username", "auth_password", "lid"] },
   { code: "custom",      name: "Custom",           description: "User-defined fields and auth",                            request_format: "json",             auth_type: "none",        required_fields: [] },
 ];
 
@@ -184,12 +185,6 @@ export default function CRMSettings() {
               </p>
             </div>
           </div>
-          {canCreate && (
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              New CRM Type
-            </Button>
-          )}
         </div>
 
         {/* System Types */}
