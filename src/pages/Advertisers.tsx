@@ -87,6 +87,12 @@ const advertiserTypes = [
     description: "NoxWealth Forex CRM — Bearer token auth, affiliate_id required, JSON POST",
     fields: ["url", "api_key", "affiliate_id"],
   },
+  {
+    value: "affilio",
+    label: "Affilio",
+    description: "Affilio — JSON POST with username/password/apiKey header auth, lid + funnelName routing",
+    fields: ["url", "api_key", "username", "auth_password", "lid", "funnel_name", "language"],
+  },
 ];
 
 interface AdvertiserConfig {

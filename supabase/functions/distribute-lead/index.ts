@@ -1093,6 +1093,101 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     return { success: false, response: text, requestMetadata: noxMeta };
   },
 
+  // Affilio — JSON POST with username/password/apiKey header auth
+  affilio: async (lead, advertiser) => {
+    const config = advertiser.config || {};
+
+    const authUsername   = String(config.username      || '');
+    const authPassword   = String(config.auth_password || '');
+    const lid            = String(config.lid            || '');
+    const funnelName     = String(config.funnel_name   || lead.offer_name || '');
+    const language       = String(config.language      || 'EN');
+
+    const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/api/register-lead`;
+
+    // Generate a lead password meeting Affilio requirements (capital + number, min 8 chars)
+    const generatePassword = (): string => {
+      const lower  = 'abcdefghijklmnopqrstuvwxyz';
+      const upper  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const digits = '0123456789';
+      const all    = lower + upper + digits;
+      let pw = '';
+      pw += upper.charAt(Math.floor(Math.random() * upper.length));
+      pw += digits.charAt(Math.floor(Math.random() * digits.length));
+      for (let i = 0; i < 6; i++) {
+        pw += all.charAt(Math.floor(Math.random() * all.length));
+      }
+      return pw;
+    };
+
+    const payload: Record<string, string> = {
+      firstName:   lead.firstname,
+      lastName:    lead.lastname,
+      email:       lead.email,
+      password:    generatePassword(),
+      phone:       lead.mobile,
+      ip:          lead.ip_address || '0.0.0.0',
+      lid,
+      funnelName,
+      countryCode: lead.country_code?.toUpperCase() || '',
+      language,
+    };
+
+    if (lead.user_agent)  payload.userAgent = lead.user_agent;
+    if (lead.custom1)     payload.mpc1      = lead.custom1;
+    if (lead.custom2)     payload.mpc2      = lead.custom2;
+    if (lead.custom3)     payload.mpc3      = lead.custom3;
+    if ((lead as any).custom4) payload.mpc4 = (lead as any).custom4;
+    if ((lead as any).custom5) payload.mpc5 = (lead as any).custom5;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'username':     authUsername,
+      'password':     authPassword,
+      'apiKey':       advertiser.api_key || '',
+    };
+
+    const payloadStr = JSON.stringify(payload);
+
+    console.log('Affilio endpoint:', endpoint);
+    console.log('Affilio payload:', payloadStr);
+
+    let responseText = '';
+    let isSuccess    = false;
+
+    try {
+      const response = await fetch(endpoint, {
+        method:  'POST',
+        headers,
+        body:    payloadStr,
+      });
+
+      responseText = await response.text();
+      console.log('Affilio raw response:', responseText);
+
+      if (response.ok) {
+        try {
+          const json = JSON.parse(responseText);
+          // Affilio success: response contains leadId
+          isSuccess = !!json.leadId;
+        } catch {
+          isSuccess = false;
+        }
+      }
+    } catch (err) {
+      console.error('Affilio fetch error:', err);
+      responseText = String(err);
+      isSuccess    = false;
+    }
+
+    return {
+      success: isSuccess,
+      response: responseText,
+      requestMetadata: { url: endpoint, headers, payload: payloadStr },
+    };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');

@@ -31,6 +31,10 @@ interface AdvertiserConfig {
   funnel?: string;
   token?: string;
   affiliate_id?: string;
+  auth_password?: string;
+  lid?: string;
+  funnel_name?: string;
+  language?: string;
 }
 
 interface FormData {
@@ -85,6 +89,7 @@ export function AdvertiserFormDialog({
       elitecrm: "https://trade.egolitrading.online/api/leads",
       gsi: "https://www.gsimarkets.com/api_add2.php",
       elnopy: "https://tracking.mpowertraffic2.com/api/v3/integration",
+      affilio: "",
       streamline11: "https://gpapi.org/leads",
       saxo: "https://platform.saxoltd.com/api/external",
       custom: "",
@@ -472,6 +477,60 @@ export function AdvertiserFormDialog({
                 <p className="text-xs text-muted-foreground">
                   Numeric affiliate ID sent with every lead submission
                 </p>
+              </div>
+            </>
+          )}
+
+          {/* === AFFILIO === */}
+          {formData.advertiser_type === 'affilio' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">Affilio Configuration</Label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Username <span className="text-destructive">*</span></Label>
+                  <Input
+                    placeholder="Affiliate username"
+                    value={formData.config.username || ''}
+                    onChange={(e) => updateConfig('username', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Auth Password <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="password"
+                    placeholder="Affiliate password"
+                    value={formData.config.auth_password || ''}
+                    onChange={(e) => updateConfig('auth_password', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>LID <span className="text-destructive">*</span></Label>
+                  <Input
+                    placeholder="Traffic link ID e.g. 310"
+                    value={formData.config.lid || ''}
+                    onChange={(e) => updateConfig('lid', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Language</Label>
+                  <Input
+                    placeholder="EN"
+                    value={formData.config.language || ''}
+                    onChange={(e) => updateConfig('language', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Funnel Name</Label>
+                <Input
+                  placeholder="e.g. Main-Funnel (falls back to lead offer_name)"
+                  value={formData.config.funnel_name || ''}
+                  onChange={(e) => updateConfig('funnel_name', e.target.value)}
+                />
               </div>
             </>
           )}
