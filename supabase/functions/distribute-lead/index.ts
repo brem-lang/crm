@@ -346,7 +346,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       }
     }
     
-    return { success: isSuccess, response: text };
+    return { success: isSuccess, response: text, requestMetadata: { url: apiUrl, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, payload: params.toString() } };
   },
 
   // Getlinked / FTD Kitchen API format
@@ -490,7 +490,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
         }
       }
       
-      return { success: isSuccess, response: text };
+      return { success: isSuccess, response: text, requestMetadata: { url: advertiser.url, headers, payload: params.toString() } };
     }
 
     // VPS forwarder path
@@ -555,7 +555,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       }
     }
     
-    return { success: isSuccess, response: text };
+    return { success: isSuccess, response: text, requestMetadata: { url: advertiser.url, headers, payload: payloadStr } };
   },
 
   // Timelocal API format (JSON with Api-Key header)
@@ -574,20 +574,21 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     console.log('Timelocal target URL:', advertiser.url);
     console.log('Timelocal routing through VPS forwarder:', FORWARDER_URL);
 
+    const timelocalPayload = JSON.stringify(payload);
+    const timelocalHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Api-Key': advertiser.api_key,
+    };
+
     const response = await fetch(FORWARDER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Target-Url': advertiser.url,
-        'X-Api-Key': advertiser.api_key,
-        'X-Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers: { ...timelocalHeaders, 'X-Target-Url': advertiser.url, 'X-Content-Type': 'application/json' },
+      body: timelocalPayload,
     });
 
     const text = await handleForwarderResponse(response, 'Timelocal');
     console.log('Timelocal response:', text);
-    return { success: response.ok, response: text };
+    return { success: response.ok, response: text, requestMetadata: { url: advertiser.url, headers: timelocalHeaders, payload: timelocalPayload } };
   },
 
   // EliteCRM API format (Egoli Trading)
@@ -615,23 +616,25 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     if (lead.comment) payload.comment = lead.comment;
 
     const targetUrl = advertiser.url;
+    const elitePayload = JSON.stringify(payload);
+    const eliteHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Api-Key': advertiser.api_key,
+    };
     console.log('EliteCRM target URL:', targetUrl);
-    console.log('EliteCRM payload:', JSON.stringify(payload));
+    console.log('EliteCRM payload:', elitePayload);
 
     // Try direct call first (EliteCRM may not require IP whitelisting)
     // If it fails, we can switch to forwarder
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Api-Key': advertiser.api_key,
-      },
-      body: JSON.stringify(payload),
+      headers: eliteHeaders,
+      body: elitePayload,
     });
 
     const text = await handleForwarderResponse(response, 'EliteCRM');
     console.log('EliteCRM response:', text);
-    
+
     // Check for success
     let isSuccess = response.ok;
     try {
@@ -644,8 +647,8 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
         isSuccess = false;
       }
     }
-    
-    return { success: isSuccess, response: text };
+
+    return { success: isSuccess, response: text, requestMetadata: { url: targetUrl, headers: eliteHeaders, payload: elitePayload } };
   },
 
   // GSI Markets API format (PHP-based with id/hash URL params)
@@ -720,7 +723,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       }
     }
     
-    return { success: isSuccess, response: text };
+    return { success: isSuccess, response: text, requestMetadata: { url: targetUrl, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, payload: params.toString() } };
   },
 
   // ELNOPY / Mpower Traffic API format
@@ -812,7 +815,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       }
     }
 
-    return { success: isSuccess, response: text };
+    return { success: isSuccess, response: text, requestMetadata: { url: targetUrl, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, payload: params.toString() } };
   },
 
   // Alias: getlinked uses the same logic as enigma
@@ -963,7 +966,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       }
     }
 
-    return { success: isSuccess, response: text };
+    return { success: isSuccess, response: text, requestMetadata: { url: integrationConfig.endpoint_url, headers, payload: body } };
   },
 
   // SAXO LTD — provider API integration
@@ -984,28 +987,32 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     if (lead.comment)    payload.agentComment = lead.comment;
     if (config.source)   payload.source       = String(config.source);
 
+    const saxoPayload = JSON.stringify(payload);
+    const saxoHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': advertiser.api_key || '',
+    };
+    const saxoMeta = { url: endpoint, headers: saxoHeaders, payload: saxoPayload };
+
     console.log(`SAXO: sending lead to ${endpoint}`);
 
     let response: Response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': advertiser.api_key || '',
-        },
-        body: JSON.stringify(payload),
+        headers: saxoHeaders,
+        body: saxoPayload,
       });
     } catch (err) {
       console.error('SAXO: network error', err);
-      return { success: false, response: JSON.stringify({ error: 'Network error contacting SAXO' }) };
+      return { success: false, response: JSON.stringify({ error: 'Network error contacting SAXO' }), requestMetadata: saxoMeta };
     }
 
     const text = await response.text();
     console.log(`SAXO: status ${response.status}, body:`, text);
 
     if (!response.ok && response.status !== 409) {
-      return { success: false, response: text };
+      return { success: false, response: text, requestMetadata: saxoMeta };
     }
 
     let externalLeadId: string | undefined;
@@ -1016,11 +1023,11 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       if (response.status === 409) {
         const dupId = json?.data?.leadId;
         externalLeadId = dupId ? String(dupId) : externalLeadId;
-        return { success: true, response: text, externalLeadId };
+        return { success: true, response: text, externalLeadId, requestMetadata: saxoMeta };
       }
-      return { success: json?.success === true, response: text, externalLeadId };
+      return { success: json?.success === true, response: text, externalLeadId, requestMetadata: saxoMeta };
     } catch {
-      return { success: response.ok, response: text };
+      return { success: response.ok, response: text, requestMetadata: saxoMeta };
     }
   },
 
@@ -1043,21 +1050,25 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     if (lead.offer_name) payload.campaign = lead.offer_name;
     if (lead.custom1)    payload.source   = lead.custom1;
 
+    const noxPayload = JSON.stringify(payload);
+    const noxHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${advertiser.api_key || ''}`,
+    };
+    const noxMeta = { url: endpoint, headers: noxHeaders, payload: noxPayload };
+
     console.log(`NoxWealth: sending lead to ${endpoint}`);
 
     let response: Response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${advertiser.api_key || ''}`,
-        },
-        body: JSON.stringify(payload),
+        headers: noxHeaders,
+        body: noxPayload,
       });
     } catch (err) {
       console.error('NoxWealth: network error', err);
-      return { success: false, response: JSON.stringify({ error: 'Network error contacting NoxWealth' }) };
+      return { success: false, response: JSON.stringify({ error: 'Network error contacting NoxWealth' }), requestMetadata: noxMeta };
     }
 
     const text = await response.text();
@@ -1069,17 +1080,17 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     // 200 with already_exists = duplicate lead, treat as success
     if (response.status === 200 && json?.status === 'already_exists') {
       const externalLeadId = json?.data ? String((json.data as Record<string, unknown>)?.lead_id ?? '') : undefined;
-      return { success: true, response: text, externalLeadId: externalLeadId || undefined };
+      return { success: true, response: text, externalLeadId: externalLeadId || undefined, requestMetadata: noxMeta };
     }
 
     // 201 = created successfully
     if (response.status === 201) {
       const externalLeadId = json?.data ? String((json.data as Record<string, unknown>)?.lead_id ?? '') : undefined;
-      return { success: true, response: text, externalLeadId: externalLeadId || undefined };
+      return { success: true, response: text, externalLeadId: externalLeadId || undefined, requestMetadata: noxMeta };
     }
 
     // All other statuses (400, 401, 409, 422, 429, 500) = failure
-    return { success: false, response: text };
+    return { success: false, response: text, requestMetadata: noxMeta };
   },
 
   // Mock advertiser - always succeeds, used for testing affiliate integrations
@@ -1106,7 +1117,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
     
     console.log('Mock adapter response:', JSON.stringify(mockResponse));
-    return { success: true, response: JSON.stringify(mockResponse) };
+    return { success: true, response: JSON.stringify(mockResponse), requestMetadata: { url: 'mock://internal', headers: {}, payload: JSON.stringify({ email: lead.email, firstname: lead.firstname, lastname: lead.lastname, country_code: lead.country_code }) } };
   },
 };
 
