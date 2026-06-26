@@ -18,6 +18,10 @@ interface LeadData {
   custom3?: string;
   offer_name?: string;
   comment?: string;
+  // Live lead scoring signals (optional — sent by frontend form)
+  click_ip?: string;
+  click_ua?: string;
+  time_to_click?: number;
 }
 
 interface DistributionSettings {
@@ -389,6 +393,9 @@ Deno.serve(async (req) => {
         custom3: body.custom3?.substring(0, 255) || null,
         comment: body.comment?.substring(0, 500) || null,
         status: 'new',
+        click_ip: (body as LeadData).click_ip?.trim() || null,
+        click_ua: (body as LeadData).click_ua?.substring(0, 500) || null,
+        time_to_click: typeof (body as LeadData).time_to_click === 'number' ? Math.round((body as LeadData).time_to_click!) : null,
       })
       .select('id')
       .single();
@@ -419,6 +426,16 @@ Deno.serve(async (req) => {
         ip_address: leadIp,
       });
     } catch { /* non-critical */ }
+
+    // === STEP 7b: Fire score-lead asynchronously (non-blocking) ===
+    fetch(`${supabaseUrl}/functions/v1/score-lead`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ lead_id: newLead.id }),
+    }).catch((err) => console.error('score-lead fire-and-forget failed:', err));
 
     // === STEP 8: Attempt distribution using the real lead_id ===
     let distributionResult = null;

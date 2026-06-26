@@ -185,6 +185,23 @@ export function LeadsTable({
         return lead.custom4 || "-";
       case "custom5":
         return lead.custom5 || "-";
+      case "live_lead_status": {
+        const statusMap: Record<string, { label: string; className: string }> = {
+          green:      { label: "Green",     className: "bg-green-100 text-green-800" },
+          orange:     { label: "Orange",    className: "bg-amber-100 text-amber-800" },
+          "light-red":{ label: "Light Red", className: "bg-orange-100 text-orange-800" },
+          red:        { label: "Red",       className: "bg-red-100 text-red-800" },
+        };
+        const s = (lead as any).live_lead_status;
+        if (!s) return <span className="text-muted-foreground text-xs">—</span>;
+        const cfg = statusMap[s] ?? { label: s, className: "bg-gray-100 text-gray-800" };
+        return <Badge className={`${cfg.className} text-xs font-medium`}>{cfg.label}</Badge>;
+      }
+      case "live_lead_score": {
+        const score = (lead as any).live_lead_score;
+        if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="text-xs font-medium tabular-nums">{score}<span className="text-muted-foreground font-normal">/100</span></span>;
+      }
       case "comment":
         return lead.comment ? (
           <span className="max-w-32 truncate block" title={lead.comment}>

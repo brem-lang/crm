@@ -31,6 +31,10 @@ interface LeadData {
   custom3?: string;
   offer_name?: string;
   comment?: string;
+  // Live lead scoring signals (optional — sent by frontend form)
+  click_ip?: string;
+  click_ua?: string;
+  time_to_click?: number;
 }
 
 interface ApiResponse {
@@ -272,6 +276,9 @@ Deno.serve(async (req) => {
         offer_name: leadData.offer_name || null,
         comment: leadData.comment || null,
         status: 'new',
+        click_ip: leadData.click_ip?.trim() || null,
+        click_ua: leadData.click_ua?.substring(0, 500) || null,
+        time_to_click: typeof leadData.time_to_click === 'number' ? Math.round(leadData.time_to_click) : null,
       })
       .select('id, request_id')
       .single();
@@ -299,6 +306,18 @@ Deno.serve(async (req) => {
     } catch { /* non-critical */ }
 
     // Distribution is now manual - use distribute-lead endpoint separately
+
+    // Fire score-lead asynchronously (non-blocking — don't delay the affiliate response)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    fetch(`${supabaseUrl}/functions/v1/score-lead`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ lead_id: lead.id }),
+    }).catch((err) => console.error('score-lead fire-and-forget failed:', err));
 
     // Return success response
     return createResponse({

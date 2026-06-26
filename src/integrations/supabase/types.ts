@@ -1868,6 +1868,10 @@ export type Database = {
           country: string | null
           country_code: string
           created_at: string
+          click_asn: string | null
+          click_country: string | null
+          click_ip: string | null
+          click_ua: string | null
           custom1: string | null
           custom2: string | null
           custom3: string | null
@@ -1887,7 +1891,10 @@ export type Database = {
           ip_address: string | null
           is_ftd: boolean
           is_live: boolean
+          is_proxy: boolean | null
           lastname: string
+          live_lead_score: number | null
+          live_lead_status: string | null
           mobile: string
           needs_review: boolean | null
           offer_name: string | null
@@ -1895,6 +1902,9 @@ export type Database = {
           request_id: string | null
           sale_status: string | null
           status: Database["public"]["Enums"]["lead_status"]
+          submission_asn: string | null
+          submission_country: string | null
+          time_to_click: number | null
           updated_at: string
           user_agent: string | null
         }
@@ -1909,6 +1919,10 @@ export type Database = {
           country?: string | null
           country_code: string
           created_at?: string
+          click_asn?: string | null
+          click_country?: string | null
+          click_ip?: string | null
+          click_ua?: string | null
           custom1?: string | null
           custom2?: string | null
           custom3?: string | null
@@ -1928,7 +1942,10 @@ export type Database = {
           ip_address?: string | null
           is_ftd?: boolean
           is_live?: boolean
+          is_proxy?: boolean | null
           lastname: string
+          live_lead_score?: number | null
+          live_lead_status?: string | null
           mobile: string
           needs_review?: boolean | null
           offer_name?: string | null
@@ -1936,6 +1953,9 @@ export type Database = {
           request_id?: string | null
           sale_status?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
+          submission_asn?: string | null
+          submission_country?: string | null
+          time_to_click?: number | null
           updated_at?: string
           user_agent?: string | null
         }
@@ -1946,6 +1966,10 @@ export type Database = {
           autologin?: string | null
           browser?: string | null
           city?: string | null
+          click_asn?: string | null
+          click_country?: string | null
+          click_ip?: string | null
+          click_ua?: string | null
           comment?: string | null
           country?: string | null
           country_code?: string
@@ -1969,7 +1993,10 @@ export type Database = {
           ip_address?: string | null
           is_ftd?: boolean
           is_live?: boolean
+          is_proxy?: boolean | null
           lastname?: string
+          live_lead_score?: number | null
+          live_lead_status?: string | null
           mobile?: string
           needs_review?: boolean | null
           offer_name?: string | null
@@ -1977,6 +2004,9 @@ export type Database = {
           request_id?: string | null
           sale_status?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
+          submission_asn?: string | null
+          submission_country?: string | null
+          time_to_click?: number | null
           updated_at?: string
           user_agent?: string | null
         }

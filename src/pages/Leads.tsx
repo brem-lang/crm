@@ -60,6 +60,7 @@ const DEVICE_COLUMN_IDS    = new Set(["user_agent", "platform", "browser"]);
 const COMMENT_COLUMN_IDS   = new Set(["comment"]);
 const DATE_COLUMN_IDS      = new Set(["created_at"]);
 const LIVE_COLUMN_IDS      = new Set(["is_live"]);
+const SCORE_COLUMN_IDS     = new Set(["live_lead_status", "live_lead_score"]);
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "request_id", label: "Lead ID", visible: true },
@@ -93,6 +94,8 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "custom3", label: "Custom 3", visible: false },
   { id: "custom4", label: "Custom 4", visible: false },
   { id: "custom5", label: "Custom 5", visible: false },
+  { id: "live_lead_status", label: "Live Score", visible: false },
+  { id: "live_lead_score",  label: "Score",      visible: false },
   { id: "created_at", label: "Created", visible: true },
 ];
 
@@ -154,6 +157,7 @@ export default function Leads() {
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [saleStatusFilter, setSaleStatusFilter] = useState<string[]>([]);
+  const [liveLeadStatusFilter, setLiveLeadStatusFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isResendOpen, setIsResendOpen] = useState(false);
@@ -271,6 +275,7 @@ export default function Leads() {
     [COMMENT_COLUMN_IDS,    canViewLeadComment],
     [DATE_COLUMN_IDS,       canViewLeadDate],
     [LIVE_COLUMN_IDS,       canViewLeadLive],
+    [SCORE_COLUMN_IDS,      canViewLeadLive],
   ];
 
   const effectiveColumns = useMemo(() => {
@@ -294,6 +299,11 @@ export default function Leads() {
         const matchesSaleStatus =
           saleStatusFilter.length === 0 ||
           (lead.sale_status && saleStatusFilter.includes(lead.sale_status));
+
+        // Live lead status filter
+        const matchesLiveLeadStatus =
+          liveLeadStatusFilter === "all" ||
+          (lead as any).live_lead_status === liveLeadStatusFilter;
 
         // Date range filter - use timezone-aware day boundaries
         // Also match leads injected within the range (injection_sent_at), even if created earlier
@@ -347,7 +357,8 @@ export default function Leads() {
           matchesAdvertiser &&
           matchesCountry &&
           matchesAffiliate &&
-          matchesFreeSearch
+          matchesFreeSearch &&
+          matchesLiveLeadStatus
         );
       }) || []
     );
@@ -362,6 +373,7 @@ export default function Leads() {
     countryFilter,
     affiliateFilter,
     freeSearch,
+    liveLeadStatusFilter,
     getStartOfDay,
     getEndOfDay,
   ]);
@@ -439,6 +451,7 @@ export default function Leads() {
   }, [
     statusFilter,
     saleStatusFilter,
+    liveLeadStatusFilter,
     showAllDates,
     pageSize,
     fromDate,
@@ -628,6 +641,8 @@ export default function Leads() {
             onStatusFilterChange={setStatusFilter}
             saleStatusFilter={saleStatusFilter}
             onSaleStatusFilterChange={setSaleStatusFilter}
+            liveLeadStatusFilter={liveLeadStatusFilter}
+            onLiveLeadStatusFilterChange={setLiveLeadStatusFilter}
             // Pagination props
             currentPage={currentPage}
             totalPages={totalPages}

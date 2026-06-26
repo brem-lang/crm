@@ -42,6 +42,8 @@ interface LeadsFilterBarProps {
   onStatusFilterChange: (value: string) => void;
   saleStatusFilter: string[];
   onSaleStatusFilterChange: (value: string[]) => void;
+  liveLeadStatusFilter?: string;
+  onLiveLeadStatusFilterChange?: (value: string) => void;
   advertisers?: { id: string; name: string }[];
   affiliates?: { id: string; name: string }[];
   countries?: string[];
@@ -86,6 +88,8 @@ export function LeadsFilterBar({
   onStatusFilterChange,
   saleStatusFilter,
   onSaleStatusFilterChange,
+  liveLeadStatusFilter = "all",
+  onLiveLeadStatusFilterChange,
   advertisers = [],
   affiliates = [],
   countries = [],
@@ -328,6 +332,23 @@ export function LeadsFilterBar({
           className="col-span-2 sm:col-span-1 w-full sm:w-[170px]"
           icon={<Filter className="h-3.5 w-3.5 text-muted-foreground" />}
         />
+
+        {onLiveLeadStatusFilterChange && (
+          <SearchableSelect
+            value={liveLeadStatusFilter}
+            onValueChange={onLiveLeadStatusFilterChange}
+            options={[
+              { value: "green",     label: "🟢 Green" },
+              { value: "orange",    label: "🟡 Orange" },
+              { value: "light-red", label: "🟠 Light Red" },
+              { value: "red",       label: "🔴 Red" },
+            ]}
+            placeholder="All Live Scores"
+            searchPlaceholder="Search score..."
+            emptyMessage="No scores found"
+            className="w-full sm:w-[150px]"
+          />
+        )}
 
         {children}
       </div>
