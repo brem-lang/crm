@@ -427,16 +427,6 @@ Deno.serve(async (req) => {
       });
     } catch { /* non-critical */ }
 
-    // === STEP 7b: Fire score-lead asynchronously (non-blocking) ===
-    fetch(`${supabaseUrl}/functions/v1/score-lead`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({ lead_id: newLead.id }),
-    }).catch((err) => console.error('score-lead fire-and-forget failed:', err));
-
     // === STEP 8: Attempt distribution using the real lead_id ===
     let distributionResult = null;
     let distributionSuccess = false;
@@ -498,13 +488,14 @@ Deno.serve(async (req) => {
     } catch { /* non-critical */ }
 
     // === STEP 10: Distribution succeeded — distribute-lead already updated lead to "contacted" ===
+    // Return tracking URL instead of raw autologin so click data is captured before redirect
     const responseData: Record<string, unknown> = {
       lead_id: newLead.id,
       request_id: null,
     };
 
     if (distributionResult?.autologin_url) {
-      responseData.autologin_url = distributionResult.autologin_url;
+      responseData.autologin_url = `${supabaseUrl}/functions/v1/track-autologin?lead_id=${newLead.id}`;
     }
 
     return new Response(

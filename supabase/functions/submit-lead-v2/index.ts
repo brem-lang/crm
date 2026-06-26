@@ -306,18 +306,7 @@ Deno.serve(async (req) => {
     } catch { /* non-critical */ }
 
     // Distribution is now manual - use distribute-lead endpoint separately
-
-    // Fire score-lead asynchronously (non-blocking — don't delay the affiliate response)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    fetch(`${supabaseUrl}/functions/v1/score-lead`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({ lead_id: lead.id }),
-    }).catch((err) => console.error('score-lead fire-and-forget failed:', err));
+    // Scoring happens when the lead clicks the autologin URL (track-autologin function)
 
     // Return success response
     return createResponse({
