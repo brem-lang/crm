@@ -88,6 +88,11 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "platform", label: "Platform", visible: false },
   { id: "browser", label: "Browser", visible: false },
   { id: "comment", label: "Comment", visible: false },
+  { id: "custom1", label: "Custom 1", visible: false },
+  { id: "custom2", label: "Custom 2", visible: false },
+  { id: "custom3", label: "Custom 3", visible: false },
+  { id: "custom4", label: "Custom 4", visible: false },
+  { id: "custom5", label: "Custom 5", visible: false },
   { id: "created_at", label: "Created", visible: true },
 ];
 

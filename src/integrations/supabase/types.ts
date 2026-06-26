@@ -1871,6 +1871,8 @@ export type Database = {
           custom1: string | null
           custom2: string | null
           custom3: string | null
+          custom4: string | null
+          custom5: string | null
           distributed_at: string | null
           email: string
           firstname: string
@@ -1910,6 +1912,8 @@ export type Database = {
           custom1?: string | null
           custom2?: string | null
           custom3?: string | null
+          custom4?: string | null
+          custom5?: string | null
           distributed_at?: string | null
           email: string
           firstname: string
@@ -1949,6 +1953,8 @@ export type Database = {
           custom1?: string | null
           custom2?: string | null
           custom3?: string | null
+          custom4?: string | null
+          custom5?: string | null
           distributed_at?: string | null
           email?: string
           firstname?: string

@@ -181,6 +181,10 @@ export function LeadsTable({
         return lead.custom2 || "-";
       case "custom3":
         return lead.custom3 || "-";
+      case "custom4":
+        return lead.custom4 || "-";
+      case "custom5":
+        return lead.custom5 || "-";
       case "comment":
         return lead.comment ? (
           <span className="max-w-32 truncate block" title={lead.comment}>
