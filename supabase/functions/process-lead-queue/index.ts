@@ -471,18 +471,15 @@ Deno.serve(async (req) => {
 
     console.log(`Processing lead queue (batch size: ${batchSize})...`);
 
-    // Get pending items from queue
+    // Atomically claim pending items via FOR UPDATE SKIP LOCKED.
+    // Prevents two concurrent invocations from processing the same lead twice.
     const { data: queueItems, error: fetchError } = await supabase
-      .from('lead_queue')
-      .select('id, lead_id, attempts')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
-      .limit(batchSize);
+      .rpc('claim_queue_items', { p_batch_size: batchSize });
 
     if (fetchError) {
-      console.error('Error fetching queue:', fetchError);
+      console.error('Error claiming queue items:', fetchError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to fetch queue' }),
+        JSON.stringify({ success: false, error: 'Failed to claim queue items' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -495,24 +492,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Found ${queueItems.length} items to process`);
+    console.log(`Claimed ${queueItems.length} items to process`);
 
-    // Mark items as processing
-    const queueIds = queueItems.map(q => q.id);
-    await supabase
-      .from('lead_queue')
-      .update({ status: 'processing' })
-      .in('id', queueIds);
-
-    // Pre-fetch distribution counts for efficiency
+    // Pre-fetch distribution counts for cap checking — both queries run in parallel
     const today = new Date().toISOString().split('T')[0];
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const { data: dailyDistributions } = await supabase
-      .from('lead_distributions')
-      .select('advertiser_id')
-      .gte('created_at', `${today}T00:00:00Z`)
-      .eq('status', 'sent');
+    const [{ data: dailyDistributions }, { data: hourlyDistributions }] = await Promise.all([
+      supabase
+        .from('lead_distributions')
+        .select('advertiser_id')
+        .gte('created_at', `${today}T00:00:00Z`)
+        .eq('status', 'sent'),
+      supabase
+        .from('lead_distributions')
+        .select('advertiser_id')
+        .gte('created_at', hourAgo)
+        .eq('status', 'sent'),
+    ]);
 
     const dailyCounts = new Map<string, number>();
     if (dailyDistributions) {
@@ -520,12 +517,6 @@ Deno.serve(async (req) => {
         dailyCounts.set(d.advertiser_id, (dailyCounts.get(d.advertiser_id) || 0) + 1);
       }
     }
-
-    const { data: hourlyDistributions } = await supabase
-      .from('lead_distributions')
-      .select('advertiser_id')
-      .gte('created_at', hourAgo)
-      .eq('status', 'sent');
 
     const hourlyCounts = new Map<string, number>();
     if (hourlyDistributions) {

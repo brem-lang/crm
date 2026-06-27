@@ -71,6 +71,11 @@ Deno.serve(async (req) => {
     const leadId = url.searchParams.get('lead_id');
     const includeRejected = url.searchParams.get('includeRejected');
 
+    // Pagination — page is 0-indexed, limit capped at 1000
+    const page = Math.max(0, parseInt(url.searchParams.get('page') || '0'));
+    const limit = Math.min(Math.max(1, parseInt(url.searchParams.get('limit') || '500')), 1000);
+    const offset = page * limit;
+
     if (!fromDate || !toDate) {
       return new Response(
         JSON.stringify({ success: false, message: 'fromDate and toDate are required (MM/DD/YY)' }),
@@ -92,11 +97,12 @@ Deno.serve(async (req) => {
     // Build query
     let query = supabase
       .from('leads')
-      .select('id, request_id, firstname, lastname, email, country_code, mobile, status, sale_status, is_ftd, ftd_date, ftd_released')
+      .select('id, request_id, firstname, lastname, email, country_code, mobile, status, sale_status, is_ftd, ftd_date, ftd_released', { count: 'exact' })
       .eq('affiliate_id', affiliate.id)
       .gte('updated_at', startDate.toISOString())
       .lte('updated_at', endDate.toISOString())
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     // Exclude rejected by default
     if (includeRejected !== '1') {
@@ -122,7 +128,7 @@ Deno.serve(async (req) => {
       query = query.eq('id', leadId);
     }
 
-    const { data: leads, error } = await query;
+    const { data: leads, error, count } = await query;
 
     if (error) {
       return new Response(
@@ -150,6 +156,10 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Leads fetched successfully',
+        total: count ?? formattedLeads.length,
+        page,
+        limit,
+        pages: count ? Math.ceil(count / limit) : 1,
         count: formattedLeads.length,
         data: formattedLeads,
       }),

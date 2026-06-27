@@ -110,6 +110,31 @@ function getClientIp(req: Request): string {
 // The distribution function is the single source of truth for advertiser availability,
 // country/affiliate targeting, scheduling, and cap enforcement.
 
+const RATE_LIMIT_RPM = 100;
+
+const DISPOSABLE_DOMAINS = new Set([
+  'tempmail.com', 'throwaway.com', '10minutemail.com', 'guerrillamail.com',
+  'mailinator.com', 'yopmail.com', 'sharklasers.com', 'guerrillamail.info',
+  'guerrillamail.biz', 'guerrillamail.de', 'guerrillamail.net', 'guerrillamail.org',
+  'spam4.me', 'trashmail.com', 'trashmail.at', 'trashmail.io', 'trashmail.me',
+  'trashmail.net', 'trashmail.org', 'dispostable.com', 'maildrop.cc',
+  'getairmail.com', 'discard.email', 'tempr.email', 'fakeinbox.com',
+  'throwam.com', 'mailnesia.com', 'mailzilla.com', 'spambox.us',
+  'tempemail.net', 'emailtemporal.org', 'filzmail.com', 'mailsac.com',
+  'temp-mail.org', 'temp-mail.io', 'burnermail.io', 'mohmal.com',
+  'mintemail.com', 'spamgourmet.com', 'spamfree24.org', 'spamfree.eu',
+]);
+
+async function isRateLimited(supabase: any, affiliateId: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('affiliate_id', affiliateId)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= RATE_LIMIT_RPM;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -139,26 +164,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Health check support
-    if ((body as { health_check?: boolean }).health_check === true) {
-      return new Response(JSON.stringify({ status: "ok", function: "submit-lead" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get API key from header (support multiple header formats)
+    // API key is required — even for health checks to prevent unauthenticated probing
     const apiKey = req.headers.get('Api-Key') || req.headers.get('api-key') || req.headers.get('X-Api-Key') || req.headers.get('x-api-key');
-    
+
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           message: 'API key required',
           rejection: { code: 'AUTH_REQUIRED', message: 'Api-Key header is required' }
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Health check (requires valid API key)
+    if ((body as { health_check?: boolean }).health_check === true) {
+      return new Response(JSON.stringify({ status: "ok", function: "submit-lead" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create Supabase client with service role for database operations
@@ -189,7 +214,7 @@ Deno.serve(async (req) => {
           affiliate_id: null,
           api_key_hint: apiKey.slice(-4),
           request_ip: clientIp,
-          payload: body,
+          payload: null,
           status: 'rejected',
           reason: 'Invalid or inactive API key',
         });
@@ -217,7 +242,7 @@ Deno.serve(async (req) => {
             affiliate_id: affiliate.id,
             api_key_hint: apiKey.slice(-4),
             request_ip: clientIp,
-            payload: body,
+            payload: null,
             status: 'rejected',
             reason,
           });
@@ -237,9 +262,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Rate limiting: max 100 requests per minute per affiliate
+    if (await isRateLimited(supabase, affiliate.id)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Rate limit exceeded. Maximum 100 requests per minute.',
+          rejection: { code: 'RATE_LIMITED', message: 'Too many requests. Please slow down.' }
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Body already parsed above for health check
     const leadData = body as LeadData;
-    
+
     // === STEP 1: Validate required fields ===
     const errors: Record<string, string> = {};
     
@@ -286,9 +323,8 @@ Deno.serve(async (req) => {
     }
 
     // Check for disposable/temporary email domains
-    const disposableDomains = ['tempmail.com', 'throwaway.com', '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'yopmail.com'];
     const emailDomain = body.email.trim().split('@')[1]?.toLowerCase();
-    if (disposableDomains.includes(emailDomain)) {
+    if (emailDomain && DISPOSABLE_DOMAINS.has(emailDomain)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -317,20 +353,19 @@ Deno.serve(async (req) => {
     // === STEP 4: Check for duplicate email ===
     const { data: existingLead } = await supabase
       .from('leads')
-      .select('id, created_at')
+      .select('id')
       .eq('email', body.email.trim().toLowerCase())
       .maybeSingle();
 
     if (existingLead) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           message: 'Duplicate email',
           errors: { email: 'Email already exists in the system' },
-          rejection: { 
-            code: 'DUPLICATE_EMAIL', 
-            message: 'A lead with this email address already exists',
-            details: `Original lead ID: ${existingLead.id}`
+          rejection: {
+            code: 'DUPLICATE_EMAIL',
+            message: 'A lead with this email address already exists'
           }
         }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -376,9 +411,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === STEP 6: Get client IP for distribution ===
-    // Prefer explicitly provided ip_address from body, then use the already-extracted clientIp
-    const leadIp = (body as LeadData).ip_address?.trim() || clientIp;
+    // === STEP 6: Use server-detected IP only — never trust client-supplied ip_address ===
+    const leadIp = clientIp;
 
     // === STEP 7: Insert lead into DB immediately (always stored regardless of distribution outcome) ===
     const { data: newLead, error: leadInsertError } = await supabase

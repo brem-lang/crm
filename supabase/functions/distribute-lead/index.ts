@@ -1390,19 +1390,30 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
         return result;
       }
 
-      // Get distribution counts for cap checking
+      // Get distribution counts for cap checking — run both queries in parallel.
       // IMPORTANT: affiliate_distribution_rules caps are per affiliate + country + advertiser.
       // Do NOT use global advertiser counts here.
       const today = new Date().toISOString().split('T')[0];
-      const { data: todayDistributions } = await supabase
-        .from('lead_distributions')
-        // Join to leads so we can filter by affiliate_id + country_code
-        .select('advertiser_id, leads!inner(country_code, affiliate_id)')
-        .in('advertiser_id', advertiserIds)
-        .gte('created_at', `${today}T00:00:00Z`)
-        .eq('status', 'sent')
-        .eq('leads.country_code', lead.country_code)
-        .eq('leads.affiliate_id', lead.affiliate_id);
+      const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+      const [{ data: todayDistributions }, { data: hourlyDistributions }] = await Promise.all([
+        supabase
+          .from('lead_distributions')
+          .select('advertiser_id, leads!inner(country_code, affiliate_id)')
+          .in('advertiser_id', advertiserIds)
+          .gte('created_at', `${today}T00:00:00Z`)
+          .eq('status', 'sent')
+          .eq('leads.country_code', lead.country_code)
+          .eq('leads.affiliate_id', lead.affiliate_id),
+        supabase
+          .from('lead_distributions')
+          .select('advertiser_id, leads!inner(country_code, affiliate_id)')
+          .in('advertiser_id', advertiserIds)
+          .gte('created_at', hourAgo)
+          .eq('status', 'sent')
+          .eq('leads.country_code', lead.country_code)
+          .eq('leads.affiliate_id', lead.affiliate_id),
+      ]);
 
       const dailyCounts = new Map<string, number>();
       if (todayDistributions) {
@@ -1410,17 +1421,6 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
           dailyCounts.set(d.advertiser_id, (dailyCounts.get(d.advertiser_id) || 0) + 1);
         }
       }
-
-      // Get hourly distribution counts (same scope: affiliate + country + advertiser)
-      const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: hourlyDistributions } = await supabase
-        .from('lead_distributions')
-        .select('advertiser_id, leads!inner(country_code, affiliate_id)')
-        .in('advertiser_id', advertiserIds)
-        .gte('created_at', hourAgo)
-        .eq('status', 'sent')
-        .eq('leads.country_code', lead.country_code)
-        .eq('leads.affiliate_id', lead.affiliate_id);
 
       const hourlyCounts = new Map<string, number>();
       if (hourlyDistributions) {

@@ -49,6 +49,30 @@ interface ApiResponse {
 }
 
 const API_VERSION = '2.0';
+const RATE_LIMIT_RPM = 100;
+
+const DISPOSABLE_DOMAINS = new Set([
+  'tempmail.com', 'throwaway.com', '10minutemail.com', 'guerrillamail.com',
+  'mailinator.com', 'yopmail.com', 'sharklasers.com', 'guerrillamail.info',
+  'guerrillamail.biz', 'guerrillamail.de', 'guerrillamail.net', 'guerrillamail.org',
+  'spam4.me', 'trashmail.com', 'trashmail.at', 'trashmail.io', 'trashmail.me',
+  'trashmail.net', 'trashmail.org', 'dispostable.com', 'maildrop.cc',
+  'getairmail.com', 'discard.email', 'tempr.email', 'fakeinbox.com',
+  'throwam.com', 'mailnesia.com', 'mailzilla.com', 'spambox.us',
+  'tempemail.net', 'emailtemporal.org', 'filzmail.com', 'mailsac.com',
+  'temp-mail.org', 'temp-mail.io', 'burnermail.io', 'mohmal.com',
+  'mintemail.com', 'spamgourmet.com', 'spamfree24.org', 'spamfree.eu',
+]);
+
+async function isRateLimited(supabase: any, affiliateId: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('affiliate_id', affiliateId)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= RATE_LIMIT_RPM;
+}
 
 function getClientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
@@ -133,23 +157,23 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    // Health check support
-    if ((body as { health_check?: boolean }).health_check === true) {
-      return new Response(JSON.stringify({ status: "ok", function: "submit-lead-v2" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get API key from header
+    // API key is required — even for health checks to prevent unauthenticated probing
     const apiKey = req.headers.get('Api-Key') || req.headers.get('api-key');
-    
+
     if (!apiKey) {
       return createResponse({
         success: false,
         message: 'API key required. Include Api-Key header.',
         api_version: API_VERSION,
       }, 401);
+    }
+
+    // Health check (requires valid API key)
+    if ((body as { health_check?: boolean }).health_check === true) {
+      return new Response(JSON.stringify({ status: "ok", function: "submit-lead-v2" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create Supabase client with service role for database operations
@@ -174,7 +198,7 @@ Deno.serve(async (req) => {
           affiliate_id: null,
           api_key_hint: apiKey.slice(-4),
           request_ip: clientIp,
-          payload: body,
+          payload: null,
           status: 'rejected',
           reason: 'Invalid or inactive API key',
         });
@@ -199,7 +223,7 @@ Deno.serve(async (req) => {
             affiliate_id: affiliate.id,
             api_key_hint: apiKey.slice(-4),
             request_ip: clientIp,
-            payload: body,
+            payload: null,
             status: 'rejected',
             reason,
           });
@@ -220,6 +244,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Rate limiting: max 100 requests per minute per affiliate
+    if (await isRateLimited(supabase, affiliate.id)) {
+      return createResponse({
+        success: false,
+        message: 'Rate limit exceeded. Maximum 100 requests per minute.',
+        api_version: API_VERSION,
+      }, 429);
+    }
+
     // Body already parsed above for health check - cast to LeadData
     const leadData = body as LeadData;
     
@@ -231,6 +264,17 @@ Deno.serve(async (req) => {
         success: false,
         message: 'Validation failed',
         errors,
+        api_version: API_VERSION,
+      }, 422);
+    }
+
+    // Disposable email check
+    const emailDomain = leadData.email.trim().split('@')[1]?.toLowerCase();
+    if (emailDomain && DISPOSABLE_DOMAINS.has(emailDomain)) {
+      return createResponse({
+        success: false,
+        message: 'Disposable email addresses are not accepted',
+        errors: { email: 'Disposable email not allowed' },
         api_version: API_VERSION,
       }, 422);
     }
@@ -251,12 +295,6 @@ Deno.serve(async (req) => {
         api_version: API_VERSION,
       }, 409);
     }
-
-    // Get client IP
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-                     req.headers.get('x-real-ip') || 
-                     leadData.ip_address || 
-                     'unknown';
 
     // Create the lead
     const { data: lead, error: leadError } = await supabase
@@ -305,8 +343,21 @@ Deno.serve(async (req) => {
       });
     } catch { /* non-critical */ }
 
-    // Distribution is now manual - use distribute-lead endpoint separately
-    // Scoring happens when the lead clicks the autologin URL (track-autologin function)
+    // Queue for async distribution. Inserting to lead_queue decouples submission
+    // throughput from distribution latency — the API returns instantly and the
+    // processor handles distribution in the background with automatic retries.
+    try {
+      await supabase.from('lead_queue').insert({ lead_id: lead.id });
+      // Fire-and-forget: trigger the processor without blocking the response
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-lead-queue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({ batch_size: 10 }),
+      }).catch(() => { /* processor will pick it up on next invocation */ });
+    } catch { /* lead is saved — queue insertion is best-effort */ }
 
     // Return success response
     return createResponse({

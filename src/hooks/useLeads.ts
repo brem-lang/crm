@@ -25,7 +25,9 @@ export function useLeadsRealtime() {
         },
         (payload) => {
           console.log('Lead realtime update:', payload);
-          queryClient.invalidateQueries({ queryKey: ['leads'] });
+          // Only refetch queries actively mounted — avoids triggering stale
+          // background cache entries on every realtime event
+          queryClient.invalidateQueries({ queryKey: ['leads'], refetchType: 'active' });
         }
       )
       .subscribe();
