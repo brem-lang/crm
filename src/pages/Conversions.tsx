@@ -95,6 +95,7 @@ export default function Conversions() {
   const [countryFilter, setCountryFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [releaseConfirmId, setReleaseConfirmId] = useState<string | null>(null);
+  const [isRemoveFtdOpen, setIsRemoveFtdOpen] = useState(false);
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
       const saved = localStorage.getItem("conversions-column-visibility");
@@ -337,11 +338,13 @@ export default function Conversions() {
   });
 
   const handleBulkDelete = () => {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    if (confirm(`Remove FTD status from ${ids.length} lead(s)? This will set is_ftd=false.`)) {
-      bulkDeleteMutation.mutate(ids);
-    }
+    if (selectedIds.size === 0) return;
+    setIsRemoveFtdOpen(true);
+  };
+
+  const confirmRemoveFtd = () => {
+    bulkDeleteMutation.mutate(Array.from(selectedIds));
+    setIsRemoveFtdOpen(false);
   };
 
   const handleExport = () => {
@@ -882,6 +885,28 @@ export default function Conversions() {
           </CardContent>
         </Card>
       </div>
+      {/* Remove FTD Confirmation */}
+      <AlertDialog open={isRemoveFtdOpen} onOpenChange={setIsRemoveFtdOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove FTD Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove FTD status from {selectedIds.size} lead{selectedIds.size !== 1 ? 's' : ''}? This will set <code className="text-xs bg-muted px-1 rounded">is_ftd=false</code> and the affiliate will no longer see them as FTD via the API.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveFtd}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Remove FTD from {selectedIds.size} Lead{selectedIds.size !== 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!releaseConfirmId} onOpenChange={(open) => { if (!open) setReleaseConfirmId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
