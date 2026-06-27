@@ -276,7 +276,7 @@ export default function Advertisers() {
   const handleFormSubmit = () => {
     const payload = {
       name: formData.name,
-      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11",
+      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio",
       url: formData.url,
       api_key: formData.api_key,
       is_active: formData.is_active,

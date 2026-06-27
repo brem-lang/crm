@@ -2469,6 +2469,7 @@ export type Database = {
         | "mock"
         | "elnopy"
         | "reacto"
+        | "affilio"
       app_role: "super_admin" | "manager" | "agent" | "affiliate"
       distribution_status: "pending" | "sent" | "failed"
       injection_lead_status:
@@ -2638,6 +2639,7 @@ export const Constants = {
         "mock",
         "elnopy",
         "reacto",
+        "affilio",
       ],
       app_role: ["super_admin", "manager", "agent", "affiliate"],
       distribution_status: ["pending", "sent", "failed"],

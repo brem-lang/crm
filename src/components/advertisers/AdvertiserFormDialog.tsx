@@ -487,6 +487,14 @@ export function AdvertiserFormDialog({
               <div className="border-t pt-4 mt-4">
                 <Label className="text-sm font-medium text-muted-foreground">Affilio Configuration</Label>
               </div>
+              <div className="space-y-2">
+                <Label>API Key <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. c5077c68-c5ee-4bc9-ae45-170bfdad1234"
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Username <span className="text-destructive">*</span></Label>
