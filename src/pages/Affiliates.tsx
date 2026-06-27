@@ -12,6 +12,7 @@ import { MoreHorizontal, Plus, Copy, Pencil, Trash2, Power, PowerOff, FlaskConic
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +34,7 @@ export default function Affiliates() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [deleteAffiliateId, setDeleteAffiliateId] = useState<string | null>(null);
   const [selectedAffiliate, setSelectedAffiliate] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -111,9 +113,12 @@ export default function Affiliates() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this affiliate?")) {
-      deleteAffiliate.mutate(id);
-    }
+    setDeleteAffiliateId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteAffiliateId) deleteAffiliate.mutate(deleteAffiliateId);
+    setDeleteAffiliateId(null);
   };
 
   const handleToggleStatus = (affiliate: any) => {
@@ -520,6 +525,27 @@ export default function Affiliates() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Affiliate Confirmation */}
+        <AlertDialog open={!!deleteAffiliateId} onOpenChange={(open) => !open && setDeleteAffiliateId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Affiliate</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this affiliate? All associated API keys and data will be permanently removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

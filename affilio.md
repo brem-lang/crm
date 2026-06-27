@@ -261,10 +261,3 @@ json
 "size": 1000, //maximum items per page is 1000
 "type": "Lead" // type can be Lead or Deposit
 }
-
-API Integration Details
-Username: 269
-Password: h1r7EdpgRm7
-API Key: 3e50d90d-ceed-4357-8a4b-fb5072cf044f
-API URL: https://adstar-media.eu
-LID: 310

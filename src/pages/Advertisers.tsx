@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAdvertisers, useCreateAdvertiser, useUpdateAdvertiser, useDeleteAdvertiser } from "@/hooks/useAdvertisers";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,6 +134,7 @@ export default function Advertisers() {
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isTestLeadOpen, setIsTestLeadOpen] = useState(false);
+  const [deleteAdvertiserId, setDeleteAdvertiserId] = useState<string | null>(null);
   const [selectedAdvertiser, setSelectedAdvertiser] = useState<Advertiser | null>(null);
   const [formData, setFormData] = useState(initialFormData);
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
@@ -305,9 +307,12 @@ export default function Advertisers() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this advertiser?")) {
-      deleteAdvertiser.mutate(id);
-    }
+    setDeleteAdvertiserId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteAdvertiserId) deleteAdvertiser.mutate(deleteAdvertiserId);
+    setDeleteAdvertiserId(null);
   };
 
   const handleTestLead = (advertiser: Advertiser) => {
@@ -429,6 +434,27 @@ export default function Advertisers() {
             advertiserName={selectedAdvertiser.name}
           />
         )}
+
+        {/* Delete Advertiser Confirmation */}
+        <AlertDialog open={!!deleteAdvertiserId} onOpenChange={(open) => !open && setDeleteAdvertiserId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Advertiser</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this advertiser? All associated distribution rules and settings will be permanently removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

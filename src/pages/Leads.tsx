@@ -9,6 +9,16 @@ import { ResendLeadsDialog } from "@/components/leads/ResendLeadsDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -162,6 +172,9 @@ export default function Leads() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isResendOpen, setIsResendOpen] = useState(false);
   const [editForm, setEditForm] = useState({ status: "", is_ftd: false });
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
+  const [releaseFtdId, setReleaseFtdId] = useState<string | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
 
   // Date and advanced filters - use timezone-aware helpers (default to Today)
   const [showAllDates, setShowAllDates] = useState(false);
@@ -496,23 +509,27 @@ export default function Leads() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this lead?")) {
-      deleteLead.mutate(id);
-    }
+    setDeleteLeadId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteLeadId) deleteLead.mutate(deleteLeadId);
+    setDeleteLeadId(null);
   };
 
   const handleReleaseFtd = (id: string) => {
-    if (
-      confirm(
-        "Release this FTD to the affiliate? They will see is_ftd=1 in the API.",
-      )
-    ) {
+    setReleaseFtdId(id);
+  };
+
+  const confirmReleaseFtd = () => {
+    if (releaseFtdId) {
       updateLead.mutate({
-        id,
+        id: releaseFtdId,
         ftd_released: true,
         ftd_released_at: new Date().toISOString(),
       });
     }
+    setReleaseFtdId(null);
   };
 
   const handleSelectChange = (id: string, checked: boolean) => {
@@ -537,11 +554,14 @@ export default function Leads() {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.size} leads?`)) {
-      bulkDeleteLeads.mutate(Array.from(selectedIds), {
-        onSuccess: () => setSelectedIds(new Set()),
-      });
-    }
+    setIsBulkDeleteOpen(true);
+  };
+
+  const confirmBulkDelete = () => {
+    bulkDeleteLeads.mutate(Array.from(selectedIds), {
+      onSuccess: () => setSelectedIds(new Set()),
+    });
+    setIsBulkDeleteOpen(false);
   };
 
   const handleBulkExport = () => {
@@ -833,6 +853,66 @@ export default function Leads() {
           advertisers={advertisers || []}
           onSuccess={() => setSelectedIds(new Set())}
         />
+
+        {/* Delete Lead Confirmation */}
+        <AlertDialog open={!!deleteLeadId} onOpenChange={(open) => !open && setDeleteLeadId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this lead? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Delete Leads Confirmation */}
+        <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedIds.size} Lead{selectedIds.size !== 1 ? 's' : ''}</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {selectedIds.size} lead{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete {selectedIds.size} Lead{selectedIds.size !== 1 ? 's' : ''}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Release FTD Confirmation */}
+        <AlertDialog open={!!releaseFtdId} onOpenChange={(open) => !open && setReleaseFtdId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Release FTD to Affiliate</AlertDialogTitle>
+              <AlertDialogDescription>
+                The affiliate will see <code className="text-xs bg-muted px-1 rounded">is_ftd=1</code> for this lead via the API. This cannot be reversed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmReleaseFtd}>
+                Release FTD
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
