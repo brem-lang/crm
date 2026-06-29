@@ -89,6 +89,15 @@ export default function Users() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      // Save original admin session so impersonation can be reversed
+      const { data: { session: originalSession } } = await supabase.auth.getSession();
+      if (originalSession) {
+        localStorage.setItem('crm_impersonation_original', JSON.stringify({
+          access_token: originalSession.access_token,
+          refresh_token: originalSession.refresh_token,
+        }));
+      }
+
       // Use verifyOtp with token_hash to log in as the target user
       const { error: otpError } = await supabase.auth.verifyOtp({
         token_hash: data.token,
@@ -98,8 +107,7 @@ export default function Users() {
       if (otpError) throw otpError;
 
       toast.success(`Logged in as ${data.email}`);
-      // Reload to reflect new session
-      window.location.reload();
+      window.location.href = '/dashboard';
     } catch (error: any) {
       toast.error(error.message || "Failed to login as user");
     } finally {

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 type AppRole = 'super_admin' | 'manager' | 'agent' | 'affiliate';
 
+const IMPERSONATION_KEY = 'crm_impersonation_original';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -23,6 +25,8 @@ interface AuthContextType {
   isAffiliate: boolean;
   isChatSupport: boolean;
   isAdmin: boolean;
+  isImpersonating: boolean;
+  endImpersonation: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -187,7 +191,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate("/dashboard");
   };
 
+  const isImpersonating = typeof window !== 'undefined' && !!localStorage.getItem(IMPERSONATION_KEY);
+
+  const endImpersonation = async () => {
+    const raw = localStorage.getItem(IMPERSONATION_KEY);
+    if (!raw) return;
+    let original: { access_token: string; refresh_token: string };
+    try {
+      original = JSON.parse(raw);
+    } catch {
+      localStorage.removeItem(IMPERSONATION_KEY);
+      navigate('/users');
+      return;
+    }
+    localStorage.removeItem(IMPERSONATION_KEY);
+    const { error } = await supabase.auth.setSession({
+      access_token: original.access_token,
+      refresh_token: original.refresh_token,
+    });
+    if (error) {
+      toast.error('Failed to restore your session. Please log in again.');
+      navigate('/login');
+      return;
+    }
+    toast.success('Returned to your account');
+    navigate('/users');
+  };
+
   const signOut = async () => {
+    // Always clear impersonation key so a stale session isn't restored after re-login
+    localStorage.removeItem(IMPERSONATION_KEY);
+
     // Log before session is destroyed
     if (user) {
       try {
@@ -234,6 +268,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAffiliate,
       isChatSupport,
       isAdmin,
+      isImpersonating,
+      endImpersonation,
     }}>
       {children}
     </AuthContext.Provider>
