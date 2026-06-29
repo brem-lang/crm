@@ -70,6 +70,7 @@ export function useLeads(options?: {
             advertiser_id,
             status,
             external_lead_id,
+            autologin_url,
             request_url,
             request_headers,
             request_payload,
