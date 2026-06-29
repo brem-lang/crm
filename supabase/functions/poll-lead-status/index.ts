@@ -76,35 +76,54 @@ interface ElnopyLeadItem {
   created_at: string;
 }
 
-// Helper function to log status changes to lead_status_history
-async function logStatusChange(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+interface HistoryEntry {
+  lead_id: string | null;
+  injection_lead_id: string | null;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  change_source: string;
+  change_reason: string;
+}
+
+// Collect a status-change entry into a batch (sync, zero DB calls)
+function collectHistory(
+  batch: HistoryEntry[],
   leadId: string | null,
   injectionLeadId: string | null,
   fieldName: string,
   oldValue: string | null,
   newValue: string | null,
-  changeSource: string = 'advertiser_poll'
+  changeSource = 'advertiser_poll'
+): void {
+  batch.push({
+    lead_id: leadId,
+    injection_lead_id: injectionLeadId,
+    field_name: fieldName,
+    old_value: oldValue,
+    new_value: newValue,
+    change_source: changeSource,
+    change_reason: 'Status update from advertiser polling',
+  });
+}
+
+// Flush all collected history entries in a single batch insert
+async function flushHistory(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  batch: HistoryEntry[]
 ): Promise<void> {
+  if (batch.length === 0) return;
   try {
-    await supabase.from('lead_status_history').insert({
-      lead_id: leadId,
-      injection_lead_id: injectionLeadId,
-      field_name: fieldName,
-      old_value: oldValue,
-      new_value: newValue,
-      change_source: changeSource,
-      change_reason: 'Status update from advertiser polling',
-    });
-    console.log(`Logged status change: ${fieldName} ${oldValue} → ${newValue}`);
+    await supabase.from('lead_status_history').insert(batch);
+    console.log(`Logged ${batch.length} status change(s)`);
   } catch (error) {
-    console.error(`Failed to log status change: ${error}`);
+    console.error(`Failed to log status changes: ${error}`);
   }
 }
 
-// Format date for Enigma API (YYYY-MM-DD HH:mm:ss)
-function formatEnigmaDate(date: Date): string {
+// Shared YYYY-MM-DD HH:mm:ss formatter (Enigma, TrackBox, ELNOPY, Affilio all use this format)
+function formatDateYMDHMS(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
@@ -122,14 +141,12 @@ async function pollEnigmaLeads(
   let updated = 0;
   let errors = 0;
 
-  // Use status_endpoint if configured, otherwise fall back to url
   const baseUrl = advertiser.status_endpoint || advertiser.url;
   if (!baseUrl) {
     console.log(`Enigma advertiser ${advertiser.name} has no URL configured`);
     return { updated: 0, errors: 0 };
   }
 
-  // Build the status URL - use the same base domain as the lead submission
   let statusUrl: string;
   try {
     const urlObj = new URL(baseUrl);
@@ -139,27 +156,31 @@ async function pollEnigmaLeads(
     return { updated: 0, errors: 0 };
   }
 
-  // Get date range - poll leads from last 30 days
+  const now = new Date().toISOString();
   const toDate = new Date();
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const url = new URL(statusUrl);
-  url.searchParams.set('fromDate', formatEnigmaDate(fromDate));
-  url.searchParams.set('toDate', formatEnigmaDate(toDate));
+  url.searchParams.set('fromDate', formatDateYMDHMS(fromDate));
+  url.searchParams.set('toDate', formatDateYMDHMS(toDate));
   url.searchParams.set('itemsPerPage', '1000');
 
-  console.log(`Enigma bulk status URL: ${url.toString()}`);
-  console.log(`Routing through VPS forwarder: ${FORWARDER_URL}`);
+  console.log(`Enigma bulk status URL: ${url.toString()}, routing through VPS forwarder`);
+
+  // Pre-fetch conversion record once for this advertiser
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  const historyBatch: HistoryEntry[] = [];
+  let ftdCount = 0;
 
   try {
-    // Route through VPS forwarder for IP whitelisting
-    // Use X-Http-Method: GET since RevDale's POST to same URL is for registration
-    console.log(`Enigma bulk status URL: ${url.toString()}`);
-    console.log(`Routing through VPS forwarder with GET method`);
-    
     const authHeaderName = String(advertiser.config?.auth_header_name || 'Api-Key');
     const response = await fetch(FORWARDER_URL, {
-      method: 'POST', // Forwarder accepts POST but uses X-Http-Method for target
+      method: 'POST',
       headers: {
         'X-Target-Url': url.toString(),
         'X-Http-Method': 'GET',
@@ -182,7 +203,6 @@ async function pollEnigmaLeads(
       return { updated: 0, errors: 0 };
     }
 
-    // Create a map of leadRequestIDEncoded -> lead data for quick lookup
     const enigmaLeadsMap = new Map<string, EnigmaLeadItem>();
     for (const item of data.items as EnigmaLeadItem[]) {
       if (item.leadRequestIDEncoded) {
@@ -192,74 +212,56 @@ async function pollEnigmaLeads(
 
     console.log(`Mapped ${enigmaLeadsMap.size} Enigma leads for matching`);
 
-    // Match our distributions with Enigma leads
     for (const dist of distributions) {
       if (!dist.external_lead_id) continue;
 
       const enigmaLead = enigmaLeadsMap.get(dist.external_lead_id);
-      
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
 
       if (enigmaLead) {
-        // Log raw Enigma data for debugging
         console.log(`Enigma data for ${dist.external_lead_id}: hasFTD=${enigmaLead.hasFTD}, saleStatus=${enigmaLead.saleStatus}`);
-        
+
         const hasFtd = enigmaLead.hasFTD === 1 || enigmaLead.hasFTD === true;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Always store raw sale_status from advertiser
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (enigmaLead.saleStatus && enigmaLead.saleStatus !== oldSaleStatus) {
           leadUpdates.sale_status = enigmaLead.saleStatus;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${enigmaLead.saleStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, enigmaLead.saleStatus);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, enigmaLead.saleStatus);
         }
 
-        // Check if FTD status changed
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = enigmaLead.signupDate || new Date().toISOString();
+          leadUpdates.ftd_date = enigmaLead.signupDate || now;
           console.log(`FTD detected for lead ${dist.lead_id} (Enigma ID: ${dist.external_lead_id})`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          // Update conversion stats
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const conversionData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: conversionData.conversion + 1 })
-              .eq('id', conversionData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
-        // No mapping needed - sale_status stores the raw advertiser status
-
-        // Apply updates if any
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('leads')
-            .update(leadUpdates)
-            .eq('id', dist.lead_id);
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
           updated++;
         }
       }
+    }
+
+    // Batch update last_polled_at for all processed distributions
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
     }
   } catch (error) {
     console.error(`Error polling Enigma: ${error}`);
     errors++;
   }
+
+  // Write conversion increment in a single update
+  if (ftdCount > 0 && convRecord) {
+    const conv = convRecord as { id: string; conversion: number };
+    await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+  }
+
+  await flushHistory(supabase, historyBatch);
 
   return { updated, errors };
 }
@@ -281,14 +283,12 @@ async function pollEliteCRMLeads(
   let updated = 0;
   let errors = 0;
 
-  // Use status_endpoint if configured, otherwise fall back to url
   const baseUrl = advertiser.status_endpoint || advertiser.url;
   if (!baseUrl) {
     console.log(`EliteCRM advertiser ${advertiser.name} has no URL configured`);
     return { updated: 0, errors: 0 };
   }
 
-  // Build the status URL - use the same base domain as the lead submission
   let statusUrl: string;
   try {
     const urlObj = new URL(baseUrl);
@@ -298,8 +298,8 @@ async function pollEliteCRMLeads(
     return { updated: 0, errors: 0 };
   }
 
-  // Get date range - poll leads from last 30 days
-  // toDate is extended by 1 day so today's leads (inclusive) are always returned
+  const now = new Date().toISOString();
+  // toDate extended by 1 day so today's leads are always included
   const toDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -309,13 +309,19 @@ async function pollEliteCRMLeads(
 
   console.log(`EliteCRM bulk status URL: ${url.toString()}`);
 
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  const historyBatch: HistoryEntry[] = [];
+  let ftdCount = 0;
+
   try {
-    // Direct call - EliteCRM doesn't require IP whitelisting for status checks
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: {
-        'Api-Key': advertiser.api_key || '',
-      },
+      headers: { 'Api-Key': advertiser.api_key || '' },
     });
 
     if (!response.ok) {
@@ -331,86 +337,62 @@ async function pollEliteCRMLeads(
       return { updated: 0, errors: 0 };
     }
 
-    // Create a map of lead_id -> lead data for quick lookup
     const eliteCRMLeadsMap = new Map<string, EliteCRMLeadItem>();
     for (const item of data.data as EliteCRMLeadItem[]) {
-      if (item.id) {
-        eliteCRMLeadsMap.set(String(item.id), item);
-      }
-      // Also map by lead_code if available
-      if (item.lead_code) {
-        eliteCRMLeadsMap.set(item.lead_code, item);
-      }
+      if (item.id)        eliteCRMLeadsMap.set(String(item.id), item);
+      if (item.lead_code) eliteCRMLeadsMap.set(item.lead_code, item);
     }
 
     console.log(`Mapped ${eliteCRMLeadsMap.size} EliteCRM leads for matching`);
 
-    // Match our distributions with EliteCRM leads
     for (const dist of distributions) {
       if (!dist.external_lead_id) continue;
 
       const eliteCRMLead = eliteCRMLeadsMap.get(dist.external_lead_id);
 
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
-
       if (eliteCRMLead) {
-        // Log raw EliteCRM data for debugging
         console.log(`EliteCRM data for ${dist.external_lead_id}: is_ftd=${eliteCRMLead.is_ftd}, ftd_date=${eliteCRMLead.ftd_date}, sales_status=${eliteCRMLead.sales_status}`);
 
         const hasFtd = eliteCRMLead.is_ftd === 1;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Store raw sales_status from advertiser (NOT the numeric account status field)
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (eliteCRMLead.sales_status && eliteCRMLead.sales_status !== oldSaleStatus) {
           leadUpdates.sale_status = eliteCRMLead.sales_status;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${eliteCRMLead.sales_status}`);
-          // Log status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, eliteCRMLead.sales_status);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, eliteCRMLead.sales_status);
         }
 
-        // Check if FTD status changed
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = eliteCRMLead.ftd_date || new Date().toISOString();
+          leadUpdates.ftd_date = eliteCRMLead.ftd_date || now;
           console.log(`FTD detected for lead ${dist.lead_id} (EliteCRM ID: ${dist.external_lead_id})`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          // Update conversion stats
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const conversionData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: conversionData.conversion + 1 })
-              .eq('id', conversionData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
-        // Apply updates if any
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('leads')
-            .update(leadUpdates)
-            .eq('id', dist.lead_id);
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
           updated++;
         }
       }
+    }
+
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
     }
   } catch (error) {
     console.error(`Error polling EliteCRM: ${error}`);
     errors++;
   }
+
+  if (ftdCount > 0 && convRecord) {
+    const conv = convRecord as { id: string; conversion: number };
+    await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+  }
+
+  await flushHistory(supabase, historyBatch);
 
   return { updated, errors };
 }
@@ -490,12 +472,11 @@ async function pollEliteCRMInjectionLeads(
     const lookingFor = injectionLeads.map(l => l.email).join(', ');
     console.log(`Looking for emails: ${lookingFor}`);
 
-    // Match injection leads by email first, then by ID
-    for (const injLead of injectionLeads) {
-      // Try to match by email first
-      let eliteCRMLead = eliteCRMByEmail.get(injLead.email.toLowerCase());
+    const historyBatch: HistoryEntry[] = [];
+    const now = new Date().toISOString();
 
-      // Fallback to ID matching if email not found
+    for (const injLead of injectionLeads) {
+      let eliteCRMLead = eliteCRMByEmail.get(injLead.email.toLowerCase());
       if (!eliteCRMLead && injLead.external_lead_id) {
         eliteCRMLead = eliteCRMById.get(injLead.external_lead_id);
       }
@@ -507,42 +488,33 @@ async function pollEliteCRMInjectionLeads(
         const injectionLeadUpdates: Record<string, unknown> = {};
         const leadsTableUpdates: Record<string, unknown> = {};
 
-        // Store raw sales_status (NOT the numeric account status field)
         if (eliteCRMLead.sales_status && eliteCRMLead.sales_status !== injLead.sale_status) {
           injectionLeadUpdates.sale_status = eliteCRMLead.sales_status;
           leadsTableUpdates.sale_status = eliteCRMLead.sales_status;
           console.log(`Injection lead ${injLead.email} sale_status updated: ${eliteCRMLead.sales_status}`);
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, eliteCRMLead.sales_status);
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, eliteCRMLead.sales_status);
         }
 
-        // Check FTD
         if (hasFtd && !injLead.is_ftd) {
           injectionLeadUpdates.is_ftd = true;
-          injectionLeadUpdates.ftd_date = eliteCRMLead.ftd_date || new Date().toISOString();
+          injectionLeadUpdates.ftd_date = eliteCRMLead.ftd_date || now;
           leadsTableUpdates.injection_ftd = true;
-          leadsTableUpdates.injection_ftd_date = eliteCRMLead.ftd_date || new Date().toISOString();
+          leadsTableUpdates.injection_ftd_date = eliteCRMLead.ftd_date || now;
           console.log(`Injection lead ${injLead.email} FTD detected: ${eliteCRMLead.ftd_date}`);
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(injectionLeadUpdates).length > 0) {
-          await supabase
-            .from('injection_leads')
-            .update(injectionLeadUpdates)
-            .eq('id', injLead.id);
-
-          // Also update the corresponding leads table record if it exists (for affiliate tracking)
+          await supabase.from('injection_leads').update(injectionLeadUpdates).eq('id', injLead.id);
           if (Object.keys(leadsTableUpdates).length > 0) {
-            await supabase
-              .from('leads')
-              .update(leadsTableUpdates)
-              .eq('email', injLead.email);
+            await supabase.from('leads').update(leadsTableUpdates).eq('email', injLead.email);
           }
-
           updated++;
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling EliteCRM for injections: ${error}`);
     errors++;
@@ -573,18 +545,18 @@ async function pollEgoliInjectionLeadsPerEmail(
 
   console.log(`Egoli per-email polling for ${injectionLeads.length} leads`);
 
+  const historyBatch: HistoryEntry[] = [];
+
   for (const injLead of injectionLeads) {
     const email = encodeURIComponent(injLead.email);
     const url = `${origin}/api/leads/update/${email}`;
-    
+
     console.log(`Egoli polling: ${url}`);
 
     try {
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Api-Key': advertiser.api_key || '',
-        },
+        headers: { 'Api-Key': advertiser.api_key || '' },
       });
 
       if (!response.ok) {
@@ -596,9 +568,7 @@ async function pollEgoliInjectionLeadsPerEmail(
       const data = await response.json();
       console.log(`Egoli response for ${injLead.email}: ${JSON.stringify(data)}`);
 
-      // Handle response - could be single lead object or wrapped in data
       const leadData = data.data || data;
-      
       if (!leadData) {
         console.log(`No data returned for ${injLead.email}`);
         continue;
@@ -607,28 +577,21 @@ async function pollEgoliInjectionLeadsPerEmail(
       const hasFtd = leadData.is_ftd === 1;
       const leadUpdates: Record<string, unknown> = {};
 
-      // Store raw status
       if (leadData.status && String(leadData.status) !== String(injLead.sale_status)) {
         leadUpdates.sale_status = String(leadData.status);
         console.log(`Egoli lead ${injLead.email} sale_status updated: ${leadData.status}`);
-        // Log status change to history
-        await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, String(leadData.status));
+        collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, String(leadData.status));
       }
 
-      // Check FTD
       if (hasFtd && !injLead.is_ftd) {
         leadUpdates.is_ftd = true;
         leadUpdates.ftd_date = leadData.ftd_date || new Date().toISOString();
         console.log(`Egoli lead ${injLead.email} FTD detected: ${leadData.ftd_date}`);
-        // Log FTD status change to history
-        await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+        collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
       }
 
       if (Object.keys(leadUpdates).length > 0) {
-        await supabase
-          .from('injection_leads')
-          .update(leadUpdates)
-          .eq('id', injLead.id);
+        await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
         const leadsSync: Record<string, unknown> = {};
         if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
         if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
@@ -642,6 +605,8 @@ async function pollEgoliInjectionLeadsPerEmail(
       errors++;
     }
   }
+
+  await flushHistory(supabase, historyBatch);
 
   return { updated, errors };
 }
@@ -677,12 +642,11 @@ async function pollEnigmaInjectionLeads(
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const url = new URL(statusUrl);
-  url.searchParams.set('fromDate', formatEnigmaDate(fromDate));
-  url.searchParams.set('toDate', formatEnigmaDate(toDate));
+  url.searchParams.set('fromDate', formatDateYMDHMS(fromDate));
+  url.searchParams.set('toDate', formatDateYMDHMS(toDate));
   url.searchParams.set('itemsPerPage', '1000');
 
-  console.log(`Enigma injection polling URL: ${url.toString()}`);
-  console.log(`Routing through VPS forwarder with GET method`);
+  console.log(`Enigma injection polling URL: ${url.toString()}, routing through VPS forwarder`);
 
   try {
     // Route through VPS forwarder for IP whitelisting
@@ -726,19 +690,15 @@ async function pollEnigmaInjectionLeads(
 
     console.log(`Mapped ${enigmaByLeadId.size} Enigma leads by ID, ${enigmaByEmail.size} by email`);
     
-    // Log what we're looking for
     const lookingFor = injectionLeads.map(l => `${l.email} (${l.external_lead_id})`).join(', ');
     console.log(`Looking for: ${lookingFor}`);
 
-    // Match injection leads
+    const historyBatch: HistoryEntry[] = [];
+    const now = new Date().toISOString();
+
     for (const injLead of injectionLeads) {
-      // Try to match by external_lead_id first
       let enigmaLead = injLead.external_lead_id ? enigmaByLeadId.get(injLead.external_lead_id) : null;
-      
-      // Fallback to email matching
-      if (!enigmaLead) {
-        enigmaLead = enigmaByEmail.get(injLead.email.toLowerCase());
-      }
+      if (!enigmaLead) enigmaLead = enigmaByEmail.get(injLead.email.toLowerCase());
 
       if (enigmaLead) {
         console.log(`Enigma match for ${injLead.email}: hasFTD=${enigmaLead.hasFTD}, saleStatus=${enigmaLead.saleStatus}`);
@@ -746,28 +706,21 @@ async function pollEnigmaInjectionLeads(
         const hasFtd = enigmaLead.hasFTD === 1 || enigmaLead.hasFTD === true;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Store raw status
         if (enigmaLead.saleStatus && enigmaLead.saleStatus !== injLead.sale_status) {
           leadUpdates.sale_status = enigmaLead.saleStatus;
           console.log(`Injection lead ${injLead.email} sale_status updated: ${enigmaLead.saleStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, enigmaLead.saleStatus);
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, enigmaLead.saleStatus);
         }
 
-        // Check FTD
         if (hasFtd && !injLead.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = enigmaLead.signupDate || new Date().toISOString();
+          leadUpdates.ftd_date = enigmaLead.signupDate || now;
           console.log(`Injection lead ${injLead.email} FTD detected`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('injection_leads')
-            .update(leadUpdates)
-            .eq('id', injLead.id);
+          await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
           const leadsSync: Record<string, unknown> = {};
           if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
           if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
@@ -778,6 +731,8 @@ async function pollEnigmaInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling Enigma for injections: ${error}`);
     errors++;
@@ -809,8 +764,14 @@ async function pollGSILeads(
   const baseUrl = advertiser.url || 'https://www.gsimarkets.com/api_add2.php';
   const statusUrl = `${baseUrl}?act=leads_status&id=${encodeURIComponent(gsiId)}&hash=${encodeURIComponent(gsiHash)}`;
 
-  console.log(`GSI bulk status URL: ${statusUrl}`);
-  console.log(`Routing through VPS forwarder: ${FORWARDER_URL}`);
+  console.log(`GSI bulk status URL: ${statusUrl}, routing through VPS forwarder`);
+
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
 
   try {
     const response = await fetch(FORWARDER_URL, {
@@ -855,19 +816,11 @@ async function pollGSILeads(
 
     console.log(`Mapped ${gsiLeadsById.size} GSI leads by ID, ${gsiLeadsByEmail.size} by email`);
 
-    // Match our distributions with GSI leads
-    for (const dist of distributions) {
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
+    const historyBatch: HistoryEntry[] = [];
+    let ftdCount = 0;
 
-      // Try to find matching GSI lead
-      let gsiLead = null;
-      if (dist.external_lead_id) {
-        gsiLead = gsiLeadsById.get(dist.external_lead_id);
-      }
+    for (const dist of distributions) {
+      let gsiLead = dist.external_lead_id ? gsiLeadsById.get(dist.external_lead_id) : null;
       if (!gsiLead && dist.leads?.email) {
         gsiLead = gsiLeadsByEmail.get((dist.leads as any).email.toLowerCase());
       }
@@ -875,55 +828,45 @@ async function pollGSILeads(
       if (gsiLead) {
         console.log(`GSI data for ${dist.external_lead_id || dist.leads?.email}: status=${gsiLead.status || gsiLead.sale_status}, ftd=${gsiLead.is_ftd || gsiLead.ftd || gsiLead.hasFTD}`);
 
-        const hasFtd = gsiLead.is_ftd === 1 || gsiLead.is_ftd === true || 
+        const hasFtd = gsiLead.is_ftd === 1 || gsiLead.is_ftd === true ||
                        gsiLead.ftd === 1 || gsiLead.ftd === true ||
                        gsiLead.hasFTD === 1 || gsiLead.hasFTD === true;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Store raw sale_status
         const rawStatus = gsiLead.status || gsiLead.sale_status;
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (rawStatus && rawStatus !== oldSaleStatus) {
           leadUpdates.sale_status = rawStatus;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${rawStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
         }
 
-        // Check if FTD status changed
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = gsiLead.ftd_date || gsiLead.deposit_date || new Date().toISOString();
+          leadUpdates.ftd_date = gsiLead.ftd_date || gsiLead.deposit_date || now;
           console.log(`FTD detected for lead ${dist.lead_id}`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          // Update conversion stats
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const conversionData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: conversionData.conversion + 1 })
-              .eq('id', conversionData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
-        // Apply updates if any
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('leads')
-            .update(leadUpdates)
-            .eq('id', dist.lead_id);
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
           updated++;
         }
       }
     }
+
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling GSI: ${error}`);
     errors++;
@@ -989,12 +932,12 @@ async function pollGSIInjectionLeads(
       if (item.lead_id) gsiById.set(String(item.lead_id), item);
     }
 
-    // Match injection leads
+    const historyBatch: HistoryEntry[] = [];
+    const now = new Date().toISOString();
+
     for (const injLead of injectionLeads) {
       let gsiLead = gsiByEmail.get(injLead.email.toLowerCase());
-      if (!gsiLead && injLead.external_lead_id) {
-        gsiLead = gsiById.get(injLead.external_lead_id);
-      }
+      if (!gsiLead && injLead.external_lead_id) gsiLead = gsiById.get(injLead.external_lead_id);
 
       if (gsiLead) {
         console.log(`GSI match for ${injLead.email}: status=${gsiLead.status || gsiLead.sale_status}, ftd=${gsiLead.is_ftd || gsiLead.ftd}`);
@@ -1008,23 +951,18 @@ async function pollGSIInjectionLeads(
         if (rawStatus && String(rawStatus) !== String(injLead.sale_status)) {
           leadUpdates.sale_status = String(rawStatus);
           console.log(`Injection lead ${injLead.email} sale_status updated: ${rawStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, String(rawStatus));
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, String(rawStatus));
         }
 
         if (hasFtd && !injLead.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = gsiLead.ftd_date || gsiLead.deposit_date || new Date().toISOString();
+          leadUpdates.ftd_date = gsiLead.ftd_date || gsiLead.deposit_date || now;
           console.log(`Injection lead ${injLead.email} FTD detected`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('injection_leads')
-            .update(leadUpdates)
-            .eq('id', injLead.id);
+          await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
           const leadsSync: Record<string, unknown> = {};
           if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
           if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
@@ -1035,6 +973,8 @@ async function pollGSIInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling GSI for injections: ${error}`);
     errors++;
@@ -1043,7 +983,7 @@ async function pollGSIInjectionLeads(
   return { updated, errors };
 }
 
-// Format date for TrackBox API (YYYY-MM-DD HH:mm:ss)
+// Format date for TrackBox API (YYYY-MM-DD HH:mm:ss) — same format as formatDateYMDHMS but kept for clarity
 function formatTrackBoxDate(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
@@ -1098,8 +1038,14 @@ async function pollTrackBoxLeads(
     page: "0"
   };
 
-  console.log(`TrackBox bulk status URL: ${statusUrl}`);
-  console.log(`TrackBox request body: ${JSON.stringify(requestBody)}`);
+  console.log(`TrackBox bulk status URL: ${statusUrl}, body: ${JSON.stringify(requestBody)}`);
+
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
 
   // TrackBox pull API may use different API key than push
   const apiKeyGet = String(config.api_key_get || advertiser.api_key || '');
@@ -1168,75 +1114,56 @@ async function pollTrackBoxLeads(
 
     console.log(`Mapped ${trackBoxByCustomerId.size} TrackBox customers by ID, ${trackBoxByEmail.size} by email`);
 
-    // Match our distributions with TrackBox customers
-    for (const dist of distributions) {
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
+    const historyBatch: HistoryEntry[] = [];
+    let ftdCount = 0;
 
-      // Try to find matching TrackBox customer
-      let customer = null;
-      if (dist.external_lead_id) {
-        customer = trackBoxByCustomerId.get(dist.external_lead_id);
-      }
+    for (const dist of distributions) {
+      let customer = dist.external_lead_id ? trackBoxByCustomerId.get(dist.external_lead_id) : null;
       if (!customer && (dist.leads as any)?.email) {
         customer = trackBoxByEmail.get((dist.leads as any).email.toLowerCase());
       }
 
       if (customer) {
-        // TrackBox uses: call_status for status, depositor (0/1) for FTD
         console.log(`TrackBox match for ${dist.external_lead_id || (dist.leads as any)?.email}: call_status=${customer.call_status}, depositor=${customer.depositor}`);
 
         const hasFtd = customer.depositor === 1 || customer.depositor === true ||
                        customer.ftd === 1 || customer.is_ftd === 1;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Store raw status - TrackBox uses call_status field
         const rawStatus = customer.call_status || customer.sale_status || customer.status;
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (rawStatus && rawStatus !== oldSaleStatus) {
           leadUpdates.sale_status = rawStatus;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${rawStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
         }
 
-        // Check if FTD status changed
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = customer.ftd_date || customer.deposit_date || new Date().toISOString();
+          leadUpdates.ftd_date = customer.ftd_date || customer.deposit_date || now;
           console.log(`FTD detected for lead ${dist.lead_id}`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          // Update conversion stats
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const conversionData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: conversionData.conversion + 1 })
-              .eq('id', conversionData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
-        // Apply updates if any
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('leads')
-            .update(leadUpdates)
-            .eq('id', dist.lead_id);
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
           updated++;
         }
       }
     }
+
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling TrackBox: ${error}`);
     errors++;
@@ -1331,15 +1258,14 @@ async function pollTrackBoxInjectionLeads(
       if (customer.uniqueid) trackBoxById.set(String(customer.uniqueid), customer);
     }
 
-    // Match injection leads
+    const historyBatch: HistoryEntry[] = [];
+    const now = new Date().toISOString();
+
     for (const injLead of injectionLeads) {
       let customer = trackBoxByEmail.get(injLead.email.toLowerCase());
-      if (!customer && injLead.external_lead_id) {
-        customer = trackBoxById.get(injLead.external_lead_id);
-      }
+      if (!customer && injLead.external_lead_id) customer = trackBoxById.get(injLead.external_lead_id);
 
       if (customer) {
-        // TrackBox uses: call_status for status, depositor (0/1) for FTD
         console.log(`TrackBox match for ${injLead.email}: call_status=${customer.call_status}, depositor=${customer.depositor}`);
 
         const hasFtd = customer.depositor === 1 || customer.depositor === true ||
@@ -1350,23 +1276,18 @@ async function pollTrackBoxInjectionLeads(
         if (rawStatus && String(rawStatus) !== String(injLead.sale_status)) {
           leadUpdates.sale_status = String(rawStatus);
           console.log(`Injection lead ${injLead.email} sale_status updated: ${rawStatus}`);
-          // Log status change to history
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, String(rawStatus));
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, String(rawStatus));
         }
 
         if (hasFtd && !injLead.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = customer.ftd_date || customer.deposit_date || new Date().toISOString();
+          leadUpdates.ftd_date = customer.ftd_date || customer.deposit_date || now;
           console.log(`Injection lead ${injLead.email} FTD detected`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('injection_leads')
-            .update(leadUpdates)
-            .eq('id', injLead.id);
+          await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
           const leadsSync: Record<string, unknown> = {};
           if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
           if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
@@ -1377,18 +1298,14 @@ async function pollTrackBoxInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling TrackBox for injections: ${error}`);
     errors++;
   }
 
   return { updated, errors };
-}
-
-// Format date for ELNOPY API (YYYY-MM-DD HH:mm:ss)
-function formatElnopyDate(date: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 // Poll ELNOPY using their bulk leads API
@@ -1433,18 +1350,23 @@ async function pollElnopyLeads(
 
   const url = new URL(statusUrl);
   url.searchParams.set('api_token', apiToken);
-  url.searchParams.set('from', formatElnopyDate(fromDate));
-  url.searchParams.set('to', formatElnopyDate(toDate));
+  url.searchParams.set('from', formatDateYMDHMS(fromDate));
+  url.searchParams.set('to', formatDateYMDHMS(toDate));
   url.searchParams.set('limit', '1000');
 
   console.log(`ELNOPY bulk status URL: ${url.toString()}`);
 
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
   try {
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: { 'Accept': 'application/json' },
     });
 
     if (!response.ok) {
@@ -1471,69 +1393,53 @@ async function pollElnopyLeads(
 
     console.log(`Mapped ${elnopyLeadsMap.size} ELNOPY leads for matching`);
 
-    // Match our distributions with ELNOPY leads
+    const historyBatch: HistoryEntry[] = [];
+    let ftdCount = 0;
+
     for (const dist of distributions) {
       if (!dist.external_lead_id) continue;
 
       const elnopyLead = elnopyLeadsMap.get(dist.external_lead_id);
-      
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
 
       if (elnopyLead) {
-        // Log raw ELNOPY data for debugging
         console.log(`ELNOPY data for ${dist.external_lead_id}: acq=${elnopyLead.acq}, status=${elnopyLead.status}`);
-        
-        // acq = 1 means FTD/Acquisition
+
         const hasFtd = elnopyLead.acq === 1;
         const leadUpdates: Record<string, unknown> = {};
 
-        // Always store raw status from advertiser
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (elnopyLead.status && elnopyLead.status !== oldSaleStatus) {
           leadUpdates.sale_status = elnopyLead.status;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${elnopyLead.status}`);
-          // Log status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, elnopyLead.status);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, elnopyLead.status);
         }
 
-        // Check if FTD status changed
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = elnopyLead.created_at || new Date().toISOString();
+          leadUpdates.ftd_date = elnopyLead.created_at || now;
           console.log(`FTD detected for lead ${dist.lead_id} (ELNOPY ID: ${dist.external_lead_id})`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          // Update conversion stats
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const conversionData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: conversionData.conversion + 1 })
-              .eq('id', conversionData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
-        // Apply updates if any
         if (Object.keys(leadUpdates).length > 0) {
-          await supabase
-            .from('leads')
-            .update(leadUpdates)
-            .eq('id', dist.lead_id);
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
           updated++;
         }
       }
     }
+
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling ELNOPY: ${error}`);
     errors++;
@@ -1580,11 +1486,13 @@ async function pollElnopyInjectionLeads(
 
   const url = new URL(statusUrl);
   url.searchParams.set('api_token', apiToken);
-  url.searchParams.set('from', formatElnopyDate(fromDate));
-  url.searchParams.set('to', formatElnopyDate(toDate));
+  url.searchParams.set('from', formatDateYMDHMS(fromDate));
+  url.searchParams.set('to', formatDateYMDHMS(toDate));
   url.searchParams.set('limit', '1000');
 
   console.log(`ELNOPY injection polling URL: ${url.toString()}`);
+
+  const historyBatch: HistoryEntry[] = [];
 
   try {
     const response = await fetch(url.toString(), {
@@ -1629,16 +1537,14 @@ async function pollElnopyInjectionLeads(
         if (elnopyLead.status && String(elnopyLead.status) !== String(injLead.sale_status)) {
           leadUpdates.sale_status = String(elnopyLead.status);
           console.log(`Injection lead ${injLead.email} sale_status updated: ${elnopyLead.status}`);
-          // Log status change to history
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, String(elnopyLead.status));
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, String(elnopyLead.status));
         }
 
         if (hasFtd && !injLead.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = elnopyLead.created_at || new Date().toISOString();
           console.log(`Injection lead ${injLead.email} FTD detected`);
-          // Log FTD status change to history
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -1656,6 +1562,8 @@ async function pollElnopyInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling ELNOPY for injections: ${error}`);
     errors++;
@@ -1694,6 +1602,13 @@ async function pollNoxWealthLeads(
 
   console.log(`NoxWealth bulk poll URL: ${url.toString()}`);
 
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
   try {
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -1721,12 +1636,12 @@ async function pollNoxWealthLeads(
       if (l.email)   byEmail.set(String(l.email).toLowerCase(), l);
     }
 
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
     for (const dist of distributions) {
-      // Update last_polled_at regardless
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
+      distIds.push(dist.id);
 
       let noxLead = dist.external_lead_id ? byLeadId.get(dist.external_lead_id) : undefined;
       if (!noxLead && (dist.leads as any)?.email) {
@@ -1746,28 +1661,15 @@ async function pollNoxWealthLeads(
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (callStatus && callStatus !== oldSaleStatus) {
           leadUpdates.sale_status = callStatus;
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, callStatus);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, callStatus);
         }
 
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || new Date().toISOString();
+          leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || now;
           console.log(`FTD detected for lead ${dist.lead_id} (NoxWealth pipeline_stage: ${pipelineStage})`);
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const convData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: convData.conversion + 1 })
-              .eq('id', convData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -1776,6 +1678,22 @@ async function pollNoxWealthLeads(
         }
       }
     }
+
+    // Batch update last_polled_at for all distributions
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    // Single conversion write
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase
+        .from('advertiser_conversions')
+        .update({ conversion: conv.conversion + ftdCount })
+        .eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling NoxWealth: ${error}`);
     errors++;
@@ -1813,6 +1731,8 @@ async function pollNoxWealthInjectionLeads(
   url.searchParams.set('per_page', '100');
 
   console.log(`NoxWealth injection poll URL: ${url.toString()}`);
+
+  const historyBatch: HistoryEntry[] = [];
 
   try {
     const response = await fetch(url.toString(), {
@@ -1855,14 +1775,14 @@ async function pollNoxWealthInjectionLeads(
         const leadUpdates: Record<string, unknown> = {};
         if (callStatus && callStatus !== injLead.sale_status) {
           leadUpdates.sale_status = callStatus;
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, callStatus);
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, callStatus);
         }
 
         if (hasFtd && !injLead.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || new Date().toISOString();
           console.log(`Injection lead ${injLead.email} FTD detected (NoxWealth)`);
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -1877,18 +1797,14 @@ async function pollNoxWealthInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling NoxWealth for injections: ${error}`);
     errors++;
   }
 
   return { updated, errors };
-}
-
-// Format date for Affilio API (YYYY-MM-DD HH:MM:SS)
-function formatAffilioDate(date: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 // Poll Affilio using their bulk POST /api/pull-leads endpoint
@@ -1917,13 +1833,20 @@ async function pollAffilioLeads(
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const requestBody = {
-    from: formatAffilioDate(fromDate),
-    to: formatAffilioDate(toDate),
+    from: formatDateYMDHMS(fromDate),
+    to: formatDateYMDHMS(toDate),
     page: 0,
     size: 1000,
   };
 
   console.log(`Affilio bulk pull URL: ${endpoint}`);
+
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
 
   try {
     const response = await fetch(endpoint, {
@@ -1958,12 +1881,12 @@ async function pollAffilioLeads(
 
     console.log(`Mapped ${byId.size} Affilio leads by id, ${byEmail.size} by email`);
 
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
     for (const dist of distributions) {
-      // Update last_polled_at regardless of match
-      await supabase
-        .from('lead_distributions')
-        .update({ last_polled_at: new Date().toISOString() })
-        .eq('id', dist.id);
+      distIds.push(dist.id);
 
       let affilioLead = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
       if (!affilioLead && (dist.leads as any)?.email) {
@@ -1981,7 +1904,7 @@ async function pollAffilioLeads(
         if (rawStatus && rawStatus !== oldSaleStatus) {
           leadUpdates.sale_status = rawStatus;
           console.log(`Sale status updated for lead ${dist.lead_id}: ${rawStatus}`);
-          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
         }
 
         // ftd field is a datetime string when the lead has deposited, null otherwise
@@ -1990,21 +1913,8 @@ async function pollAffilioLeads(
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = String(affilioLead.ftd);
           console.log(`FTD detected for lead ${dist.lead_id} (Affilio ftd: ${affilioLead.ftd})`);
-          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
-
-          const { data: existingConversion } = await supabase
-            .from('advertiser_conversions')
-            .select('id, conversion')
-            .eq('advertiser_id', dist.advertiser_id)
-            .maybeSingle();
-
-          if (existingConversion) {
-            const convData = existingConversion as { id: string; conversion: number };
-            await supabase
-              .from('advertiser_conversions')
-              .update({ conversion: convData.conversion + 1 })
-              .eq('id', convData.id);
-          }
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -2013,6 +1923,22 @@ async function pollAffilioLeads(
         }
       }
     }
+
+    // Batch update last_polled_at for all distributions
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    // Single conversion write
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase
+        .from('advertiser_conversions')
+        .update({ conversion: conv.conversion + ftdCount })
+        .eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling Affilio: ${error}`);
     errors++;
@@ -2046,13 +1972,15 @@ async function pollAffilioInjectionLeads(
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const requestBody = {
-    from: formatAffilioDate(fromDate),
-    to: formatAffilioDate(toDate),
+    from: formatDateYMDHMS(fromDate),
+    to: formatDateYMDHMS(toDate),
     page: 0,
     size: 1000,
   };
 
   console.log(`Affilio injection poll URL: ${endpoint}`);
+
+  const historyBatch: HistoryEntry[] = [];
 
   try {
     const response = await fetch(endpoint, {
@@ -2095,7 +2023,7 @@ async function pollAffilioInjectionLeads(
         if (rawStatus && rawStatus !== injLead.sale_status) {
           leadUpdates.sale_status = rawStatus;
           console.log(`Injection lead ${injLead.email} sale_status updated: ${rawStatus}`);
-          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, rawStatus);
+          collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, rawStatus);
         }
 
         const hasFtd = !!affilioLead.ftd && !injLead.is_ftd;
@@ -2103,7 +2031,7 @@ async function pollAffilioInjectionLeads(
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = String(affilioLead.ftd);
           console.log(`Injection lead ${injLead.email} FTD detected (Affilio ftd: ${affilioLead.ftd})`);
-          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+          collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -2118,6 +2046,8 @@ async function pollAffilioInjectionLeads(
         }
       }
     }
+
+    await flushHistory(supabase, historyBatch);
   } catch (error) {
     console.error(`Error polling Affilio for injections: ${error}`);
     errors++;
@@ -2714,7 +2644,7 @@ Deno.serve(async (req) => {
         is_ftd,
         sale_status,
         advertiser_id,
-        advertisers!inner (id, name, advertiser_type, api_key, url, status_endpoint)
+        advertisers!inner (id, name, advertiser_type, api_key, url, status_endpoint, config)
       `)
       .eq('status', 'sent')
       .not('external_lead_id', 'is', null)
@@ -2855,7 +2785,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Polling complete',
-        polled: distributions.length,
+        polled: distributions?.length ?? 0,
         injectionLeadsPolled: injectionLeads?.length || 0,
         updated: totalUpdated,
         errors: totalErrors,
