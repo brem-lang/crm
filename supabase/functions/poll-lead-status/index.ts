@@ -1735,13 +1735,39 @@ async function pollNoxWealthLeads(
 
       if (noxLead) {
         const callStatus = noxLead.call_status as string | undefined;
-        console.log(`NoxWealth match for ${dist.external_lead_id}: call_status=${callStatus}, pipeline_stage=${noxLead.pipeline_stage}`);
+        const pipelineStage = noxLead.pipeline_stage as string | undefined;
+        console.log(`NoxWealth match for ${dist.external_lead_id}: call_status=${callStatus}, pipeline_stage=${pipelineStage}, depositor=${noxLead.depositor}, is_ftd=${noxLead.is_ftd}`);
+
+        const hasFtd = noxLead.depositor === 1 || noxLead.depositor === true ||
+                       noxLead.is_ftd === 1 || noxLead.is_ftd === true ||
+                       (pipelineStage && pipelineStage.toLowerCase() === 'depositor');
 
         const leadUpdates: Record<string, unknown> = {};
         const oldSaleStatus = (dist.leads as any).sale_status;
         if (callStatus && callStatus !== oldSaleStatus) {
           leadUpdates.sale_status = callStatus;
           await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, callStatus);
+        }
+
+        if (hasFtd && !dist.leads.is_ftd) {
+          leadUpdates.is_ftd = true;
+          leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || new Date().toISOString();
+          console.log(`FTD detected for lead ${dist.lead_id} (NoxWealth pipeline_stage: ${pipelineStage})`);
+          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
+
+          const { data: existingConversion } = await supabase
+            .from('advertiser_conversions')
+            .select('id, conversion')
+            .eq('advertiser_id', dist.advertiser_id)
+            .maybeSingle();
+
+          if (existingConversion) {
+            const convData = existingConversion as { id: string; conversion: number };
+            await supabase
+              .from('advertiser_conversions')
+              .update({ conversion: convData.conversion + 1 })
+              .eq('id', convData.id);
+          }
         }
 
         if (Object.keys(leadUpdates).length > 0) {
@@ -1819,7 +1845,12 @@ async function pollNoxWealthInjectionLeads(
 
       if (noxLead) {
         const callStatus = noxLead.call_status as string | undefined;
-        console.log(`NoxWealth match for ${injLead.email}: call_status=${callStatus}`);
+        const pipelineStage = noxLead.pipeline_stage as string | undefined;
+        console.log(`NoxWealth match for ${injLead.email}: call_status=${callStatus}, pipeline_stage=${pipelineStage}, depositor=${noxLead.depositor}`);
+
+        const hasFtd = noxLead.depositor === 1 || noxLead.depositor === true ||
+                       noxLead.is_ftd === 1 || noxLead.is_ftd === true ||
+                       (pipelineStage && pipelineStage.toLowerCase() === 'depositor');
 
         const leadUpdates: Record<string, unknown> = {};
         if (callStatus && callStatus !== injLead.sale_status) {
@@ -1827,15 +1858,268 @@ async function pollNoxWealthInjectionLeads(
           await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, callStatus);
         }
 
+        if (hasFtd && !injLead.is_ftd) {
+          leadUpdates.is_ftd = true;
+          leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || new Date().toISOString();
+          console.log(`Injection lead ${injLead.email} FTD detected (NoxWealth)`);
+          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+        }
+
         if (Object.keys(leadUpdates).length > 0) {
           await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
-          await supabase.from('leads').update({ sale_status: callStatus }).eq('email', injLead.email);
+          const leadsSync: Record<string, unknown> = {};
+          if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
+          if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
+          if (Object.keys(leadsSync).length > 0) {
+            await supabase.from('leads').update(leadsSync).eq('email', injLead.email);
+          }
           updated++;
         }
       }
     }
   } catch (error) {
     console.error(`Error polling NoxWealth for injections: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
+// Format date for Affilio API (YYYY-MM-DD HH:MM:SS)
+function formatAffilioDate(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+// Poll Affilio using their bulk POST /api/pull-leads endpoint
+async function pollAffilioLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+  if (!baseUrl) {
+    console.log(`Affilio advertiser ${advertiser.name} has no URL configured`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const config = advertiser.config as Record<string, unknown> || {};
+  const authUsername = String(config.username || '');
+  const authPassword = String(config.auth_password || '');
+
+  const endpoint = `${baseUrl}/api/pull-leads`;
+
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const requestBody = {
+    from: formatAffilioDate(fromDate),
+    to: formatAffilioDate(toDate),
+    page: 0,
+    size: 1000,
+  };
+
+  console.log(`Affilio bulk pull URL: ${endpoint}`);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'username': authUsername,
+        'password': authPassword,
+        'apiKey': advertiser.api_key || '',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`Affilio pull-leads failed: ${response.status}, body: ${errorText}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const leads: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
+    console.log(`Affilio returned ${leads.length} leads (totalItems: ${data.totalItems})`);
+
+    // Build lookup maps: registration response stores leadId UUID as external_lead_id,
+    // which maps to the `id` field in pull-leads response. Also map by email as fallback.
+    const byId = new Map<string, Record<string, unknown>>();
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const l of leads) {
+      if (l.id)    byId.set(String(l.id), l);
+      if (l.email) byEmail.set(String(l.email).toLowerCase(), l);
+    }
+
+    console.log(`Mapped ${byId.size} Affilio leads by id, ${byEmail.size} by email`);
+
+    for (const dist of distributions) {
+      // Update last_polled_at regardless of match
+      await supabase
+        .from('lead_distributions')
+        .update({ last_polled_at: new Date().toISOString() })
+        .eq('id', dist.id);
+
+      let affilioLead = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
+      if (!affilioLead && (dist.leads as any)?.email) {
+        affilioLead = byEmail.get(String((dist.leads as any).email).toLowerCase());
+      }
+
+      if (affilioLead) {
+        console.log(`Affilio match for ${dist.external_lead_id}: status=${affilioLead.status}, ftd=${affilioLead.ftd}`);
+
+        const leadUpdates: Record<string, unknown> = {};
+
+        // status field is the call status (e.g. "New", "Deposit", "No Answer")
+        const rawStatus = affilioLead.status as string | undefined;
+        const oldSaleStatus = (dist.leads as any).sale_status;
+        if (rawStatus && rawStatus !== oldSaleStatus) {
+          leadUpdates.sale_status = rawStatus;
+          console.log(`Sale status updated for lead ${dist.lead_id}: ${rawStatus}`);
+          await logStatusChange(supabase, dist.lead_id, null, 'sale_status', oldSaleStatus, rawStatus);
+        }
+
+        // ftd field is a datetime string when the lead has deposited, null otherwise
+        const hasFtd = !!affilioLead.ftd && !dist.leads.is_ftd;
+        if (hasFtd) {
+          leadUpdates.is_ftd = true;
+          leadUpdates.ftd_date = String(affilioLead.ftd);
+          console.log(`FTD detected for lead ${dist.lead_id} (Affilio ftd: ${affilioLead.ftd})`);
+          await logStatusChange(supabase, dist.lead_id, null, 'is_ftd', 'false', 'true');
+
+          const { data: existingConversion } = await supabase
+            .from('advertiser_conversions')
+            .select('id, conversion')
+            .eq('advertiser_id', dist.advertiser_id)
+            .maybeSingle();
+
+          if (existingConversion) {
+            const convData = existingConversion as { id: string; conversion: number };
+            await supabase
+              .from('advertiser_conversions')
+              .update({ conversion: convData.conversion + 1 })
+              .eq('id', convData.id);
+          }
+        }
+
+        if (Object.keys(leadUpdates).length > 0) {
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+          updated++;
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error polling Affilio: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
+// Poll Affilio for injection_leads
+async function pollAffilioInjectionLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: { id: string; name: string; api_key: string; url: string | null; config?: Record<string, unknown> },
+  injectionLeads: { id: string; email: string; external_lead_id: string | null; is_ftd: boolean; sale_status: string | null }[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+  if (!baseUrl) {
+    console.log(`Affilio advertiser ${advertiser.name} has no URL configured for injection polling`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const config = advertiser.config || {};
+  const authUsername = String(config.username || '');
+  const authPassword = String(config.auth_password || '');
+  const endpoint = `${baseUrl}/api/pull-leads`;
+
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const requestBody = {
+    from: formatAffilioDate(fromDate),
+    to: formatAffilioDate(toDate),
+    page: 0,
+    size: 1000,
+  };
+
+  console.log(`Affilio injection poll URL: ${endpoint}`);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'username': authUsername,
+        'password': authPassword,
+        'apiKey': advertiser.api_key || '',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.log(`Affilio injection pull-leads failed: ${response.status}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const leads: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
+    console.log(`Affilio returned ${leads.length} leads for injection polling`);
+
+    const byId = new Map<string, Record<string, unknown>>();
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const l of leads) {
+      if (l.id)    byId.set(String(l.id), l);
+      if (l.email) byEmail.set(String(l.email).toLowerCase(), l);
+    }
+
+    for (const injLead of injectionLeads) {
+      let affilioLead = injLead.external_lead_id ? byId.get(injLead.external_lead_id) : undefined;
+      if (!affilioLead) affilioLead = byEmail.get(injLead.email.toLowerCase());
+
+      if (affilioLead) {
+        console.log(`Affilio match for ${injLead.email}: status=${affilioLead.status}, ftd=${affilioLead.ftd}`);
+
+        const leadUpdates: Record<string, unknown> = {};
+
+        const rawStatus = affilioLead.status as string | undefined;
+        if (rawStatus && rawStatus !== injLead.sale_status) {
+          leadUpdates.sale_status = rawStatus;
+          console.log(`Injection lead ${injLead.email} sale_status updated: ${rawStatus}`);
+          await logStatusChange(supabase, null, injLead.id, 'sale_status', injLead.sale_status, rawStatus);
+        }
+
+        const hasFtd = !!affilioLead.ftd && !injLead.is_ftd;
+        if (hasFtd) {
+          leadUpdates.is_ftd = true;
+          leadUpdates.ftd_date = String(affilioLead.ftd);
+          console.log(`Injection lead ${injLead.email} FTD detected (Affilio ftd: ${affilioLead.ftd})`);
+          await logStatusChange(supabase, null, injLead.id, 'is_ftd', 'false', 'true');
+        }
+
+        if (Object.keys(leadUpdates).length > 0) {
+          await supabase.from('injection_leads').update(leadUpdates).eq('id', injLead.id);
+          const leadsSync: Record<string, unknown> = {};
+          if (leadUpdates.sale_status) leadsSync.sale_status = leadUpdates.sale_status;
+          if (leadUpdates.is_ftd) { leadsSync.injection_ftd = true; leadsSync.injection_ftd_date = leadUpdates.ftd_date; }
+          if (Object.keys(leadsSync).length > 0) {
+            await supabase.from('leads').update(leadsSync).eq('email', injLead.email);
+          }
+          updated++;
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error polling Affilio for injections: ${error}`);
     errors++;
   }
 
@@ -2331,6 +2615,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Affilio uses bulk POST /api/pull-leads
+      if (advertiserType === 'affilio') {
+        const result = await pollAffilioLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
       // Other advertisers use per-lead polling
       const poller = statusPollers[advertiserType] || statusPollers.custom;
       
@@ -2536,8 +2828,22 @@ Deno.serve(async (req) => {
           );
           totalUpdated += result.updated;
           totalErrors += result.errors;
+        } else if (adv.advertiser_type === 'affilio') {
+          console.log(`Polling ${advLeads.length} injection leads for Affilio advertiser ${adv.name}`);
+          const result = await pollAffilioInjectionLeads(
+            supabase,
+            { ...adv, config: adv.config || {} },
+            advLeads.map((l: any) => ({
+              id: l.id,
+              email: l.email,
+              external_lead_id: l.external_lead_id,
+              is_ftd: l.is_ftd,
+              sale_status: l.sale_status,
+            }))
+          );
+          totalUpdated += result.updated;
+          totalErrors += result.errors;
         }
-        // Add other advertiser types here if needed
       }
     } else {
       console.log('No injection leads to poll');
