@@ -63,6 +63,30 @@ Deno.serve(async (req) => {
     return new Response('Lead not found', { status: 404, headers: corsHeaders });
   }
 
+  // If leads.autologin is not set, fall back to lead_distributions.autologin_url.
+  // Exclude tracking URLs to prevent redirect loops.
+  if (!lead.autologin) {
+    const { data: dist } = await supabase
+      .from('lead_distributions')
+      .select('autologin_url')
+      .eq('lead_id', lead_id)
+      .eq('status', 'sent')
+      .not('autologin_url', 'like', '%track-autologin%')
+      .not('autologin_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dist?.autologin_url) {
+      lead.autologin = dist.autologin_url;
+      // Backfill leads.autologin so future clicks don't need this fallback
+      await supabase
+        .from('leads')
+        .update({ autologin: dist.autologin_url })
+        .eq('id', lead_id);
+    }
+  }
+
   // Capture click signals from request
   const clickIp = getClientIp(req);
   const clickUa = req.headers.get('user-agent') || null;

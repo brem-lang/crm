@@ -534,7 +534,22 @@ Deno.serve(async (req) => {
     };
 
     if (distributionResult?.autologin_url) {
-      responseData.autologin_url = `${trackingBase}/functions/v1/track-autologin?lead_id=${newLead.id}`;
+      const trackingUrl = `${trackingBase}/functions/v1/track-autologin?lead_id=${newLead.id}`;
+      responseData.autologin_url = trackingUrl;
+
+      // Store raw advertiser URL on the lead so track-autologin can redirect there
+      await supabase
+        .from('leads')
+        .update({ autologin: distributionResult.autologin_url })
+        .eq('id', newLead.id);
+
+      // Replace raw URL in lead_distributions with the tracking URL so the
+      // CRM table and the API response always show the same clickable link
+      await supabase
+        .from('lead_distributions')
+        .update({ autologin_url: trackingUrl })
+        .eq('lead_id', newLead.id)
+        .eq('status', 'sent');
     }
 
     return new Response(
