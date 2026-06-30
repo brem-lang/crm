@@ -1885,6 +1885,10 @@ async function distributeLead(
     // Extract external lead ID and autologin URL from response
     const externalLeadId = success ? extractExternalLeadId(response) : null;
     const autologinUrl = success ? extractAutologinUrl(response) : null;
+    const fnBaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const trackingUrl = autologinUrl
+      ? `${fnBaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
+      : null;
     
     if (externalLeadId) {
       console.log(`Extracted external_lead_id: ${externalLeadId}`);
@@ -1894,12 +1898,7 @@ async function distributeLead(
     }
 
     if (success) {
-      // Build tracking URL so every autologin link — in the table, the dialog,
-      // and the API response — routes through track-autologin for click capture.
-      const fnBaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-      const trackingUrl = autologinUrl
-        ? `${fnBaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
-        : null;
+      // trackingUrl already built above at function scope
 
       // Replace raw advertiser URL with tracking URL in stored response so the
       // Advertiser Response dialog also shows a trackable link.
@@ -2017,7 +2016,7 @@ async function distributeLead(
       advertiser_id: advertiser.id,
       advertiser_name: advertiser.name,
       external_lead_id: externalLeadId || undefined,
-      autologin_url: autologinUrl || undefined,
+      autologin_url: trackingUrl || undefined,
       response: success ? 'Lead distributed successfully' : response,
     };
   } catch (error) {
