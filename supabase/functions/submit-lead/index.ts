@@ -530,7 +530,7 @@ Deno.serve(async (req) => {
     // Return tracking URL instead of raw autologin so click data is captured before redirect
     const responseData: Record<string, unknown> = {
       lead_id: newLead.id,
-      request_id: null,
+      request_id: crypto.randomUUID(),
     };
 
     if (distributionResult?.autologin_url) {

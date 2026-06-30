@@ -429,7 +429,15 @@ export function LeadsTable({
                   variant="ghost" size="icon"
                   className="absolute top-2 right-2 h-8 w-8 z-10"
                   onClick={() => {
-                    const content = dist?.response ? (() => { try { return JSON.stringify(JSON.parse(dist.response), null, 2); } catch { return dist.response; } })() : "";
+                    const parsed = dist?.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
+                    let content = dist?.response || "";
+                    if (parsed && dist?.autologin_url) {
+                      const replaced = { ...parsed };
+                      if ('autologin_url' in replaced) replaced.autologin_url = dist.autologin_url;
+                      content = JSON.stringify(replaced, null, 2);
+                    } else if (parsed) {
+                      content = JSON.stringify(parsed, null, 2);
+                    }
                     navigator.clipboard.writeText(content);
                     toast.success("Response copied to clipboard");
                   }}
@@ -443,7 +451,17 @@ export function LeadsTable({
                       <p className="text-xs mt-1">This lead has not been sent to an advertiser yet.</p>
                     </div>
                   ) : (
-                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">{dist.response ? (() => { try { return JSON.stringify(JSON.parse(dist.response), null, 2); } catch { return dist.response; } })() : "No response recorded"}</pre>
+                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+                      {(() => {
+                        const parsed = dist.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
+                        if (parsed && dist.autologin_url) {
+                          const replaced = { ...parsed };
+                          if ('autologin_url' in replaced) replaced.autologin_url = dist.autologin_url;
+                          return JSON.stringify(replaced, null, 2);
+                        }
+                        return parsed ? JSON.stringify(parsed, null, 2) : (dist.response || "No response recorded");
+                      })()}
+                    </pre>
                   )}
                 </ScrollArea>
               </div>

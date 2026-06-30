@@ -549,7 +549,7 @@ export default function Distributions() {
 
                 {selectedDistribution.autologin_url && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Autologin URL</label>
+                    <label className="text-sm font-medium text-muted-foreground">Tracking URL</label>
                     <div className="mt-2 flex items-center gap-2">
                       <a
                         href={selectedDistribution.autologin_url}
