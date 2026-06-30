@@ -58,6 +58,7 @@ const DEFAULT_CONVERSION_COLUMNS: ColumnConfig[] = [
   { id: "country",          label: "Country",          visible: true  },
   { id: "city",             label: "City",             visible: true  },
   { id: "ip_address",       label: "IP Address",       visible: false },
+  { id: "locale",           label: "Locale",           visible: false },
   { id: "status",           label: "Status",           visible: true  },
   { id: "sale_status",      label: "Sale Status",      visible: true  },
   { id: "advertiser",       label: "Advertiser",       visible: true  },
@@ -69,8 +70,10 @@ const DEFAULT_CONVERSION_COLUMNS: ColumnConfig[] = [
   { id: "affiliate",        label: "Affiliate",        visible: true  },
   { id: "affiliate_id",     label: "Affiliate ID",     visible: false },
   { id: "offer_name",       label: "Offer Name",       visible: false },
+  { id: "click_id",         label: "Click ID",         visible: false },
   { id: "autologin",        label: "AutoLogin URL",    visible: false },
-  { id: "user_agent",       label: "User Agent",       visible: false },
+  { id: "user_agent",       label: "Click UA",         visible: false },
+  { id: "submission_ua",    label: "Submission UA",    visible: false },
   { id: "platform",         label: "Platform",         visible: false },
   { id: "browser",          label: "Browser",          visible: false },
   { id: "comment",          label: "Comment",          visible: false },
@@ -245,8 +248,11 @@ export default function Conversions() {
           injection_ftd,
           sale_status,
           offer_name,
+          locale,
+          click_id,
           autologin,
           user_agent,
+          submission_ua,
           platform,
           browser,
           comment,
@@ -544,6 +550,21 @@ export default function Conversions() {
           </Popover>
         );
       }
+      case "locale":
+        return (lead as any).locale || '-';
+      case "click_id": {
+        const cid = (lead as any).click_id as string | null;
+        if (!cid) return '-';
+        return (
+          <div className="flex items-center gap-1 max-w-[140px]">
+            <span className="text-xs font-mono truncate">{cid}</span>
+            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0"
+              onClick={() => { navigator.clipboard.writeText(cid); toast.success("Click ID copied"); }}>
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        );
+      }
       case "platform":   return lead.platform || '-';
       case "browser":    return lead.browser || '-';
       case "user_agent": {
@@ -556,11 +577,34 @@ export default function Conversions() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-3" align="start">
-              <p className="text-xs font-medium mb-2 text-muted-foreground">User Agent</p>
+              <p className="text-xs font-medium mb-2 text-muted-foreground">Click User Agent</p>
               <div className="flex items-start gap-2">
                 <p className="text-xs break-all flex-1">{lead.user_agent}</p>
                 <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
                   onClick={() => { navigator.clipboard.writeText(lead.user_agent!); toast.success("User agent copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      }
+      case "submission_ua": {
+        const sua = (lead as any).submission_ua as string | null;
+        if (!sua) return '-';
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <span className="truncate">View UA</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">Submission User Agent</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs break-all flex-1">{sua}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(sua); toast.success("User agent copied"); }}>
                   <Copy className="h-3 w-3" />
                 </Button>
               </div>

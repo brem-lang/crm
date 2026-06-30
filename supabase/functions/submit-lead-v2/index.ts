@@ -35,6 +35,9 @@ interface LeadData {
   click_ip?: string;
   click_ua?: string;
   time_to_click?: number;
+  // Tracking fields
+  locale?: string;
+  click_id?: string;
 }
 
 interface ApiResponse {
@@ -191,6 +194,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const clientIp = getClientIp(req);
+    const submissionUa = req.headers.get('user-agent') || null;
 
     if (affiliateError || !affiliate) {
       try {
@@ -317,6 +321,9 @@ Deno.serve(async (req) => {
         click_ip: leadData.click_ip?.trim() || null,
         click_ua: leadData.click_ua?.substring(0, 500) || null,
         time_to_click: typeof leadData.time_to_click === 'number' ? Math.round(leadData.time_to_click) : null,
+        locale: leadData.locale?.substring(0, 20) || null,
+        click_id: leadData.click_id?.substring(0, 255) || null,
+        submission_ua: submissionUa?.substring(0, 500) || null,
       })
       .select('id, request_id')
       .single();

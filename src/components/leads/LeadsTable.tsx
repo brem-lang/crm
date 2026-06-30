@@ -294,6 +294,44 @@ export function LeadsTable({
           </Popover>
         );
       }
+      case "submission_ua": {
+        const sua = (lead as any).submission_ua as string | null;
+        if (!sua) return "-";
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <span className="truncate">View UA</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">Submission User Agent</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs break-all flex-1">{sua}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(sua); toast.success("User agent copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      }
+      case "locale":
+        return (lead as any).locale || "-";
+      case "click_id": {
+        const cid = (lead as any).click_id as string | null;
+        if (!cid) return "-";
+        return (
+          <div className="flex items-center gap-1 max-w-[140px]">
+            <span className="text-xs font-mono truncate">{cid}</span>
+            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0"
+              onClick={() => { navigator.clipboard.writeText(cid); toast.success("Click ID copied"); }}>
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        );
+      }
       case "platform":
         return lead.platform || "-";
       case "browser":

@@ -22,6 +22,9 @@ interface LeadData {
   click_ip?: string;
   click_ua?: string;
   time_to_click?: number;
+  // Tracking fields
+  locale?: string;
+  click_id?: string;
 }
 
 interface DistributionSettings {
@@ -413,6 +416,7 @@ Deno.serve(async (req) => {
 
     // === STEP 6: Use server-detected IP only — never trust client-supplied ip_address ===
     const leadIp = clientIp;
+    const submissionUa = req.headers.get('user-agent') || null;
 
     // === STEP 7: Insert lead into DB immediately (always stored regardless of distribution outcome) ===
     const { data: newLead, error: leadInsertError } = await supabase
@@ -435,6 +439,9 @@ Deno.serve(async (req) => {
         click_ip: (body as LeadData).click_ip?.trim() || null,
         click_ua: (body as LeadData).click_ua?.substring(0, 500) || null,
         time_to_click: typeof (body as LeadData).time_to_click === 'number' ? Math.round((body as LeadData).time_to_click!) : null,
+        locale: (body as LeadData).locale?.substring(0, 20) || null,
+        click_id: (body as LeadData).click_id?.substring(0, 255) || null,
+        submission_ua: submissionUa?.substring(0, 500) || null,
       })
       .select('id')
       .single();

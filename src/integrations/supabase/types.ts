@@ -1870,6 +1870,7 @@ export type Database = {
           created_at: string
           click_asn: string | null
           click_country: string | null
+          click_id: string | null
           click_ip: string | null
           click_ua: string | null
           custom1: string | null
@@ -1895,6 +1896,7 @@ export type Database = {
           lastname: string
           live_lead_score: number | null
           live_lead_status: string | null
+          locale: string | null
           mobile: string
           needs_review: boolean | null
           offer_name: string | null
@@ -1904,6 +1906,7 @@ export type Database = {
           status: Database["public"]["Enums"]["lead_status"]
           submission_asn: string | null
           submission_country: string | null
+          submission_ua: string | null
           time_to_click: number | null
           updated_at: string
           user_agent: string | null
@@ -1921,6 +1924,7 @@ export type Database = {
           created_at?: string
           click_asn?: string | null
           click_country?: string | null
+          click_id?: string | null
           click_ip?: string | null
           click_ua?: string | null
           custom1?: string | null
@@ -1946,6 +1950,7 @@ export type Database = {
           lastname: string
           live_lead_score?: number | null
           live_lead_status?: string | null
+          locale?: string | null
           mobile: string
           needs_review?: boolean | null
           offer_name?: string | null
@@ -1955,6 +1960,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           submission_asn?: string | null
           submission_country?: string | null
+          submission_ua?: string | null
           time_to_click?: number | null
           updated_at?: string
           user_agent?: string | null
@@ -1968,6 +1974,7 @@ export type Database = {
           city?: string | null
           click_asn?: string | null
           click_country?: string | null
+          click_id?: string | null
           click_ip?: string | null
           click_ua?: string | null
           comment?: string | null
@@ -1997,6 +2004,7 @@ export type Database = {
           lastname?: string
           live_lead_score?: number | null
           live_lead_status?: string | null
+          locale?: string | null
           mobile?: string
           needs_review?: boolean | null
           offer_name?: string | null
@@ -2006,6 +2014,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           submission_asn?: string | null
           submission_country?: string | null
+          submission_ua?: string | null
           time_to_click?: number | null
           updated_at?: string
           user_agent?: string | null

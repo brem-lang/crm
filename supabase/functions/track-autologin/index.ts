@@ -123,7 +123,6 @@ Deno.serve(async (req) => {
       click_ip:      clickIp !== 'unknown' ? clickIp : null,
       click_ua:      clickUa,
       time_to_click: timeToClick,
-      user_agent:    clickUa,
       platform,
       browser,
     })
