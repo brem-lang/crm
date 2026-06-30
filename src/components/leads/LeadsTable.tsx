@@ -406,6 +406,25 @@ export function LeadsTable({
         const lead = leads.find(l => l.id === responseDialogLeadId);
         const dist = lead?.lead_distributions?.find((d: any) => d.status === 'sent') || lead?.lead_distributions?.[0];
         const advertiserName = dist?.advertisers?.name || "Advertiser";
+        const trackerUrl = lead?.id
+          ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${lead.id}`
+          : null;
+
+        const buildResponseContent = () => {
+          const parsed = dist?.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
+          if (parsed && trackerUrl) {
+            const replaced = { ...parsed };
+            const autologinFields = ['autologin_url', 'autologinUrl', 'autoLoginUrl', 'redirect_url', 'login_url', 'loginUrl'];
+            for (const field of autologinFields) {
+              if (field in replaced && typeof replaced[field] === 'string' && replaced[field].startsWith('http')) {
+                replaced[field] = trackerUrl;
+              }
+            }
+            return JSON.stringify(replaced, null, 2);
+          }
+          return parsed ? JSON.stringify(parsed, null, 2) : (dist?.response || "No response recorded");
+        };
+
         return (
           <Dialog open={!!responseDialogLeadId} onOpenChange={(open) => !open && setResponseDialogLeadId(null)}>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -418,16 +437,7 @@ export function LeadsTable({
                   variant="ghost" size="icon"
                   className="absolute top-2 right-2 h-8 w-8 z-10"
                   onClick={() => {
-                    const parsed = dist?.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
-                    let content = dist?.response || "";
-                    if (parsed && dist?.autologin_url) {
-                      const replaced = { ...parsed };
-                      if ('autologin_url' in replaced) replaced.autologin_url = dist.autologin_url;
-                      content = JSON.stringify(replaced, null, 2);
-                    } else if (parsed) {
-                      content = JSON.stringify(parsed, null, 2);
-                    }
-                    navigator.clipboard.writeText(content);
+                    navigator.clipboard.writeText(buildResponseContent());
                     toast.success("Response copied to clipboard");
                   }}
                 >
@@ -441,15 +451,7 @@ export function LeadsTable({
                     </div>
                   ) : (
                     <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                      {(() => {
-                        const parsed = dist.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
-                        if (parsed && dist.autologin_url) {
-                          const replaced = { ...parsed };
-                          if ('autologin_url' in replaced) replaced.autologin_url = dist.autologin_url;
-                          return JSON.stringify(replaced, null, 2);
-                        }
-                        return parsed ? JSON.stringify(parsed, null, 2) : (dist.response || "No response recorded");
-                      })()}
+                      {buildResponseContent()}
                     </pre>
                   )}
                 </ScrollArea>
