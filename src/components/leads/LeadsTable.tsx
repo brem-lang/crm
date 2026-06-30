@@ -187,10 +187,10 @@ export function LeadsTable({
         return lead.custom5 || "-";
       case "live_lead_status": {
         const statusMap: Record<string, { label: string; className: string }> = {
-          green:      { label: "Green",     className: "bg-green-100 text-green-800" },
-          orange:     { label: "Orange",    className: "bg-amber-100 text-amber-800" },
-          "light-red":{ label: "Light Red", className: "bg-orange-100 text-orange-800" },
-          red:        { label: "Red",       className: "bg-red-100 text-red-800" },
+          green:      { label: "Live",        className: "bg-green-100 text-green-800" },
+          orange:     { label: "Likely Live", className: "bg-amber-100 text-amber-800" },
+          "light-red":{ label: "Suspicious",  className: "bg-orange-100 text-orange-800" },
+          red:        { label: "NO",          className: "bg-red-100 text-red-800" },
         };
         const s = (lead as any).live_lead_status;
         if (!s) {
@@ -198,7 +198,7 @@ export function LeadsTable({
             (d: any) => d.status === 'sent' && d.autologin_url
           ) && lead.time_to_click == null;
           if (hasUnclickedAutologin) {
-            return <Badge className="bg-red-100 text-red-800 text-xs font-medium">Red</Badge>;
+            return <Badge className="bg-red-100 text-red-800 text-xs font-medium">NO</Badge>;
           }
           return <span className="text-muted-foreground text-xs">—</span>;
         }
