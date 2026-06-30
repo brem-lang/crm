@@ -25,7 +25,6 @@ interface TestResult {
   response?: any;
   email?: string;
   lead_id?: string;
-  autologin_url?: string;
 }
 
 export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName }: TestLeadDialogProps) {
@@ -119,7 +118,6 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         response: funcData,
         email: testLeadData.email,
         lead_id: funcData?.lead_id,
-        autologin_url: funcData?.autologin_url,
       });
 
       if (funcData?.success) {

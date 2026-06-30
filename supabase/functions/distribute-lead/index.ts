@@ -2241,7 +2241,6 @@ Deno.serve(async (req) => {
               advertiser_name: typedAdvertiser.name,
               advertiser_response: advertiserResponse,
               lead_id: createdLeadId,
-              autologin_url: trackerUrl,
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
