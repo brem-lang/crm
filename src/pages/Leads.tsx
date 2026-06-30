@@ -93,7 +93,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "affiliate", label: "Affiliate", visible: true },
   { id: "affiliate_id", label: "Affiliate ID", visible: false },
   { id: "offer_name", label: "Offer Name", visible: true },
-  { id: "autologin", label: "AutoLogin", visible: false },
+  { id: "autologin", label: "AutoLogin URL", visible: false },
   { id: "user_agent", label: "User Agent", visible: false },
   { id: "platform", label: "Platform", visible: false },
   { id: "browser", label: "Browser", visible: false },

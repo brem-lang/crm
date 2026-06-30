@@ -69,7 +69,7 @@ const DEFAULT_CONVERSION_COLUMNS: ColumnConfig[] = [
   { id: "affiliate",        label: "Affiliate",        visible: true  },
   { id: "affiliate_id",     label: "Affiliate ID",     visible: false },
   { id: "offer_name",       label: "Offer Name",       visible: false },
-  { id: "autologin",        label: "AutoLogin",        visible: false },
+  { id: "autologin",        label: "AutoLogin URL",    visible: false },
   { id: "user_agent",       label: "User Agent",       visible: false },
   { id: "platform",         label: "Platform",         visible: false },
   { id: "browser",          label: "Browser",          visible: false },
@@ -922,19 +922,43 @@ export default function Conversions() {
           </DialogHeader>
           {viewResponseLead && (
             <>
-              <ScrollArea className="max-h-[400px]">
-                <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
+              <ScrollArea className="max-h-[60vh]">
+                <pre className="text-xs bg-muted p-4 rounded-md whitespace-pre-wrap break-all">
                   {(() => {
                     const rd = viewResponseLead.lead_distributions?.[0]?.response;
                     if (!rd) return "No response";
-                    return typeof rd === "string" ? rd : JSON.stringify(rd, null, 2);
+                    if (typeof rd === "string") {
+                      try { return JSON.stringify(JSON.parse(rd), null, 2); } catch { return rd; }
+                    }
+                    return JSON.stringify(rd, null, 2);
                   })()}
                 </pre>
               </ScrollArea>
-              <div className="text-xs text-muted-foreground mt-2">
-                Last polled: {viewResponseLead.lead_distributions?.[0]?.last_polled_at
-                  ? formatDate(viewResponseLead.lead_distributions[0].last_polled_at)
-                  : "Never"}
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-xs text-muted-foreground">
+                  Last polled: {viewResponseLead.lead_distributions?.[0]?.last_polled_at
+                    ? formatDate(viewResponseLead.lead_distributions[0].last_polled_at)
+                    : "Never"}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const rd = viewResponseLead.lead_distributions?.[0]?.response;
+                    if (!rd) return;
+                    let text: string;
+                    if (typeof rd === "string") {
+                      try { text = JSON.stringify(JSON.parse(rd), null, 2); } catch { text = rd; }
+                    } else {
+                      text = JSON.stringify(rd, null, 2);
+                    }
+                    navigator.clipboard.writeText(text);
+                    toast.success("Response copied to clipboard");
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copy
+                </Button>
               </div>
             </>
           )}

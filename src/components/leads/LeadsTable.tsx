@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History } from "lucide-react";
+import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { cn } from "@/lib/utils";
@@ -211,7 +212,16 @@ export function LeadsTable({
       case "live_lead_score": {
         const score = (lead as any).live_lead_score;
         if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="text-xs font-medium tabular-nums">{score}<span className="text-muted-foreground font-normal">/100</span></span>;
+        const scoreClass =
+          score >= 75 ? "bg-green-100 text-green-800" :
+          score >= 50 ? "bg-amber-100 text-amber-800" :
+          score >= 25 ? "bg-orange-100 text-orange-800" :
+                        "bg-red-100 text-red-800";
+        return (
+          <Badge className={`${scoreClass} text-xs font-medium tabular-nums`}>
+            {score}<span className="opacity-60 font-normal">/100</span>
+          </Badge>
+        );
       }
       case "comment":
         return lead.comment ? (
@@ -225,12 +235,43 @@ export function LeadsTable({
         return lead.ftd_date ? formatDate(lead.ftd_date) : "-";
       case "ftd_id":
         return lead.ftd_id || "-";
-      case "autologin":
-        return lead.autologin ? (
-          <span className="max-w-32 truncate block font-mono text-xs" title={lead.autologin}>
-            {lead.autologin}
-          </span>
-        ) : "-";
+      case "autologin": {
+        if (!lead.autologin) return "-";
+        const trackerUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${lead.id}`;
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <Link className="h-3 w-3 shrink-0" />
+                <span className="truncate">AutoLogin</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">AutoLogin Tracker URL</p>
+              <div className="flex items-start gap-2 mb-3">
+                <p className="text-xs font-mono break-all flex-1">{trackerUrl}</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(trackerUrl); toast.success("Tracker URL copied"); }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              <a href={trackerUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <Button size="sm" className="w-full gap-2">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open AutoLogin
+                </Button>
+              </a>
+              <p className="text-[10px] text-muted-foreground mt-2 break-all">
+                Destination: {lead.autologin}
+              </p>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case "user_agent":
         return lead.user_agent ? (
           <span className="max-w-40 truncate block text-xs" title={lead.user_agent}>
