@@ -417,6 +417,7 @@ Deno.serve(async (req) => {
     // === STEP 6: Use server-detected IP only — never trust client-supplied ip_address ===
     const leadIp = clientIp;
     const submissionUa = req.headers.get('user-agent') || null;
+    const requestId = crypto.randomUUID();
 
     // === STEP 7: Insert lead into DB immediately (always stored regardless of distribution outcome) ===
     const { data: newLead, error: leadInsertError } = await supabase
@@ -436,6 +437,7 @@ Deno.serve(async (req) => {
         custom3: body.custom3?.substring(0, 255) || null,
         comment: body.comment?.substring(0, 500) || null,
         status: 'new',
+        request_id: requestId,
         click_ip: (body as LeadData).click_ip?.trim() || null,
         click_ua: (body as LeadData).click_ua?.substring(0, 500) || null,
         time_to_click: typeof (body as LeadData).time_to_click === 'number' ? Math.round((body as LeadData).time_to_click!) : null,
@@ -537,7 +539,7 @@ Deno.serve(async (req) => {
     // Return tracking URL instead of raw autologin so click data is captured before redirect
     const responseData: Record<string, unknown> = {
       lead_id: newLead.id,
-      request_id: crypto.randomUUID(),
+      request_id: requestId,
     };
 
     if (distributionResult?.autologin_url) {

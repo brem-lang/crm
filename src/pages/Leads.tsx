@@ -59,7 +59,7 @@ import { toast } from "sonner";
 const STORAGE_KEY = "leads-column-visibility";
 const ADVERTISER_COLUMN_IDS = new Set(["advertiser", "advertiser_id"]);
 const NAME_COLUMN_IDS      = new Set(["firstname", "lastname"]);
-const ID_COLUMN_IDS        = new Set(["request_id"]);
+const ID_COLUMN_IDS        = new Set(["request_id", "api_request_id"]);
 const COUNTRY_COLUMN_IDS   = new Set(["country_code", "country", "city"]);
 const IP_COLUMN_IDS        = new Set(["ip_address"]);
 const STATUS_COLUMN_IDS    = new Set(["status", "sale_status"]);
@@ -73,7 +73,8 @@ const DATE_COLUMN_IDS      = new Set(["created_at"]);
 const SCORE_COLUMN_IDS     = new Set(["live_lead_status", "live_lead_score"]);
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { id: "request_id", label: "Lead ID", visible: true },
+  { id: "request_id",     label: "Lead ID",     visible: true  },
+  { id: "api_request_id", label: "Request ID",  visible: false },
   { id: "firstname", label: "First Name", visible: true },
   { id: "lastname", label: "Last Name", visible: true },
   { id: "email", label: "Email", visible: true },

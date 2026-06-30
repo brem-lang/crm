@@ -77,13 +77,49 @@ export function LeadsTable({
 
   const renderCellValue = (lead: any, columnId: string) => {
     switch (columnId) {
-      case "request_id":
-        const fullId = lead.request_id || lead.id;
+      case "request_id": {
         return (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={fullId}>
-            {fullId.slice(0, 8)}
-          </span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <span className="truncate">Lead ID</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">Lead ID</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs font-mono break-all flex-1">{lead.id}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(lead.id); toast.success("Lead ID copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         );
+      }
+      case "api_request_id": {
+        if (!lead.request_id) return "-";
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <span className="truncate">Request ID</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">API Request ID</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs font-mono break-all flex-1">{lead.request_id}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(lead.request_id!); toast.success("Request ID copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case "firstname":
         return lead.firstname;
       case "lastname":

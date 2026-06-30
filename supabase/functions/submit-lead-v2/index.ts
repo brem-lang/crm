@@ -300,6 +300,9 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
+    // Generate request_id here so the API response and DB value are guaranteed identical
+    const requestId = crypto.randomUUID();
+
     // Create the lead
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -318,6 +321,7 @@ Deno.serve(async (req) => {
         offer_name: leadData.offer_name || null,
         comment: leadData.comment || null,
         status: 'new',
+        request_id: requestId,
         click_ip: leadData.click_ip?.trim() || null,
         click_ua: leadData.click_ua?.substring(0, 500) || null,
         time_to_click: typeof leadData.time_to_click === 'number' ? Math.round(leadData.time_to_click) : null,
@@ -325,7 +329,7 @@ Deno.serve(async (req) => {
         click_id: leadData.click_id?.substring(0, 255) || null,
         submission_ua: submissionUa?.substring(0, 500) || null,
       })
-      .select('id, request_id')
+      .select('id')
       .single();
 
     if (leadError) {
@@ -372,7 +376,7 @@ Deno.serve(async (req) => {
       message: 'Lead submitted successfully',
       data: {
         lead_id: lead.id,
-        request_id: lead.request_id,
+        request_id: requestId,
       },
       api_version: API_VERSION,
     }, 201);
