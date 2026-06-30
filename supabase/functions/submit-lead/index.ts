@@ -534,8 +534,14 @@ Deno.serve(async (req) => {
     };
 
     if (distributionResult?.autologin_url) {
-      // Build tracking URL using the public hostname from the incoming request
-      const publicOrigin = new URL(req.url).origin;
+      // Build tracking URL using the public hostname.
+      // Kong (the API gateway) forwards the real host/proto via headers — prefer those
+      // over req.url which reflects the internal Docker network address.
+      const forwardedProto = req.headers.get('x-forwarded-proto') || req.headers.get('x-scheme') || 'https';
+      const forwardedHost  = req.headers.get('x-forwarded-host')  || req.headers.get('host');
+      const publicOrigin   = forwardedHost
+        ? `${forwardedProto}://${forwardedHost}`
+        : Deno.env.get('PUBLIC_URL') || new URL(req.url).origin;
       const trackingUrl = `${publicOrigin}/functions/v1/track-autologin?lead_id=${newLead.id}`;
       responseData.autologin_url = trackingUrl;
 
