@@ -1896,8 +1896,9 @@ async function distributeLead(
     if (success) {
       // Build tracking URL so every autologin link — in the table, the dialog,
       // and the API response — routes through track-autologin for click capture.
+      const fnBaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
       const trackingUrl = autologinUrl
-        ? `${supabaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
+        ? `${fnBaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
         : null;
 
       // Replace raw advertiser URL with tracking URL in stored response so the
