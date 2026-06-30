@@ -1902,7 +1902,7 @@ async function distributeLead(
 
       // Replace raw advertiser URL with tracking URL in stored response so the
       // Advertiser Response dialog also shows a trackable link.
-      const rawResponse = response.substring(0, 1000);
+      const rawResponse = String(response ?? '').substring(0, 1000);
       const storedResponse = autologinUrl && trackingUrl
         ? rawResponse.replace(autologinUrl, trackingUrl)
         : rawResponse;
