@@ -1,18 +1,58 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCallbackLogs, CallbackLog } from "@/hooks/useCallbackLogs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateFilterBar } from "@/components/filters/DateFilterBar";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { format } from "date-fns";
-import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle, MoreHorizontal } from "lucide-react";
 
 export function CallbackLogsTable() {
-  const { data: logs, isLoading, refetch } = useCallbackLogs(100);
+  const { data: logs, isLoading, refetch } = useCallbackLogs(500);
+  const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+
   const [selectedLog, setSelectedLog] = useState<CallbackLog | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [showAllDates, setShowAllDates] = useState(false);
+  const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
+  const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
+
+  const filteredLogs = useMemo(() => {
+    return (logs ?? []).filter((log) => {
+      if (showAllDates) return true;
+      const d = new Date(log.created_at);
+      return d >= getStartOfDay(fromDate) && d <= getEndOfDay(toDate);
+    });
+  }, [logs, showAllDates, fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
+
+  const allSelected = filteredLogs.length > 0 && filteredLogs.every(l => selectedIds.has(l.id));
+  const someSelected = filteredLogs.some(l => selectedIds.has(l.id)) && !allSelected;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(new Set(filteredLogs.map(l => l.id)));
+    else setSelectedIds(new Set());
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    checked ? next.add(id) : next.delete(id);
+    setSelectedIds(next);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -46,13 +86,24 @@ export function CallbackLogsTable() {
 
   return (
     <>
+      {/* Date Filter Bar */}
+      <Card className="p-4">
+        <DateFilterBar
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={(d) => { setFromDate(d); setCurrentPage(1); }}
+          onToDateChange={(d) => { setToDate(d); setCurrentPage(1); }}
+          onShowAllChange={(v) => { setShowAllDates(v); setCurrentPage(1); }}
+        />
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Webhook className="h-5 w-5 text-primary" />
               <CardTitle className="text-base">Callback Logs</CardTitle>
-              <Badge variant="secondary">{logs?.length || 0}</Badge>
+              <Badge variant="secondary">{filteredLogs.length}</Badge>
             </div>
             <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
               <RefreshCw className="h-4 w-4" />
@@ -66,21 +117,25 @@ export function CallbackLogsTable() {
         <CardContent>
           {isLoading ? (
             <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : !logs || logs.length === 0 ? (
+          ) : filteredLogs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Webhook className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No callback logs yet</p>
-              <p className="text-sm">Callbacks will appear here when advertisers send updates</p>
+              <p className="text-lg font-medium">No callback logs found</p>
+              <p className="text-sm">Try adjusting the date range or check back later</p>
             </div>
           ) : (
-            <ScrollArea className="h-[400px]">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={someSelected ? "indeterminate" : allSelected}
+                        onCheckedChange={(c) => handleSelectAll(!!c)}
+                      />
+                    </TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Advertiser</TableHead>
@@ -90,33 +145,56 @@ export function CallbackLogsTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="font-mono text-xs">
-                        {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
+                  {paginatedLogs.map((log) => (
+                    <TableRow key={log.id} className={selectedIds.has(log.id) ? "bg-muted/50" : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(log.id)}
+                          onCheckedChange={(c) => handleSelectOne(log.id, !!c)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {format(new Date(log.created_at), 'MMM d, yyyy HH:mm:ss')}
                       </TableCell>
                       <TableCell>{getTypeBadge(log.callback_type)}</TableCell>
                       <TableCell>{log.advertiser_name || '-'}</TableCell>
                       <TableCell>{getStatusBadge(log.processing_status)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {log.matched_by || '-'}
-                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{log.matched_by || '-'}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedLog(log)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setSelectedLog(log)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
+        {filteredLogs.length > 0 && (
+          <CardFooter className="pt-0">
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={filteredLogs.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+              itemLabel="logs"
+            />
+          </CardFooter>
+        )}
       </Card>
 
       {/* Details Dialog */}
