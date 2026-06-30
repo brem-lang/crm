@@ -2213,7 +2213,9 @@ Deno.serve(async (req) => {
             request_payload: requestMetadata?.payload || null,
           });
           
-          const autologinUrl = success ? extractAutologinUrl(response) : null;
+          const trackerUrl = createdLeadId
+            ? `${supabaseUrl}/functions/v1/track-autologin?lead_id=${createdLeadId}`
+            : null;
           return new Response(
             JSON.stringify({
               success,
@@ -2222,7 +2224,7 @@ Deno.serve(async (req) => {
               advertiser_name: typedAdvertiser.name,
               advertiser_response: response,
               lead_id: createdLeadId,
-              autologin_url: autologinUrl,
+              autologin_url: trackerUrl,
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );

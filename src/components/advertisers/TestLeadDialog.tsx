@@ -220,7 +220,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            {testResult.success && testResult.lead_id && (
+            {testResult.success && testResult.autologin_url && (
               <div className="space-y-1.5 border rounded-lg p-3 bg-blue-500/5 border-blue-500/20">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-blue-600">Autologin Tracker URL</p>
@@ -230,8 +230,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                       size="sm"
                       className="h-6 text-xs px-2"
                       onClick={() => {
-                        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`;
-                        navigator.clipboard.writeText(url);
+                        navigator.clipboard.writeText(testResult.autologin_url!);
                         toast.success("Tracker URL copied");
                       }}
                     >
@@ -242,21 +241,15 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs px-2"
-                      onClick={() => window.open(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`, '_blank')}
+                      onClick={() => window.open(testResult.autologin_url!, '_blank')}
                     >
                       Open ↗
                     </Button>
                   </div>
                 </div>
                 <p className="font-mono text-xs break-all text-muted-foreground">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`}
+                  {testResult.autologin_url}
                 </p>
-                {testResult.autologin_url && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    <span className="font-medium">Raw advertiser URL:</span>{" "}
-                    <span className="font-mono break-all">{testResult.autologin_url}</span>
-                  </p>
-                )}
               </div>
             )}
 
