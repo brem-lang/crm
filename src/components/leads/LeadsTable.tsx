@@ -228,17 +228,6 @@ export function LeadsTable({
             {lead.autologin}
           </span>
         ) : "-";
-      case "is_live": {
-        const hasAutologin = (lead as any).lead_distributions?.some(
-          (d: any) => d.status === 'sent' && d.autologin_url
-        );
-        if (hasAutologin && lead.time_to_click == null) {
-          return <Badge className="bg-red-100 text-red-800">Not Clicked</Badge>;
-        }
-        return lead.is_live ? (
-          <Badge className="bg-green-100 text-green-800">Live</Badge>
-        ) : <span className="text-muted-foreground">-</span>;
-      }
       case "user_agent":
         return lead.user_agent ? (
           <span className="max-w-40 truncate block text-xs" title={lead.user_agent}>

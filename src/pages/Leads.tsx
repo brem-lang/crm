@@ -70,7 +70,6 @@ const AUTOLOGIN_COLUMN_IDS = new Set(["autologin"]);
 const DEVICE_COLUMN_IDS    = new Set(["user_agent", "platform", "browser"]);
 const COMMENT_COLUMN_IDS   = new Set(["comment"]);
 const DATE_COLUMN_IDS      = new Set(["created_at"]);
-const LIVE_COLUMN_IDS      = new Set(["is_live"]);
 const SCORE_COLUMN_IDS     = new Set(["live_lead_status", "live_lead_score"]);
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -95,7 +94,6 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "affiliate_id", label: "Affiliate ID", visible: false },
   { id: "offer_name", label: "Offer Name", visible: true },
   { id: "autologin", label: "AutoLogin", visible: false },
-  { id: "is_live", label: "Live Lead", visible: false },
   { id: "user_agent", label: "User Agent", visible: false },
   { id: "platform", label: "Platform", visible: false },
   { id: "browser", label: "Browser", visible: false },
@@ -105,7 +103,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "custom3", label: "Custom 3", visible: false },
   { id: "custom4", label: "Custom 4", visible: false },
   { id: "custom5", label: "Custom 5", visible: false },
-  { id: "live_lead_status", label: "Live Lead",  visible: false },
+  { id: "live_lead_status", label: "Live Lead", visible: false },
   { id: "live_lead_score",  label: "Live Score", visible: false },
   { id: "created_at", label: "Created", visible: true },
 ];
@@ -287,7 +285,6 @@ export default function Leads() {
     [DEVICE_COLUMN_IDS,     canViewLeadDevice],
     [COMMENT_COLUMN_IDS,    canViewLeadComment],
     [DATE_COLUMN_IDS,       canViewLeadDate],
-    [LIVE_COLUMN_IDS,       canViewLeadLive],
     [SCORE_COLUMN_IDS,      canViewLeadLive],
   ];
 
