@@ -1894,26 +1894,46 @@ async function distributeLead(
     }
 
     if (success) {
+      // Build tracking URL so every autologin link — in the table, the dialog,
+      // and the API response — routes through track-autologin for click capture.
+      const trackingUrl = autologinUrl
+        ? `${supabaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
+        : null;
+
+      // Replace raw advertiser URL with tracking URL in stored response so the
+      // Advertiser Response dialog also shows a trackable link.
+      const rawResponse = response.substring(0, 1000);
+      const storedResponse = autologinUrl && trackingUrl
+        ? rawResponse.replace(autologinUrl, trackingUrl)
+        : rawResponse;
+
       // Only record distribution on success
       await supabase.from('lead_distributions').insert({
         lead_id: lead.id,
         advertiser_id: advertiser.id,
         affiliate_id: lead.affiliate_id,
         status: 'sent',
-        response: response.substring(0, 1000),
+        response: storedResponse,
         external_lead_id: externalLeadId,
-        autologin_url: autologinUrl,
+        autologin_url: trackingUrl,
         sent_at: new Date().toISOString(),
         request_url: requestMetadata?.url || null,
         request_headers: requestMetadata?.headers || null,
         request_payload: requestMetadata?.payload || null,
       });
 
-      // Update lead distributed_at
-      await supabase
-        .from('leads')
-        .update({ distributed_at: new Date().toISOString(), status: 'contacted' })
-        .eq('id', lead.id);
+      // Store raw advertiser URL on the lead so track-autologin can redirect there
+      if (autologinUrl) {
+        await supabase
+          .from('leads')
+          .update({ distributed_at: new Date().toISOString(), status: 'contacted', autologin: autologinUrl })
+          .eq('id', lead.id);
+      } else {
+        await supabase
+          .from('leads')
+          .update({ distributed_at: new Date().toISOString(), status: 'contacted' })
+          .eq('id', lead.id);
+      }
 
       // Update conversion stats
       const { data: existingConversion } = await supabase
