@@ -2217,13 +2217,29 @@ Deno.serve(async (req) => {
           const trackerUrl = createdLeadId
             ? `${publicUrl}/functions/v1/track-autologin?lead_id=${createdLeadId}`
             : null;
+
+          // Replace autologin_url inside the advertiser_response string with the tracker URL
+          let advertiserResponse = response;
+          if (trackerUrl) {
+            try {
+              const parsed = JSON.parse(response);
+              const autologinFields = ['autologin_url', 'autologinUrl', 'autoLoginUrl', 'redirect_url', 'login_url', 'loginUrl'];
+              for (const field of autologinFields) {
+                if (parsed[field] && typeof parsed[field] === 'string' && parsed[field].startsWith('http')) {
+                  parsed[field] = trackerUrl;
+                }
+              }
+              advertiserResponse = JSON.stringify(parsed);
+            } catch { /* not JSON, leave as-is */ }
+          }
+
           return new Response(
             JSON.stringify({
               success,
               message: success ? 'Test lead sent and saved successfully' : 'Test lead rejected',
               test_mode: true,
               advertiser_name: typedAdvertiser.name,
-              advertiser_response: response,
+              advertiser_response: advertiserResponse,
               lead_id: createdLeadId,
               autologin_url: trackerUrl,
             }),
