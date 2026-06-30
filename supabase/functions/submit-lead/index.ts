@@ -115,6 +115,29 @@ function getClientIp(req: Request): string {
 
 const RATE_LIMIT_RPM = 100;
 
+const COUNTRY_LOCALE_MAP: Record<string, string> = {
+  US: 'en-US', GB: 'en-GB', UK: 'en-GB', CA: 'en-CA', AU: 'en-AU', NZ: 'en-NZ',
+  IE: 'en-IE', ZA: 'en-ZA', NG: 'en-NG', IN: 'en-IN', SG: 'en-SG', MY: 'en-MY',
+  FR: 'fr-FR', BE: 'fr-BE', CH: 'fr-CH', LU: 'fr-LU',
+  DE: 'de-DE', AT: 'de-AT',
+  ES: 'es-ES', MX: 'es-MX', AR: 'es-AR', CO: 'es-CO', CL: 'es-CL', PE: 'es-PE',
+  IT: 'it-IT',
+  PT: 'pt-PT', BR: 'pt-BR',
+  NL: 'nl-NL',
+  PL: 'pl-PL',
+  RU: 'ru-RU',
+  TR: 'tr-TR',
+  IL: 'he-IL',
+  JP: 'ja-JP',
+  KR: 'ko-KR',
+  CN: 'zh-CN', TW: 'zh-TW', HK: 'zh-HK',
+  SE: 'sv-SE', NO: 'nb-NO', DK: 'da-DK', FI: 'fi-FI',
+  GR: 'el-GR', CZ: 'cs-CZ', HU: 'hu-HU', RO: 'ro-RO', SK: 'sk-SK',
+  HR: 'hr-HR', BG: 'bg-BG', RS: 'sr-RS', SI: 'sl-SI',
+  AE: 'ar-AE', SA: 'ar-SA', EG: 'ar-EG',
+  TH: 'th-TH', VN: 'vi-VN', ID: 'id-ID', PH: 'fil-PH',
+};
+
 const DISPOSABLE_DOMAINS = new Set([
   'tempmail.com', 'throwaway.com', '10minutemail.com', 'guerrillamail.com',
   'mailinator.com', 'yopmail.com', 'sharklasers.com', 'guerrillamail.info',
@@ -441,7 +464,7 @@ Deno.serve(async (req) => {
         click_ip: (body as LeadData).click_ip?.trim() || null,
         click_ua: (body as LeadData).click_ua?.substring(0, 500) || null,
         time_to_click: typeof (body as LeadData).time_to_click === 'number' ? Math.round((body as LeadData).time_to_click!) : null,
-        locale: (body as LeadData).locale?.substring(0, 20) || null,
+        locale: (body as LeadData).locale?.substring(0, 20) || COUNTRY_LOCALE_MAP[normalizedCountryCode] || null,
         click_id: (body as LeadData).click_id?.substring(0, 255) || null,
         submission_ua: submissionUa?.substring(0, 500) || null,
       })

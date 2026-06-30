@@ -97,6 +97,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         custom1: custom1 || undefined,
         custom2: custom2 || undefined,
         custom3: custom3 || undefined,
+        locale: navigator.language || undefined,
       };
       
       // Use test mode - sends directly to advertiser and logs the result
