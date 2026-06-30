@@ -35,6 +35,8 @@ import {
   ShieldCheck,
   MessageCircle,
   Plug,
+  Layers,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -58,7 +60,6 @@ const navItems: NavItem[] = [
     customRoles: ["Admin"],
     children: [
       { title: "Performance", href: "/affiliate-performance", icon: TrendingUp, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
-      { title: "API Logs", href: "/affiliate-api-logs", icon: ShieldCheck, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
   {
@@ -93,7 +94,6 @@ const navItems: NavItem[] = [
       { title: "Affiliate Rejections", href: "/affiliate-rejected", icon: XCircle, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
     ]
   },
-  { title: "Test Logs", href: "/test-logs", icon: TestTube2, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
   {
     title: "Reports",
     href: "/reports",
@@ -132,7 +132,19 @@ const navItems: NavItem[] = [
     ]
   },
   { title: "Monitoring", href: "/monitoring", icon: Activity, roles: ["super_admin"], customRoles: ["Admin"] },
-  { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"], customRoles: ["Admin"] },
+  {
+    title: "Logs",
+    href: "/affiliate-api-logs",
+    icon: Layers,
+    roles: ["super_admin", "manager"],
+    customRoles: ["Admin"],
+    children: [
+      { title: "Affiliate API Logs", href: "/affiliate-api-logs", icon: ShieldCheck, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Test Logs", href: "/test-logs", icon: TestTube2, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Callback Logs", href: "/logs/callback-logs", icon: Radio, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"], customRoles: ["Admin"] },
+    ]
+  },
   { title: "Users", href: "/users", icon: UsersRound, roles: ["super_admin"], customRoles: ["Admin"] },
   { title: "Roles & Permissions", href: "/roles", icon: ShieldCheck, roles: ["super_admin"], customRoles: ["Admin"] },
   { title: "CRM Integrations", href: "/crm-settings", icon: Plug, roles: ["super_admin"] },

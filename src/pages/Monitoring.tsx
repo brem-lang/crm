@@ -11,7 +11,6 @@ import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { EdgeFunctionStatusCard } from "@/components/monitoring/EdgeFunctionStatusCard";
-import { CallbackLogsTable } from "@/components/monitoring/CallbackLogsTable";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 
 interface ThroughputData {
@@ -937,8 +936,7 @@ export default function Monitoring() {
           </CardContent>
         </Card>
 
-        {/* Callback Logs */}
-        <CallbackLogsTable />
+
       </div>
     </DashboardLayout>
   );
