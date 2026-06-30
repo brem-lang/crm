@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
+import { countryData } from "@/components/advertisers/countryData";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-100 text-blue-800",
@@ -111,8 +112,10 @@ export function LeadsTable({
         return canViewPhone ? lead.mobile : maskValue(lead.mobile);
       case "country_code":
         return lead.country_code;
-      case "country":
-        return lead.country || "-";
+      case "country": {
+        const name = lead.country || countryData[lead.country_code?.toUpperCase()]?.name;
+        return name || "-";
+      }
       case "city":
         return lead.city || "-";
       case "ip_address":
