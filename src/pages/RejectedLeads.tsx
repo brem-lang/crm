@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useRejectedLeads, useDeleteRejectedLeads } from "@/hooks/useRejectedLeads";
 import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
+import { useAuth } from "@/hooks/useAuth";
+import { countryData } from "@/components/advertisers/countryData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,34 +25,40 @@ import { toast } from "sonner";
 const STORAGE_KEY = "rejected-leads-column-visibility";
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { id: "request_id",      label: "Lead ID",       visible: true  },
-  { id: "firstname",       label: "First Name",    visible: true  },
-  { id: "lastname",        label: "Last Name",     visible: true  },
-  { id: "email",           label: "Email",         visible: true  },
-  { id: "mobile",          label: "Phone",         visible: true  },
-  { id: "country_code",    label: "Country Code",  visible: true  },
-  { id: "country",         label: "Country",       visible: false },
-  { id: "city",            label: "City",          visible: false },
-  { id: "ip_address",      label: "IP Address",    visible: false },
-  { id: "status",          label: "Status",        visible: true  },
-  { id: "sale_status",     label: "Sale Status",   visible: true  },
-  { id: "advertiser",      label: "Advertiser",    visible: true  },
-  { id: "advertiser_id",   label: "Advertiser ID", visible: false },
-  { id: "is_ftd",          label: "FTD",           visible: true  },
-  { id: "ftd_date",        label: "FTD Date",      visible: false },
-  { id: "ftd_id",          label: "FTD ID",        visible: false },
-  { id: "injection_ftd",   label: "Injection FTD", visible: false },
-  { id: "affiliate",       label: "Affiliate",     visible: true  },
-  { id: "affiliate_id",    label: "Affiliate ID",  visible: false },
-  { id: "offer_name",      label: "Offer Name",    visible: true  },
-  { id: "autologin",       label: "AutoLogin",     visible: false },
-  { id: "is_live",         label: "Live Lead",     visible: false },
-  { id: "user_agent",      label: "User Agent",    visible: false },
-  { id: "platform",        label: "Platform",      visible: false },
-  { id: "browser",         label: "Browser",       visible: false },
-  { id: "comment",         label: "Comment",       visible: false },
-  { id: "created_at",      label: "Created",       visible: true  },
-  { id: "rejection_reason",label: "Rejection Reason", visible: true },
+  { id: "request_id",       label: "Lead ID",          visible: true  },
+  { id: "firstname",        label: "First Name",       visible: true  },
+  { id: "lastname",         label: "Last Name",        visible: true  },
+  { id: "email",            label: "Email",            visible: true  },
+  { id: "mobile",           label: "Phone",            visible: true  },
+  { id: "country_code",     label: "Country Code",     visible: true  },
+  { id: "country",          label: "Country",          visible: false },
+  { id: "city",             label: "City",             visible: false },
+  { id: "ip_address",       label: "IP Address",       visible: false },
+  { id: "status",           label: "Status",           visible: true  },
+  { id: "sale_status",      label: "Sale Status",      visible: true  },
+  { id: "advertiser",       label: "Advertiser",       visible: true  },
+  { id: "advertiser_id",    label: "Advertiser ID",    visible: false },
+  { id: "is_ftd",           label: "FTD",              visible: true  },
+  { id: "ftd_date",         label: "FTD Date",         visible: false },
+  { id: "ftd_id",           label: "FTD ID",           visible: false },
+  { id: "injection_ftd",    label: "Injection FTD",    visible: true  },
+  { id: "affiliate",        label: "Affiliate",        visible: true  },
+  { id: "affiliate_id",     label: "Affiliate ID",     visible: false },
+  { id: "offer_name",       label: "Offer Name",       visible: true  },
+  { id: "autologin",        label: "AutoLogin",        visible: false },
+  { id: "user_agent",       label: "User Agent",       visible: false },
+  { id: "platform",         label: "Platform",         visible: false },
+  { id: "browser",          label: "Browser",          visible: false },
+  { id: "comment",          label: "Comment",          visible: false },
+  { id: "custom1",          label: "Custom 1",         visible: false },
+  { id: "custom2",          label: "Custom 2",         visible: false },
+  { id: "custom3",          label: "Custom 3",         visible: false },
+  { id: "custom4",          label: "Custom 4",         visible: false },
+  { id: "custom5",          label: "Custom 5",         visible: false },
+  { id: "live_lead_status", label: "Live Lead",        visible: false },
+  { id: "live_lead_score",  label: "Live Score",       visible: false },
+  { id: "created_at",       label: "Created",          visible: true  },
+  { id: "rejection_reason", label: "Rejection Reason", visible: true  },
 ];
 
 const statusColors: Record<string, string> = {
@@ -66,11 +74,17 @@ function loadColumns(): ColumnConfig[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return DEFAULT_COLUMNS;
-    const savedMap: Record<string, boolean> = JSON.parse(saved);
-    return DEFAULT_COLUMNS.map(col => ({
-      ...col,
-      visible: savedMap[col.id] ?? col.visible,
-    }));
+    const parsed: ColumnConfig[] = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return DEFAULT_COLUMNS;
+    const savedById = new Map(parsed.map(c => [c.id, c]));
+    const savedOrder = parsed
+      .map(s => {
+        const def = DEFAULT_COLUMNS.find(c => c.id === s.id);
+        return def ? { ...def, visible: !!s.visible } : null;
+      })
+      .filter((c): c is ColumnConfig => c !== null);
+    const newCols = DEFAULT_COLUMNS.filter(c => !savedById.has(c.id));
+    return [...savedOrder, ...newCols];
   } catch {
     return DEFAULT_COLUMNS;
   }
@@ -83,6 +97,7 @@ export default function RejectedLeads() {
   const deleteRejectedLeads = useDeleteRejectedLeads();
   const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { canDeleteLeads } = useCurrentUserPermissions();
+  const { isSuperAdmin } = useAuth();
 
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -97,11 +112,14 @@ export default function RejectedLeads() {
       const next = prev.map(col =>
         col.id === columnId ? { ...col, visible: !col.visible } : col
       );
-      const visibilityMap: Record<string, boolean> = {};
-      next.forEach(col => { visibilityMap[col.id] = col.visible; });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(visibilityMap));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
+  };
+
+  const handleReorderColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
   };
 
   const visibleColumns = columns.filter(c => c.visible);
@@ -199,8 +217,10 @@ export default function RejectedLeads() {
         return lead?.country_code
           ? <Badge variant="secondary">{lead.country_code}</Badge>
           : "-";
-      case "country":
-        return lead?.country || "-";
+      case "country": {
+        const name = lead?.country || countryData[lead?.country_code?.toUpperCase()]?.name;
+        return name || "-";
+      }
       case "city":
         return lead?.city || "-";
       case "ip_address":
@@ -249,10 +269,6 @@ export default function RejectedLeads() {
         return lead?.offer_name || "-";
       case "autologin":
         return lead?.autologin || "-";
-      case "is_live":
-        return lead?.is_live
-          ? <Badge className="bg-blue-100 text-blue-800">Yes</Badge>
-          : <Badge variant="secondary">No</Badge>;
       case "user_agent":
         return <span className="text-xs max-w-[200px] truncate block" title={lead?.user_agent}>{lead?.user_agent || "-"}</span>;
       case "platform":
@@ -261,6 +277,32 @@ export default function RejectedLeads() {
         return lead?.browser || "-";
       case "comment":
         return lead?.comment || "-";
+      case "custom1":
+        return lead?.custom1 || "-";
+      case "custom2":
+        return lead?.custom2 || "-";
+      case "custom3":
+        return lead?.custom3 || "-";
+      case "custom4":
+        return lead?.custom4 || "-";
+      case "custom5":
+        return lead?.custom5 || "-";
+      case "live_lead_status": {
+        const statusMap: Record<string, { label: string; className: string }> = {
+          green:       { label: "Live",        className: "bg-green-100 text-green-800" },
+          orange:      { label: "Likely Live", className: "bg-amber-100 text-amber-800" },
+          "light-red": { label: "Suspicious",  className: "bg-orange-100 text-orange-800" },
+          red:         { label: "NO",          className: "bg-red-100 text-red-800" },
+        };
+        const s = lead?.live_lead_status;
+        if (!s) return "-";
+        const entry = statusMap[s];
+        return entry
+          ? <Badge className={entry.className}>{entry.label}</Badge>
+          : <Badge variant="secondary">{s}</Badge>;
+      }
+      case "live_lead_score":
+        return lead?.live_lead_score != null ? String(lead.live_lead_score) : "-";
       case "created_at":
         return rejection.created_at ? formatDate(new Date(rejection.created_at)) : "-";
       case "rejection_reason":
@@ -342,7 +384,12 @@ export default function RejectedLeads() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            <LeadColumnSelector columns={columns} onToggle={handleToggleColumn} />
+            <LeadColumnSelector
+              columns={columns}
+              onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              isSuperAdmin={isSuperAdmin}
+            />
             <div className="flex items-center gap-2 text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
               <span className="text-sm">{filteredLeads.length} rejected leads</span>
