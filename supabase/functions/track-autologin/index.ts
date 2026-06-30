@@ -17,6 +17,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function parsePlatform(ua: string): string {
+  if (/windows/i.test(ua))  return 'Windows';
+  if (/iphone/i.test(ua))   return 'iPhone';
+  if (/ipad/i.test(ua))     return 'iPad';
+  if (/android/i.test(ua))  return 'Android';
+  if (/mac os x/i.test(ua)) return 'macOS';
+  if (/linux/i.test(ua))    return 'Linux';
+  return 'Other';
+}
+
+function parseBrowser(ua: string): string {
+  if (/edg\//i.test(ua))     return 'Edge';
+  if (/opr\//i.test(ua))     return 'Opera';
+  if (/chrome\//i.test(ua))  return 'Chrome';
+  if (/firefox\//i.test(ua)) return 'Firefox';
+  if (/safari\//i.test(ua))  return 'Safari';
+  if (/msie|trident/i.test(ua)) return 'IE';
+  return 'Other';
+}
+
 function getClientIp(req: Request): string {
   return (
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
@@ -93,14 +113,19 @@ Deno.serve(async (req) => {
   const timeToClick = Math.round(
     (Date.now() - new Date(lead.created_at).getTime()) / 1000
   );
+  const platform = clickUa ? parsePlatform(clickUa) : null;
+  const browser  = clickUa ? parseBrowser(clickUa)  : null;
 
   // Persist click data on the lead
   const { error: updateError } = await supabase
     .from('leads')
     .update({
-      click_ip:       clickIp !== 'unknown' ? clickIp : null,
-      click_ua:       clickUa,
-      time_to_click:  timeToClick,
+      click_ip:      clickIp !== 'unknown' ? clickIp : null,
+      click_ua:      clickUa,
+      time_to_click: timeToClick,
+      user_agent:    clickUa,
+      platform,
+      browser,
     })
     .eq('id', lead_id);
 
