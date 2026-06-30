@@ -239,14 +239,19 @@ export default function Leads() {
         // Reconcile old saved configs with current defaults (e.g. replace old "name" column
         // with new "firstname" + "lastname" columns).
         const savedById = new Map(parsed.map((c) => [c.id, c]));
-        return DEFAULT_COLUMNS.map((col) => {
-          const savedCol = savedById.get(col.id);
-          // Use showLeadId from settings for the request_id column initial state
-          if (col.id === "request_id" && !savedCol) {
-            return { ...col, visible: showLeadId };
-          }
-          return savedCol ? { ...col, visible: !!savedCol.visible } : col;
-        });
+        // Preserve saved order; append any new columns not yet in saved state
+        const savedOrder = parsed
+          .map((saved) => {
+            const def = DEFAULT_COLUMNS.find((c) => c.id === saved.id);
+            if (!def) return null;
+            if (def.id === "request_id") return { ...def, visible: saved.visible ?? showLeadId };
+            return { ...def, visible: !!saved.visible };
+          })
+          .filter((c): c is ColumnConfig => c !== null);
+        const newCols = DEFAULT_COLUMNS.filter((c) => !savedById.has(c.id)).map((col) =>
+          col.id === "request_id" ? { ...col, visible: showLeadId } : col
+        );
+        return [...savedOrder, ...newCols];
       } catch {
         return DEFAULT_COLUMNS.map((col) =>
           col.id === "request_id" ? { ...col, visible: showLeadId } : col,
@@ -268,6 +273,10 @@ export default function Leads() {
         col.id === columnId ? { ...col, visible: !col.visible } : col,
       ),
     );
+  };
+
+  const handleReorderColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
   };
 
   // Map each column set to its required permission (super admins bypass all)
@@ -674,6 +683,8 @@ export default function Leads() {
                 !columnPermissions.some(([ids, permitted]) => ids.has(col.id) && !permitted)
               )}
               onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              isSuperAdmin={isSuperAdmin}
             />
             {canExportLeads && (
               <Button variant="outline" size="sm" onClick={handleBulkExport}>
