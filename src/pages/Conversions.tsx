@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CalendarIcon, ChevronLeft, ChevronRight, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw, MoreHorizontal } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw, MoreHorizontal, Link, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 import { LeadColumnSelector, type ColumnConfig } from "@/components/leads/LeadColumnSelector";
@@ -511,10 +511,39 @@ export default function Conversions() {
         return lead.ftd_released
           ? <Badge className="bg-green-100 text-green-800">Released</Badge>
           : <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case "autologin":
-        return lead.autologin
-          ? <span className="max-w-32 truncate block font-mono text-xs" title={lead.autologin}>{lead.autologin}</span>
-          : '-';
+      case "autologin": {
+        if (!lead.autologin) return '-';
+        const trackerUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${lead.id}`;
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <Link className="h-3 w-3 shrink-0" />
+                <span className="truncate">AutoLogin</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">AutoLogin Tracker URL</p>
+              <div className="flex items-start gap-2 mb-3">
+                <p className="text-xs font-mono break-all flex-1">{trackerUrl}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(trackerUrl); toast.success("Tracker URL copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              <a href={trackerUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <Button size="sm" className="w-full gap-2">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open AutoLogin
+                </Button>
+              </a>
+              <p className="text-[10px] text-muted-foreground mt-2 break-all">
+                Destination: {lead.autologin}
+              </p>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case "platform":   return lead.platform || '-';
       case "browser":    return lead.browser || '-';
       case "user_agent":

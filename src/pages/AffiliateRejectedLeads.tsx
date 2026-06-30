@@ -54,6 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
 import {
   useAffiliateSubmissionFailures,
   useDeleteAffiliateSubmissionFailures,
@@ -62,9 +63,43 @@ import {
 import { useAffiliates } from "@/hooks/useAffiliates";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { MoreHorizontal, Trash2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
+
+const STORAGE_KEY = "affiliate-rejected-leads-column-visibility";
+
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+  { id: "created_at",        label: "Date / Time",     visible: true  },
+  { id: "affiliate",         label: "Affiliate",       visible: true  },
+  { id: "email",             label: "Email",           visible: true  },
+  { id: "name",              label: "Name",            visible: true  },
+  { id: "mobile",            label: "Phone",           visible: true  },
+  { id: "country_code",      label: "Country",         visible: true  },
+  { id: "rejection_code",    label: "Rejection Code",  visible: true  },
+  { id: "rejection_message", label: "Message",         visible: true  },
+];
+
+function loadColumns(): ColumnConfig[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return DEFAULT_COLUMNS;
+    const parsed: ColumnConfig[] = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return DEFAULT_COLUMNS;
+    const savedById = new Map(parsed.map(c => [c.id, c]));
+    const savedOrder = parsed
+      .map(s => {
+        const def = DEFAULT_COLUMNS.find(c => c.id === s.id);
+        return def ? { ...def, visible: !!s.visible } : null;
+      })
+      .filter((c): c is ColumnConfig => c !== null);
+    const newCols = DEFAULT_COLUMNS.filter(c => !savedById.has(c.id));
+    return [...savedOrder, ...newCols];
+  } catch {
+    return DEFAULT_COLUMNS;
+  }
+}
 
 const HIDDEN_KEYS = [
   "addonData", "ai", "ci", "gi", "api_key", "apiKey",
@@ -95,6 +130,7 @@ const safeStringify = (obj: unknown): string => {
 export default function AffiliateRejectedLeads() {
   const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } =
     useCRMSettings();
+  const { isSuperAdmin } = useAuth();
 
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -106,6 +142,22 @@ export default function AffiliateRejectedLeads() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = usePageSizeState();
   const [detailFailure, setDetailFailure] = useState<AffiliateSubmissionFailure | null>(null);
+  const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
+
+  const handleToggleColumn = (columnId: string) => {
+    setColumns(prev => {
+      const next = prev.map(c => c.id === columnId ? { ...c, visible: !c.visible } : c);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleReorderColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
+  };
+
+  const visibleColumns = columns.filter(c => c.visible);
 
   const filters = {
     affiliateId: affiliateFilter !== "all" ? affiliateFilter : undefined,
@@ -166,6 +218,43 @@ export default function AffiliateRejectedLeads() {
 
   const hasActiveFilters = affiliateFilter !== "all" || rejectionCodeFilter !== "all" || !!search;
 
+  const renderCellValue = (failure: AffiliateSubmissionFailure, columnId: string) => {
+    switch (columnId) {
+      case "created_at":
+        return (
+          <span className="text-sm whitespace-nowrap">
+            {format(new Date(failure.created_at), "MMM d, yyyy HH:mm:ss")}
+          </span>
+        );
+      case "affiliate":
+        return <span className="text-sm">{getAffiliateName(failure.affiliate_id)}</span>;
+      case "email":
+        return <span className="text-sm max-w-[180px] truncate block">{failure.email || "—"}</span>;
+      case "name":
+        return (
+          <span className="text-sm">
+            {[failure.firstname, failure.lastname].filter(Boolean).join(" ") || "—"}
+          </span>
+        );
+      case "mobile":
+        return <span className="text-sm">{failure.mobile || "—"}</span>;
+      case "country_code":
+        return failure.country_code ? (
+          <Badge variant="secondary">{failure.country_code}</Badge>
+        ) : "—";
+      case "rejection_code":
+        return <Badge variant="destructive">{failure.rejection_code}</Badge>;
+      case "rejection_message":
+        return (
+          <span className="text-xs text-muted-foreground max-w-[200px] truncate block">
+            {failure.rejection_message || "—"}
+          </span>
+        );
+      default:
+        return "—";
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -179,34 +268,42 @@ export default function AffiliateRejectedLeads() {
               Leads rejected during affiliate submission
             </p>
           </div>
-          {selectedIds.size > 0 && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete ({selectedIds.size})
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Records</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete {selectedIds.size} record
-                    {selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleBulkDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+          <div className="flex items-center gap-2">
+            <LeadColumnSelector
+              columns={columns}
+              onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              isSuperAdmin={isSuperAdmin}
+            />
+            {selectedIds.size > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete ({selectedIds.size})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Records</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete {selectedIds.size} record
+                      {selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleBulkDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         <Card className="p-4">
@@ -319,14 +416,9 @@ export default function AffiliateRejectedLeads() {
                           onCheckedChange={(c) => handleSelectAll(!!c)}
                         />
                       </TableHead>
-                      <TableHead>Date / Time</TableHead>
-                      <TableHead>Affiliate</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Country</TableHead>
-                      <TableHead>Rejection Code</TableHead>
-                      <TableHead>Message</TableHead>
+                      {visibleColumns.map(col => (
+                        <TableHead key={col.id}>{col.label}</TableHead>
+                      ))}
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -342,32 +434,11 @@ export default function AffiliateRejectedLeads() {
                             onCheckedChange={(c) => handleSelectOne(failure.id, !!c)}
                           />
                         </TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          {format(new Date(failure.created_at), "MMM d, yyyy HH:mm:ss")}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {getAffiliateName(failure.affiliate_id)}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-[180px] truncate">
-                          {failure.email || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {[failure.firstname, failure.lastname].filter(Boolean).join(" ") || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">{failure.mobile || "—"}</TableCell>
-                        <TableCell>
-                          {failure.country_code ? (
-                            <Badge variant="secondary">{failure.country_code}</Badge>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="destructive">{failure.rejection_code}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                          {failure.rejection_message || "—"}
-                        </TableCell>
+                        {visibleColumns.map(col => (
+                          <TableCell key={col.id}>
+                            {renderCellValue(failure, col.id)}
+                          </TableCell>
+                        ))}
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

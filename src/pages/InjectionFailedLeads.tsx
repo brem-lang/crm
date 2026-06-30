@@ -8,23 +8,74 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
 import { useState, useMemo } from "react";
 import { Download, Search, AlertTriangle, Upload, Users, XCircle } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 
+const STORAGE_KEY = "injection-failed-leads-column-visibility";
+
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+  { id: "injection",   label: "Injection",  visible: true },
+  { id: "advertiser", label: "Advertiser", visible: true },
+  { id: "lead",       label: "Lead",       visible: true },
+  { id: "country",    label: "Country",    visible: true },
+  { id: "source",     label: "Source",     visible: true },
+  { id: "created_at", label: "Created",    visible: true },
+  { id: "response",   label: "Response",   visible: true },
+];
+
+function loadColumns(): ColumnConfig[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return DEFAULT_COLUMNS;
+    const parsed: ColumnConfig[] = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return DEFAULT_COLUMNS;
+    const savedById = new Map(parsed.map(c => [c.id, c]));
+    const savedOrder = parsed
+      .map(s => {
+        const def = DEFAULT_COLUMNS.find(c => c.id === s.id);
+        return def ? { ...def, visible: !!s.visible } : null;
+      })
+      .filter((c): c is ColumnConfig => c !== null);
+    const newCols = DEFAULT_COLUMNS.filter(c => !savedById.has(c.id));
+    return [...savedOrder, ...newCols];
+  } catch {
+    return DEFAULT_COLUMNS;
+  }
+}
+
 export default function InjectionFailedLeads() {
   const { canExportLeads } = useCurrentUserPermissions();
+  const { isSuperAdmin } = useAuth();
 
   const [search, setSearch] = useState("");
   const [injectionFilter, setInjectionFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
+
+  const handleToggleColumn = (columnId: string) => {
+    setColumns(prev => {
+      const next = prev.map(c => c.id === columnId ? { ...c, visible: !c.visible } : c);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleReorderColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
+  };
+
+  const visibleColumns = columns.filter(c => c.visible);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -219,12 +270,20 @@ export default function InjectionFailedLeads() {
               All leads that failed to send through injections
             </p>
           </div>
-          {canExportLeads && filteredLeads.length > 0 && (
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Failed Leads
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <LeadColumnSelector
+              columns={columns}
+              onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              isSuperAdmin={isSuperAdmin}
+            />
+            {canExportLeads && filteredLeads.length > 0 && (
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Failed Leads
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}
@@ -302,13 +361,9 @@ export default function InjectionFailedLeads() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Injection</TableHead>
-                        <TableHead>Advertiser</TableHead>
-                        <TableHead>Lead</TableHead>
-                        <TableHead>Country</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Response</TableHead>
+                        {visibleColumns.map(col => (
+                          <TableHead key={col.id}>{col.label}</TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -316,83 +371,108 @@ export default function InjectionFailedLeads() {
                         const sourceInfo = getSourceInfo(lead.pool_lead_id);
                         return (
                           <TableRow key={lead.id} className="bg-destructive/5">
-                            <TableCell>
-                              {(lead as any).injection?.name ? (
-                                <Link
-                                  to={`/injections/${lead.injection_id}`}
-                                  className="text-primary hover:underline font-medium"
-                                >
-                                  {(lead as any).injection.name}
-                                </Link>
-                              ) : (
-                                <Badge variant="outline" className="text-muted-foreground">
-                                  Deleted
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm font-medium">
-                                {getAdvertiserName(lead)}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{lead.firstname} {lead.lastname}</p>
-                                <p className="text-sm text-muted-foreground">{lead.email}</p>
-                                <p className="text-xs text-muted-foreground">{lead.mobile}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{lead.country_code}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1.5">
-                                {sourceInfo.type === 'import' ? (
-                                  <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                                ) : (
-                                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                )}
-                                <span className="text-sm">{sourceInfo.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(lead.created_at), 'MMM d, HH:mm:ss')}
-                            </TableCell>
-                            <TableCell>
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="text-destructive border-destructive/50 hover:bg-destructive/10"
-                                  >
-                                    View Details
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-lg">
-                                  <DialogHeader>
-                                    <DialogTitle>Error Details</DialogTitle>
-                                    <DialogDescription>
-                                      {lead.firstname} {lead.lastname} ({lead.email})
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <ScrollArea className="max-h-[400px] border rounded-lg bg-muted/50">
-                                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                                      {lead.response ? 
-                                        (() => {
-                                          try {
-                                            return JSON.stringify(JSON.parse(lead.response), null, 2);
-                                          } catch {
-                                            return lead.response;
-                                          }
-                                        })() 
-                                        : lead.error_message || 'No details available'
-                                      }
-                                    </pre>
-                                  </ScrollArea>
-                                </DialogContent>
-                              </Dialog>
-                            </TableCell>
+                            {visibleColumns.map(col => {
+                              switch (col.id) {
+                                case "injection":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      {(lead as any).injection?.name ? (
+                                        <Link
+                                          to={`/injections/${lead.injection_id}`}
+                                          className="text-primary hover:underline font-medium"
+                                        >
+                                          {(lead as any).injection.name}
+                                        </Link>
+                                      ) : (
+                                        <Badge variant="outline" className="text-muted-foreground">
+                                          Deleted
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                  );
+                                case "advertiser":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      <span className="text-sm font-medium">{getAdvertiserName(lead)}</span>
+                                    </TableCell>
+                                  );
+                                case "lead":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      <div>
+                                        <p className="font-medium">{lead.firstname} {lead.lastname}</p>
+                                        <p className="text-sm text-muted-foreground">{lead.email}</p>
+                                        <p className="text-xs text-muted-foreground">{lead.mobile}</p>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                case "country":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      <Badge variant="outline">{lead.country_code}</Badge>
+                                    </TableCell>
+                                  );
+                                case "source":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      <div className="flex items-center gap-1.5">
+                                        {sourceInfo.type === 'import' ? (
+                                          <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                                        ) : (
+                                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                        )}
+                                        <span className="text-sm">{sourceInfo.name}</span>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                case "created_at":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      {format(new Date(lead.created_at), 'MMM d, HH:mm:ss')}
+                                    </TableCell>
+                                  );
+                                case "response":
+                                  return (
+                                    <TableCell key={col.id}>
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                                          >
+                                            View Details
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-lg">
+                                          <DialogHeader>
+                                            <DialogTitle>Error Details</DialogTitle>
+                                            <DialogDescription>
+                                              {lead.firstname} {lead.lastname} ({lead.email})
+                                            </DialogDescription>
+                                          </DialogHeader>
+                                          <ScrollArea className="max-h-[60vh] border rounded-lg bg-muted/50">
+                                            <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+                                              {lead.response ?
+                                                (() => {
+                                                  try {
+                                                    return JSON.stringify(JSON.parse(lead.response), null, 2);
+                                                  } catch {
+                                                    return lead.response;
+                                                  }
+                                                })()
+                                                : (lead as any).error_message || 'No details available'
+                                              }
+                                            </pre>
+                                          </ScrollArea>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </TableCell>
+                                  );
+                                default:
+                                  return <TableCell key={col.id}>—</TableCell>;
+                              }
+                            })}
                           </TableRow>
                         );
                       })}

@@ -88,25 +88,24 @@ export default function InjectionLeads() {
   const pageSizeOptions = [5, 10, 15, 25, 50, 100, 200];
   
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as ColumnConfig[];
-        const savedById = new Map(parsed.map((c) => [c.id, c]));
-        return DEFAULT_COLUMNS.map((col) => {
-          const savedCol = savedById.get(col.id);
-          return savedCol ? { ...col, visible: !!savedCol.visible } : col;
-        });
-      } catch {
-        return DEFAULT_COLUMNS;
-      }
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return DEFAULT_COLUMNS;
+      const parsed: ColumnConfig[] = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return DEFAULT_COLUMNS;
+      const savedById = new Map(parsed.map((c) => [c.id, c]));
+      const savedOrder = parsed
+        .map(s => {
+          const def = DEFAULT_COLUMNS.find(c => c.id === s.id);
+          return def ? { ...def, visible: !!s.visible } : null;
+        })
+        .filter((c): c is ColumnConfig => c !== null);
+      const newCols = DEFAULT_COLUMNS.filter(c => !savedById.has(c.id));
+      return [...savedOrder, ...newCols];
+    } catch {
+      return DEFAULT_COLUMNS;
     }
-    return DEFAULT_COLUMNS;
   });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
-  }, [columns]);
 
   // Fetch only successfully sent injection leads with advertiser info
   const { data: leads, isLoading, error } = useQuery({
@@ -242,11 +241,16 @@ export default function InjectionLeads() {
   }, [baseFilteredLeads]);
 
   const handleToggleColumn = (columnId: string) => {
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === columnId ? { ...col, visible: !col.visible } : col
-      )
-    );
+    setColumns((prev) => {
+      const next = prev.map((col) => col.id === columnId ? { ...col, visible: !col.visible } : col);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleReorderColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
   };
 
   // Final filtered leads with sale status filter applied
@@ -450,7 +454,7 @@ export default function InjectionLeads() {
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
           >
-            <LeadColumnSelector columns={columns} onToggle={handleToggleColumn} />
+            <LeadColumnSelector columns={columns} onToggle={handleToggleColumn} onReorder={handleReorderColumns} isSuperAdmin={isSuperAdmin} />
             {canExportLeads && (
               <Button variant="outline" size="sm" onClick={handleBulkExport}>
                 <Download className="h-4 w-4 mr-2" />
