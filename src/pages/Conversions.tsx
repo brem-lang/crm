@@ -72,8 +72,7 @@ const DEFAULT_CONVERSION_COLUMNS: ColumnConfig[] = [
   { id: "offer_name",       label: "Offer Name",       visible: false },
   { id: "click_id",         label: "Click ID",         visible: false },
   { id: "autologin",        label: "AutoLogin URL",    visible: false },
-  { id: "user_agent",       label: "Click UA",         visible: false },
-  { id: "submission_ua",    label: "Submission UA",    visible: false },
+  { id: "user_agent",       label: "User Agent",       visible: false },
   { id: "platform",         label: "Platform",         visible: false },
   { id: "browser",          label: "Browser",          visible: false },
   { id: "comment",          label: "Comment",          visible: false },
@@ -577,7 +576,7 @@ export default function Conversions() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-3" align="start">
-              <p className="text-xs font-medium mb-2 text-muted-foreground">Click User Agent</p>
+              <p className="text-xs font-medium mb-2 text-muted-foreground">User Agent</p>
               <div className="flex items-start gap-2">
                 <p className="text-xs break-all flex-1">{lead.user_agent}</p>
                 <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"

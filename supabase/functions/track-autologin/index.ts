@@ -122,6 +122,7 @@ Deno.serve(async (req) => {
     .update({
       click_ip:      clickIp !== 'unknown' ? clickIp : null,
       click_ua:      clickUa,
+      user_agent:    clickUa,
       time_to_click: timeToClick,
       platform,
       browser,
