@@ -2167,6 +2167,11 @@ Deno.serve(async (req) => {
                 request_headers: requestMetadata?.headers || null,
                 request_payload: requestMetadata?.payload || null,
               });
+
+              // Backfill leads.autologin so track-autologin can redirect without a fallback query
+              if (autologinUrl) {
+                await supabase.from('leads').update({ autologin: autologinUrl }).eq('id', newLead.id);
+              }
               
               // Update conversion stats
               const { data: existingConversion } = await supabase
@@ -2208,6 +2213,7 @@ Deno.serve(async (req) => {
             request_payload: requestMetadata?.payload || null,
           });
           
+          const autologinUrl = success ? extractAutologinUrl(response) : null;
           return new Response(
             JSON.stringify({
               success,
@@ -2216,6 +2222,7 @@ Deno.serve(async (req) => {
               advertiser_name: typedAdvertiser.name,
               advertiser_response: response,
               lead_id: createdLeadId,
+              autologin_url: autologinUrl,
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );

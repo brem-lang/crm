@@ -24,6 +24,8 @@ interface TestResult {
   message?: string;
   response?: any;
   email?: string;
+  lead_id?: string;
+  autologin_url?: string;
 }
 
 export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName }: TestLeadDialogProps) {
@@ -116,6 +118,8 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         message: funcData?.message || (funcData?.success ? "Test lead sent successfully" : "Test failed"),
         response: funcData,
         email: testLeadData.email,
+        lead_id: funcData?.lead_id,
+        autologin_url: funcData?.autologin_url,
       });
 
       if (funcData?.success) {
@@ -205,9 +209,56 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Test Mode:</span> No lead was created in the database
-            </div>
+            {testResult.success && testResult.lead_id ? (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">Lead ID:</span>{" "}
+                <span className="font-mono text-xs">{testResult.lead_id}</span>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">Test Mode:</span> Lead was not saved (rejected by advertiser)
+              </div>
+            )}
+
+            {testResult.success && testResult.lead_id && (
+              <div className="space-y-1.5 border rounded-lg p-3 bg-blue-500/5 border-blue-500/20">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-blue-600">Autologin Tracker URL</p>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => {
+                        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`;
+                        navigator.clipboard.writeText(url);
+                        toast.success("Tracker URL copied");
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => window.open(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`, '_blank')}
+                    >
+                      Open ↗
+                    </Button>
+                  </div>
+                </div>
+                <p className="font-mono text-xs break-all text-muted-foreground">
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${testResult.lead_id}`}
+                </p>
+                {testResult.autologin_url && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <span className="font-medium">Raw advertiser URL:</span>{" "}
+                    <span className="font-mono break-all">{testResult.autologin_url}</span>
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
               <div className="flex justify-between items-center">
