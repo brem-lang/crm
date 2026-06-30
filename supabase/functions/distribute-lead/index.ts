@@ -1885,10 +1885,6 @@ async function distributeLead(
     // Extract external lead ID and autologin URL from response
     const externalLeadId = success ? extractExternalLeadId(response) : null;
     const autologinUrl = success ? extractAutologinUrl(response) : null;
-    const fnBaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const trackingUrl = autologinUrl
-      ? `${fnBaseUrl}/functions/v1/track-autologin?lead_id=${lead.id}`
-      : null;
     
     if (externalLeadId) {
       console.log(`Extracted external_lead_id: ${externalLeadId}`);
@@ -1898,24 +1894,15 @@ async function distributeLead(
     }
 
     if (success) {
-      // trackingUrl already built above at function scope
-
-      // Replace raw advertiser URL with tracking URL in stored response so the
-      // Advertiser Response dialog also shows a trackable link.
-      const rawResponse = String(response ?? '').substring(0, 1000);
-      const storedResponse = autologinUrl && trackingUrl
-        ? rawResponse.replace(autologinUrl, trackingUrl)
-        : rawResponse;
-
       // Only record distribution on success
       await supabase.from('lead_distributions').insert({
         lead_id: lead.id,
         advertiser_id: advertiser.id,
         affiliate_id: lead.affiliate_id,
         status: 'sent',
-        response: storedResponse,
+        response: String(response ?? '').substring(0, 1000),
         external_lead_id: externalLeadId,
-        autologin_url: trackingUrl,
+        autologin_url: autologinUrl,
         sent_at: new Date().toISOString(),
         request_url: requestMetadata?.url || null,
         request_headers: requestMetadata?.headers || null,
@@ -2016,7 +2003,7 @@ async function distributeLead(
       advertiser_id: advertiser.id,
       advertiser_name: advertiser.name,
       external_lead_id: externalLeadId || undefined,
-      autologin_url: trackingUrl || undefined,
+      autologin_url: autologinUrl || undefined,
       response: success ? 'Lead distributed successfully' : response,
     };
   } catch (error) {

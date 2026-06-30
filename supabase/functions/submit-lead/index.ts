@@ -534,9 +534,16 @@ Deno.serve(async (req) => {
     };
 
     if (distributionResult?.autologin_url) {
-      // distribute-lead already stored the tracking URL in lead_distributions.autologin_url
-      // and the raw URL in leads.autologin — just return the tracking URL to the affiliate.
-      responseData.autologin_url = distributionResult.autologin_url;
+      // Build tracking URL using the public hostname from the incoming request
+      const publicOrigin = new URL(req.url).origin;
+      const trackingUrl = `${publicOrigin}/functions/v1/track-autologin?lead_id=${newLead.id}`;
+      responseData.autologin_url = trackingUrl;
+
+      // Store raw advertiser URL on the lead so track-autologin can redirect there
+      await supabase.from('leads').update({ autologin: distributionResult.autologin_url }).eq('id', newLead.id);
+
+      // Overwrite lead_distributions.autologin_url with the tracking URL
+      await supabase.from('lead_distributions').update({ autologin_url: trackingUrl }).eq('lead_id', newLead.id).eq('status', 'sent');
     }
 
     return new Response(
