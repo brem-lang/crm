@@ -546,10 +546,28 @@ export default function Conversions() {
       }
       case "platform":   return lead.platform || '-';
       case "browser":    return lead.browser || '-';
-      case "user_agent":
-        return lead.user_agent
-          ? <span className="max-w-40 truncate block text-xs" title={lead.user_agent}>{lead.user_agent}</span>
-          : '-';
+      case "user_agent": {
+        if (!lead.user_agent) return '-';
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
+                <span className="truncate">View UA</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">User Agent</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs break-all flex-1">{lead.user_agent}</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(lead.user_agent!); toast.success("User agent copied"); }}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case "comment":
         return lead.comment
           ? <span className="max-w-32 truncate block" title={lead.comment}>{lead.comment}</span>
