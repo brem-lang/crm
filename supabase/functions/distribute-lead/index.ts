@@ -1922,17 +1922,22 @@ async function distributeLead(
         request_payload: requestMetadata?.payload || null,
       });
 
-      // Store raw advertiser URL on the lead so track-autologin can redirect there
+      // Update lead status — always critical
+      await supabase
+        .from('leads')
+        .update({ distributed_at: new Date().toISOString(), status: 'contacted' })
+        .eq('id', lead.id);
+
+      // Store raw advertiser URL for track-autologin redirect — best-effort, non-fatal
       if (autologinUrl) {
-        await supabase
-          .from('leads')
-          .update({ distributed_at: new Date().toISOString(), status: 'contacted', autologin: autologinUrl })
-          .eq('id', lead.id);
-      } else {
-        await supabase
-          .from('leads')
-          .update({ distributed_at: new Date().toISOString(), status: 'contacted' })
-          .eq('id', lead.id);
+        try {
+          await supabase
+            .from('leads')
+            .update({ autologin: autologinUrl })
+            .eq('id', lead.id);
+        } catch (e) {
+          console.error('Failed to store autologin URL on lead (non-fatal):', e);
+        }
       }
 
       // Update conversion stats
