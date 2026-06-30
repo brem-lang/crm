@@ -188,6 +188,7 @@ export default function Users() {
                     <TableHead>Email</TableHead>
                     <TableHead>Full Name</TableHead>
                     <TableHead>Roles</TableHead>
+                    <TableHead>Last Login</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="w-[80px] text-center">Active</TableHead>
                     {isSuperAdmin && <TableHead className="w-[50px]">Actions</TableHead>}
@@ -225,6 +226,11 @@ export default function Users() {
                             <span className="text-muted-foreground text-sm">No roles</span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {tableUser.last_sign_in_at
+                          ? format(new Date(tableUser.last_sign_in_at), "MMM d, yyyy HH:mm")
+                          : <span className="italic">Never</span>}
                       </TableCell>
                       <TableCell>
                         {format(new Date(tableUser.created_at), "MMM d, yyyy")}

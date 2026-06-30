@@ -8,6 +8,7 @@ interface UserWithRoles {
   full_name: string | null;
   username: string | null;
   created_at: string;
+  last_sign_in_at: string | null;
   is_active: boolean;
   roles: string[];
   customRoles: { name: string; color: string; slug: string }[];
@@ -23,7 +24,7 @@ export function useUsers() {
       const [profilesRes, systemRolesRes, customRolesRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, email, full_name, username, created_at, is_active")
+          .select("id, email, full_name, username, created_at, last_sign_in_at, is_active")
           .order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase
