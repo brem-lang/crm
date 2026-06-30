@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useMemo } from "react";
-import { MoreHorizontal, Plus, Copy, Pencil, Trash2, Power, PowerOff, FlaskConical, Shield, X } from "lucide-react";
+import { MoreHorizontal, Plus, Copy, Pencil, Trash2, Power, PowerOff, FlaskConical, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AffiliateCountrySelector, CountryBadges } from "@/components/affiliates/AffiliateCountrySelector";
+import { IpWhitelistManager } from "@/components/affiliates/IpWhitelistManager";
 
 export default function Affiliates() {
   const { data: affiliates, isLoading, error } = useAffiliates();
@@ -49,7 +50,6 @@ export default function Affiliates() {
     ip_whitelist_required: false,
     allowed_ips: [] as string[],
   });
-  const [ipInput, setIpInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -82,24 +82,8 @@ export default function Affiliates() {
     setSelectedIds(next);
   };
 
-  const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-
-  const handleAddIp = () => {
-    const ip = ipInput.trim();
-    if (!ip) return;
-    if (!ipRegex.test(ip)) { toast.error("Invalid IPv4 address"); return; }
-    if (formData.allowed_ips.includes(ip)) { toast.error("IP already added"); return; }
-    setFormData({ ...formData, allowed_ips: [...formData.allowed_ips, ip] });
-    setIpInput("");
-  };
-
-  const handleRemoveIp = (ip: string) => {
-    setFormData({ ...formData, allowed_ips: formData.allowed_ips.filter(i => i !== ip) });
-  };
-
   const resetForm = () => {
     setFormData({ name: "", is_active: true, test_mode: false, allowed_countries: null, callback_url: "", ip_whitelist_required: false, allowed_ips: [] });
-    setIpInput("");
   };
 
   const handleCreate = () => {
@@ -127,7 +111,6 @@ export default function Affiliates() {
       ip_whitelist_required: affiliate.ip_whitelist_required || false,
       allowed_ips: affiliate.allowed_ips || [],
     });
-    setIpInput("");
     setIsEditOpen(true);
   };
 
@@ -441,6 +424,9 @@ export default function Affiliates() {
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-muted-foreground" />
                       <Label>IP Whitelist Required</Label>
+                      {formData.ip_whitelist_required && formData.allowed_ips.length > 0 && (
+                        <Badge variant="secondary">{formData.allowed_ips.length}</Badge>
+                      )}
                     </div>
                     <Switch
                       checked={formData.ip_whitelist_required}
@@ -448,31 +434,10 @@ export default function Affiliates() {
                     />
                   </div>
                   {formData.ip_whitelist_required && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="e.g. 192.168.1.1"
-                          value={ipInput}
-                          onChange={(e) => setIpInput(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
-                          className="text-xs"
-                        />
-                        <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
-                      </div>
-                      {formData.allowed_ips.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {formData.allowed_ips.map(ip => (
-                            <Badge key={ip} variant="secondary" className="gap-1 text-xs">
-                              {ip}
-                              <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <IpWhitelistManager
+                      ips={formData.allowed_ips}
+                      onChange={(ips) => setFormData({ ...formData, allowed_ips: ips })}
+                    />
                   )}
                 </div>
               )}
@@ -552,6 +517,9 @@ export default function Affiliates() {
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-muted-foreground" />
                       <Label>IP Whitelist Required</Label>
+                      {formData.ip_whitelist_required && formData.allowed_ips.length > 0 && (
+                        <Badge variant="secondary">{formData.allowed_ips.length}</Badge>
+                      )}
                     </div>
                     <Switch
                       checked={formData.ip_whitelist_required}
@@ -559,31 +527,10 @@ export default function Affiliates() {
                     />
                   </div>
                   {formData.ip_whitelist_required && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">Only listed IPs can submit leads for this affiliate.</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="e.g. 192.168.1.1"
-                          value={ipInput}
-                          onChange={(e) => setIpInput(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddIp())}
-                          className="text-xs"
-                        />
-                        <Button type="button" variant="outline" size="sm" onClick={handleAddIp}>Add</Button>
-                      </div>
-                      {formData.allowed_ips.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {formData.allowed_ips.map(ip => (
-                            <Badge key={ip} variant="secondary" className="gap-1 text-xs">
-                              {ip}
-                              <button onClick={() => handleRemoveIp(ip)} className="hover:text-destructive">
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <IpWhitelistManager
+                      ips={formData.allowed_ips}
+                      onChange={(ips) => setFormData({ ...formData, allowed_ips: ips })}
+                    />
                   )}
                 </div>
               )}
