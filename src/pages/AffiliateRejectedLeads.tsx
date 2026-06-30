@@ -1,8 +1,50 @@
-import { useState } from "react";
+import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -11,56 +53,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, Eye, Search, XCircle, Loader2, X } from "lucide-react";
-import { useAffiliateSubmissionFailures, useDeleteAffiliateSubmissionFailures } from "@/hooks/useAffiliateSubmissionFailures";
+  useAffiliateSubmissionFailures,
+  useDeleteAffiliateSubmissionFailures,
+  type AffiliateSubmissionFailure,
+} from "@/hooks/useAffiliateSubmissionFailures";
 import { useAffiliates } from "@/hooks/useAffiliates";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
+import { format } from "date-fns";
+import { MoreHorizontal, Trash2, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 
-// Keys to hide from affiliate view (internal config)
-const HIDDEN_KEYS = ['addonData', 'ai', 'ci', 'gi', 'api_key', 'apiKey', 'password', 'username', 'box', 'advertiser_id', 'advertiser_name'];
+const HIDDEN_KEYS = [
+  "addonData", "ai", "ci", "gi", "api_key", "apiKey",
+  "password", "username", "box", "advertiser_id", "advertiser_name",
+];
 
-// Sanitize payload to remove internal configuration data
 const sanitizePayload = (obj: unknown): unknown => {
   if (obj === null || obj === undefined) return obj;
-  if (typeof obj !== 'object') return obj;
+  if (typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(sanitizePayload);
-  
   const sanitized: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     if (HIDDEN_KEYS.includes(key)) continue;
-    // Also hide any key containing 'key' or 'secret' (case insensitive)
     if (/key|secret|token|password/i.test(key)) continue;
-    sanitized[key] = typeof value === 'object' ? sanitizePayload(value) : value;
+    sanitized[key] = typeof value === "object" ? sanitizePayload(value) : value;
   }
   return sanitized;
 };
 
-// Safe JSON stringify helper
 const safeStringify = (obj: unknown): string => {
   try {
-    const sanitized = sanitizePayload(obj);
-    return JSON.stringify(sanitized, null, 2);
+    return JSON.stringify(sanitizePayload(obj), null, 2);
   } catch {
     return "Unable to display payload";
   }
 };
 
 export default function AffiliateRejectedLeads() {
-  const { formatDate } = useCRMSettings();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } =
+    useCRMSettings();
+
+  const [showAllDates, setShowAllDates] = useState(false);
+  const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
+  const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [search, setSearch] = useState("");
-  const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
-  const [rejectionCodeFilter, setRejectionCodeFilter] = useState<string>("all");
-  const [viewingPayload, setViewingPayload] = useState<Record<string, unknown> | null>(null);
+  const [affiliateFilter, setAffiliateFilter] = useState("all");
+  const [rejectionCodeFilter, setRejectionCodeFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
+  const [detailFailure, setDetailFailure] = useState<AffiliateSubmissionFailure | null>(null);
 
   const filters = {
     affiliateId: affiliateFilter !== "all" ? affiliateFilter : undefined,
@@ -68,219 +113,287 @@ export default function AffiliateRejectedLeads() {
     search: search || undefined,
   };
 
-  const { data: failures = [], isLoading, error } = useAffiliateSubmissionFailures(filters);
+  const { data: failures = [], isLoading } = useAffiliateSubmissionFailures(filters);
   const { data: affiliates = [] } = useAffiliates();
   const deleteMutation = useDeleteAffiliateSubmissionFailures();
 
-  // Get unique rejection codes for filter
-  const rejectionCodes = [...new Set(failures.map((f) => f.rejection_code))].filter(Boolean);
+  const rejectionCodes = useMemo(
+    () => [...new Set(failures.map((f) => f.rejection_code))].filter(Boolean),
+    [failures]
+  );
+
+  const filteredFailures = useMemo(() => {
+    if (showAllDates) return failures;
+    return failures.filter((f) => {
+      const d = new Date(f.created_at);
+      return d >= getStartOfDay(fromDate) && d <= getEndOfDay(toDate);
+    });
+  }, [failures, showAllDates, fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredFailures.length / pageSize));
+  const paginatedFailures = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredFailures.slice(start, start + pageSize);
+  }, [filteredFailures, currentPage, pageSize]);
+
+  const allSelected =
+    paginatedFailures.length > 0 &&
+    paginatedFailures.every((f) => selectedIds.has(f.id));
+  const someSelected =
+    paginatedFailures.some((f) => selectedIds.has(f.id)) && !allSelected;
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(failures.map((f) => f.id));
-    } else {
-      setSelectedIds([]);
-    }
+    if (checked) setSelectedIds(new Set(paginatedFailures.map((f) => f.id)));
+    else setSelectedIds(new Set());
   };
 
   const handleSelectOne = (id: string, checked: boolean) => {
-    if (checked) {
-      setSelectedIds((prev) => [...prev, id]);
-    } else {
-      setSelectedIds((prev) => prev.filter((i) => i !== id));
-    }
+    const next = new Set(selectedIds);
+    checked ? next.add(id) : next.delete(id);
+    setSelectedIds(next);
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
-    await deleteMutation.mutateAsync(selectedIds);
-    setSelectedIds([]);
+  const handleBulkDelete = () => {
+    deleteMutation.mutate(Array.from(selectedIds), {
+      onSuccess: () => setSelectedIds(new Set()),
+    });
   };
 
   const getAffiliateName = (affiliateId: string | null) => {
     if (!affiliateId) return "Unknown";
-    const affiliate = affiliates.find((a) => a.id === affiliateId);
-    return affiliate?.name || affiliateId.slice(0, 8);
+    return affiliates.find((a) => a.id === affiliateId)?.name ?? affiliateId.slice(0, 8);
   };
 
-  if (error) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-lg font-medium">Failed to load data</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {error instanceof Error ? error.message : "Unknown error"}
-            </p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const hasActiveFilters = affiliateFilter !== "all" || rejectionCodeFilter !== "all" || !!search;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Affiliate Rejected Leads</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <XCircle className="h-7 w-7 text-destructive" />
+              Affiliate Rejected Leads
+            </h1>
             <p className="text-muted-foreground">
               Leads rejected during affiliate submission
             </p>
           </div>
+          {selectedIds.size > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedIds.size})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Records</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {selectedIds.size} record
+                    {selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleBulkDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
+
+        <Card className="p-4">
+          <DateFilterBar
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDateChange={(d) => { setFromDate(d); setCurrentPage(1); }}
+            onToDateChange={(d) => { setToDate(d); setCurrentPage(1); }}
+            onShowAllChange={(v) => { setShowAllDates(v); setCurrentPage(1); }}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredFailures.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+            itemLabel="records"
+          >
+            <Select
+              value={affiliateFilter}
+              onValueChange={(v) => { setAffiliateFilter(v); setCurrentPage(1); }}
+            >
+              <SelectTrigger className="w-44 h-8 text-sm">
+                <SelectValue placeholder="All Affiliates" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Affiliates</SelectItem>
+                {affiliates.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={rejectionCodeFilter}
+              onValueChange={(v) => { setRejectionCodeFilter(v); setCurrentPage(1); }}
+            >
+              <SelectTrigger className="w-44 h-8 text-sm">
+                <SelectValue placeholder="All Rejection Codes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Rejection Codes</SelectItem>
+                {rejectionCodes.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              placeholder="Search email, name, phone..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              className="w-52 h-8 text-sm"
+            />
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => {
+                  setAffiliateFilter("all");
+                  setRejectionCodeFilter("all");
+                  setSearch("");
+                  setCurrentPage(1);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </DateFilterBar>
+        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Rejection Log ({failures.length})</span>
-              {selectedIds.length > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBulkDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
-                  )}
-                  Delete Selected ({selectedIds.length})
-                </Button>
-              )}
+            <CardTitle className="text-base">
+              {isLoading
+                ? "Loading..."
+                : `${filteredFailures.length.toLocaleString()} rejection${filteredFailures.length !== 1 ? "s" : ""}`}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-6">
-              <div className="flex-1 min-w-[200px]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by email, name, phone..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <Select value={affiliateFilter} onValueChange={setAffiliateFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All Affiliates" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Affiliates</SelectItem>
-                  {affiliates.map((aff) => (
-                    <SelectItem key={aff.id} value={aff.id}>
-                      {aff.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={rejectionCodeFilter} onValueChange={setRejectionCodeFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All Rejection Codes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Rejection Codes</SelectItem>
-                  {rejectionCodes.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Table */}
             {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="space-y-3">
+                {[...Array(8)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
               </div>
-            ) : failures.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <XCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No rejected submissions found</p>
+            ) : filteredFailures.length === 0 ? (
+              <div className="text-center py-12">
+                <XCircle className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">
+                  No rejected submissions found
+                </p>
+                <p className="text-sm text-muted-foreground/70 mt-1">
+                  Try adjusting the date range or filters
+                </p>
               </div>
             ) : (
-              <div className="rounded-md border">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]">
+                      <TableHead className="w-12">
                         <Checkbox
-                          checked={
-                            failures.length > 0 &&
-                            selectedIds.length === failures.length
-                          }
-                          onCheckedChange={handleSelectAll}
+                          checked={someSelected ? "indeterminate" : allSelected}
+                          onCheckedChange={(c) => handleSelectAll(!!c)}
                         />
                       </TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Date / Time</TableHead>
                       <TableHead>Affiliate</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Country</TableHead>
-                      <TableHead>Rejection Reason</TableHead>
-                      <TableHead className="w-[80px]">Payload</TableHead>
+                      <TableHead>Rejection Code</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {failures.map((failure) => (
-                      <TableRow key={failure.id}>
+                    {paginatedFailures.map((failure) => (
+                      <TableRow
+                        key={failure.id}
+                        className={selectedIds.has(failure.id) ? "bg-muted/50" : undefined}
+                      >
                         <TableCell>
                           <Checkbox
-                            checked={selectedIds.includes(failure.id)}
-                            onCheckedChange={(checked) =>
-                              handleSelectOne(failure.id, checked === true)
-                            }
+                            checked={selectedIds.has(failure.id)}
+                            onCheckedChange={(c) => handleSelectOne(failure.id, !!c)}
                           />
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {formatDate(new Date(failure.created_at))}
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {format(new Date(failure.created_at), "MMM d, yyyy HH:mm:ss")}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           {getAffiliateName(failure.affiliate_id)}
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {failure.email || "-"}
+                        <TableCell className="text-sm max-w-[180px] truncate">
+                          {failure.email || "—"}
                         </TableCell>
-                        <TableCell>
-                          {[failure.firstname, failure.lastname]
-                            .filter(Boolean)
-                            .join(" ") || "-"}
+                        <TableCell className="text-sm">
+                          {[failure.firstname, failure.lastname].filter(Boolean).join(" ") || "—"}
                         </TableCell>
+                        <TableCell className="text-sm">{failure.mobile || "—"}</TableCell>
                         <TableCell>
                           {failure.country_code ? (
-                            <Badge variant="outline">{failure.country_code}</Badge>
+                            <Badge variant="secondary">{failure.country_code}</Badge>
                           ) : (
-                            "-"
+                            "—"
                           )}
-                        </TableCell>
-                        <TableCell className="max-w-[300px]">
-                          <div className="flex flex-col gap-1">
-                            <Badge variant="destructive" className="w-fit">
-                              {failure.rejection_code}
-                            </Badge>
-                            {failure.rejection_message && (
-                              <span className="text-xs text-muted-foreground">
-                                {failure.rejection_message}
-                              </span>
-                            )}
-                          </div>
                         </TableCell>
                         <TableCell>
-                          {failure.raw_payload && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setViewingPayload(failure.raw_payload)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Badge variant="destructive">{failure.rejection_code}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                          {failure.rejection_message || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setDetailFailure(failure)}>
+                                View Details
+                              </DropdownMenuItem>
+                              {failure.raw_payload && (
+                                <DropdownMenuItem onClick={() => setDetailFailure(failure)}>
+                                  View Payload
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => deleteMutation.mutate([failure.id])}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -289,35 +402,67 @@ export default function AffiliateRejectedLeads() {
               </div>
             )}
           </CardContent>
+          {filteredFailures.length > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredFailures.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="records"
+              />
+            </CardFooter>
+          )}
         </Card>
       </div>
 
-      {/* Native Modal for viewing payload */}
-      {viewingPayload && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
-          onClick={() => setViewingPayload(null)}
-        >
-          <div 
-            className="bg-background border rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Raw Payload</h2>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setViewingPayload(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+      {/* Details Dialog */}
+      <Dialog open={!!detailFailure} onOpenChange={() => setDetailFailure(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Rejection Details</DialogTitle>
+            <DialogDescription>
+              Submission failure from {getAffiliateName(detailFailure?.affiliate_id ?? null)}
+            </DialogDescription>
+          </DialogHeader>
+          {detailFailure && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-3 text-sm space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Date</span>
+                  <span>{format(new Date(detailFailure.created_at), "MMM d, yyyy HH:mm:ss")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Email</span>
+                  <span>{detailFailure.email || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Rejection Code</span>
+                  <Badge variant="destructive">{detailFailure.rejection_code}</Badge>
+                </div>
+                {detailFailure.rejection_message && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground shrink-0">Message</span>
+                    <span className="text-right text-xs">{detailFailure.rejection_message}</span>
+                  </div>
+                )}
+              </div>
+              {detailFailure.raw_payload && (
+                <>
+                  <p className="text-xs text-muted-foreground font-medium">Raw Payload</p>
+                  <ScrollArea className="max-h-[300px] border rounded-lg bg-muted/50">
+                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+                      {safeStringify(detailFailure.raw_payload)}
+                    </pre>
+                  </ScrollArea>
+                </>
+              )}
             </div>
-            <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
-              {safeStringify(viewingPayload)}
-            </pre>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -24,6 +24,8 @@ export type UserPermission =
   | 'delete_affiliates'
   | 'manage_affiliate_ip_whitelist'
   | 'view_affiliate_api_logs'
+  | 'view_test_logs'
+  | 'view_callback_logs'
   // Injection Pools
   | 'create_injection_pools'
   | 'delete_injection_pools'
@@ -98,6 +100,8 @@ export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; descrip
   { group: 'Affiliates', id: 'delete_affiliates', label: 'Delete Affiliates', description: 'Can delete affiliates' },
   { group: 'Affiliates', id: 'manage_affiliate_ip_whitelist', label: 'Manage IP Whitelist', description: 'Can enable/disable IP whitelisting and manage allowed IPs per affiliate' },
   { group: 'Affiliates', id: 'view_affiliate_api_logs', label: 'View Affiliate API Logs', description: 'Can access the Affiliate API Logs page' },
+  { group: 'Affiliates', id: 'view_test_logs', label: 'View Test Logs', description: 'Can access the Test Lead Logs page' },
+  { group: 'Affiliates', id: 'view_callback_logs', label: 'View Callback Logs', description: 'Can access the Callback Logs page' },
   // Injection Pools
   { group: 'Injection', id: 'create_injection_pools', label: 'Create Injection Pools', description: 'Can create injection pools' },
   { group: 'Injection', id: 'delete_injection_pools', label: 'Delete Injection Pools', description: 'Can delete injection pools' },
@@ -273,6 +277,8 @@ export function useCurrentUserPermissions() {
     canDeleteAffiliates: hasPermission('delete_affiliates'),
     canManageAffiliateIpWhitelist: hasPermission('manage_affiliate_ip_whitelist'),
     canViewAffiliateApiLogs: hasPermission('view_affiliate_api_logs'),
+    canViewTestLogs: hasPermission('view_test_logs'),
+    canViewCallbackLogs: hasPermission('view_callback_logs'),
     // Injection
     canCreateInjectionPools: hasPermission('create_injection_pools'),
     canDeleteInjectionPools: hasPermission('delete_injection_pools'),

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,7 @@ import { differenceInDays } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
@@ -50,7 +52,7 @@ export default function CountryPerformance() {
     tzSubWeeks,
     tzSubMonths,
   } = useCRMSettings();
-  
+
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -60,6 +62,8 @@ export default function CountryPerformance() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedCountryForBreakdown, setSelectedCountryForBreakdown] = useState<string | null>(null);
   const [breakdownTab, setBreakdownTab] = useState<"advertiser" | "affiliate">("advertiser");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -266,6 +270,12 @@ export default function CountryPerformance() {
     });
   }, [performanceData, countryFilter, selectedCountries]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
+
   const totals = filteredData.reduce(
     (acc, row) => ({
       leads: acc.leads + row.leads,
@@ -468,6 +478,7 @@ export default function CountryPerformance() {
                 <Skeleton className="h-10 w-full" />
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -480,9 +491,9 @@ export default function CountryPerformance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredData && filteredData.length > 0 ? (
+                  {paginatedData && paginatedData.length > 0 ? (
                     <>
-                      {filteredData.map((row) => (
+                      {paginatedData.map((row) => (
                         <TableRow 
                           key={row.country_code} 
                           className="cursor-pointer hover:bg-muted/50"
@@ -517,8 +528,22 @@ export default function CountryPerformance() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
+          {filteredData.length > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredData.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="countries"
+              />
+            </CardFooter>
+          )}
         </Card>
 
         {/* Breakdown Dialog */}

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, ChevronLeft, ChevronRight, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CalendarIcon, ChevronLeft, ChevronRight, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 import { LeadColumnSelector, type ColumnConfig } from "@/components/leads/LeadColumnSelector";
@@ -26,10 +28,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
@@ -83,7 +86,7 @@ export default function Conversions() {
     tzSubWeeks,
     tzSubMonths,
   } = useCRMSettings();
-  
+
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -96,6 +99,9 @@ export default function Conversions() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [releaseConfirmId, setReleaseConfirmId] = useState<string | null>(null);
   const [isRemoveFtdOpen, setIsRemoveFtdOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
+  const [viewResponseLead, setViewResponseLead] = useState<any | null>(null);
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
       const saved = localStorage.getItem("conversions-column-visibility");
@@ -290,6 +296,12 @@ export default function Conversions() {
     const countries = new Set(conversions.map((c: any) => c.country_code).filter(Boolean));
     return Array.from(countries).sort() as string[];
   }, [conversions]);
+
+  const totalPages = Math.max(1, Math.ceil((filteredConversions?.length ?? 0) / pageSize));
+  const paginatedConversions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredConversions?.slice(start, start + pageSize) ?? [];
+  }, [filteredConversions, currentPage, pageSize]);
 
   const releaseFtd = useMutation({
     mutationFn: async (leadId: string) => {
@@ -676,6 +688,7 @@ export default function Conversions() {
                 <Skeleton className="h-10 w-full" />
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -714,8 +727,8 @@ export default function Conversions() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredConversions && filteredConversions.length > 0 ? (
-                    filteredConversions.map((lead: any) => {
+                  {paginatedConversions && paginatedConversions.length > 0 ? (
+                    paginatedConversions.map((lead: any) => {
                       const distribution = lead.lead_distributions?.[0];
                       const advertiserName = distribution?.advertisers?.name || '-';
                       const affiliateName = lead.affiliates?.name || '-';
@@ -829,45 +842,31 @@ export default function Conversions() {
                                 : '-'}
                             </TableCell>
                           )}
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {responseData && (
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-                                    <DialogHeader>
-                                      <DialogTitle>Advertiser Response</DialogTitle>
-                                    </DialogHeader>
-                                    <ScrollArea className="max-h-[400px]">
-                                      <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
-                                        {typeof responseData === 'string' 
-                                          ? responseData 
-                                          : JSON.stringify(responseData, null, 2)}
-                                      </pre>
-                                    </ScrollArea>
-                                    <div className="text-xs text-muted-foreground mt-2">
-                                      Last polled: {lastPolledAt ? formatDate(lastPolledAt) : 'Never'}
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              )}
-                              {!lead.ftd_released && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleReleaseFtd(lead.id)}
-                                  disabled={releaseFtd.isPending}
-                                  className="gap-1"
-                                >
-                                  <Send className="h-3 w-3" />
-                                  Release
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                              )}
-                            </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {responseData && (
+                                  <DropdownMenuItem onClick={() => setViewResponseLead(lead)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Response
+                                  </DropdownMenuItem>
+                                )}
+                                {!lead.ftd_released && (
+                                  <>
+                                    {responseData && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem onClick={() => handleReleaseFtd(lead.id)}>
+                                      <Send className="h-4 w-4 mr-2" />
+                                      Release FTD
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -881,10 +880,50 @@ export default function Conversions() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
+          {(filteredConversions?.length ?? 0) > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredConversions?.length ?? 0}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="conversions"
+              />
+            </CardFooter>
+          )}
         </Card>
       </div>
+      {/* View Response Dialog */}
+      <Dialog open={!!viewResponseLead} onOpenChange={() => setViewResponseLead(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Advertiser Response</DialogTitle>
+          </DialogHeader>
+          {viewResponseLead && (
+            <>
+              <ScrollArea className="max-h-[400px]">
+                <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
+                  {(() => {
+                    const rd = viewResponseLead.lead_distributions?.[0]?.response;
+                    if (!rd) return "No response";
+                    return typeof rd === "string" ? rd : JSON.stringify(rd, null, 2);
+                  })()}
+                </pre>
+              </ScrollArea>
+              <div className="text-xs text-muted-foreground mt-2">
+                Last polled: {viewResponseLead.lead_distributions?.[0]?.last_polled_at
+                  ? formatDate(viewResponseLead.lead_distributions[0].last_polled_at)
+                  : "Never"}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
       {/* Remove FTD Confirmation */}
       <AlertDialog open={isRemoveFtdOpen} onOpenChange={setIsRemoveFtdOpen}>
         <AlertDialogContent>

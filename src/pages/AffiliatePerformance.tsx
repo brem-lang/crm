@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useAffiliates } from "@/hooks/useAffiliates";
 import { cn } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
@@ -41,13 +43,15 @@ export default function AffiliatePerformance() {
     tzSubWeeks,
     tzSubMonths,
   } = useCRMSettings();
-  
+
   const [datePreset, setDatePreset] = useState<DatePreset>("thisMonth");
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedAffiliateId, setSelectedAffiliateId] = useState<string>("");
   const [affiliateSearch, setAffiliateSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   const { data: affiliates } = useAffiliates();
 
@@ -147,6 +151,13 @@ export default function AffiliatePerformance() {
         .filter(Boolean) as AffiliatePerformanceData[];
     },
   });
+
+  const totalPages = Math.max(1, Math.ceil((performanceData?.length ?? 0) / pageSize));
+  const paginatedData = useMemo(() => {
+    if (!performanceData) return [];
+    const start = (currentPage - 1) * pageSize;
+    return performanceData.slice(start, start + pageSize);
+  }, [performanceData, currentPage, pageSize]);
 
   const totals = performanceData?.reduce(
     (acc, row) => ({
@@ -319,6 +330,7 @@ export default function AffiliatePerformance() {
                 <Skeleton className="h-10 w-full" />
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -330,9 +342,9 @@ export default function AffiliatePerformance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {performanceData && performanceData.length > 0 ? (
+                  {paginatedData && paginatedData.length > 0 ? (
                     <>
-                      {performanceData.map((row) => (
+                      {paginatedData.map((row) => (
                         <TableRow key={row.affiliate_id}>
                           <TableCell className="font-medium">{row.affiliate_name}</TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
@@ -359,8 +371,22 @@ export default function AffiliatePerformance() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
+          {(performanceData?.length ?? 0) > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={performanceData?.length ?? 0}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="affiliates"
+              />
+            </CardFooter>
+          )}
         </Card>
       </div>
     </DashboardLayout>

@@ -47,13 +47,15 @@ import {
 } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import {
   useDeleteTestLeadLogs,
   useTestLeadLogs,
 } from "@/hooks/useTestLeadLogs";
 import { format } from "date-fns";
-import { CheckCircle2, Copy, MoreHorizontal, TestTube2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, Lock, MoreHorizontal, TestTube2, Trash2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -62,13 +64,14 @@ export default function TestLeadLogs() {
   const deleteTestLogs = useDeleteTestLeadLogs();
   const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { isSuperAdmin } = useAuth();
+  const { canViewTestLogs } = useCurrentUserPermissions();
 
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   // Dialog state
   const [requestLogId, setRequestLogId] = useState<string | null>(null);
@@ -112,6 +115,18 @@ export default function TestLeadLogs() {
 
   const requestLog = requestLogId ? logs?.find(l => l.id === requestLogId) : null;
   const responseLog = responseLogId ? logs?.find(l => l.id === responseLogId) : null;
+
+  if (!isSuperAdmin && !canViewTestLogs) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+          <Lock className="h-10 w-10" />
+          <p className="text-lg font-medium">Access Denied</p>
+          <p className="text-sm">You don't have permission to view Test Logs.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -160,9 +175,16 @@ export default function TestLeadLogs() {
           <DateFilterBar
             fromDate={fromDate}
             toDate={toDate}
-            onFromDateChange={setFromDate}
-            onToDateChange={setToDate}
-            onShowAllChange={setShowAllDates}
+            onFromDateChange={(d) => { setFromDate(d); setCurrentPage(1); }}
+            onToDateChange={(d) => { setToDate(d); setCurrentPage(1); }}
+            onShowAllChange={(v) => { setShowAllDates(v); setCurrentPage(1); }}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredLogs.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+            itemLabel="logs"
           />
         </Card>
 

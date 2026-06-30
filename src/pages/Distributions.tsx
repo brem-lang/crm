@@ -16,6 +16,7 @@ import { format, startOfDay, endOfDay } from "date-fns";
 import { CheckCircle, XCircle, Search, Eye, RefreshCw, ExternalLink, Trash2 } from "lucide-react";
 import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useBulkDeleteDistributions } from "@/hooks/useDistributions";
 
 const statusIcons = {
@@ -44,7 +45,7 @@ interface Distribution {
 }
 
 export default function Distributions() {
-  const { getStartOfMonth, getEndOfMonth, getNow, defaultPageSize } = useCRMSettings();
+  const { getStartOfMonth, getEndOfMonth, getNow } = useCRMSettings();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -62,7 +63,7 @@ export default function Distributions() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
   const pageSizeOptions = [5, 10, 15, 25, 50, 100, 200];
 
   const { data: distributions, isLoading, isFetching, error, refetch } = useQuery({

@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useMemo } from "react";
 import { Download, Search, AlertTriangle, Upload, Users, XCircle } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +20,6 @@ import { format } from "date-fns";
 import { Link } from "react-router-dom";
 
 export default function InjectionFailedLeads() {
-  const { defaultPageSize } = useCRMSettings();
   const { canExportLeads } = useCurrentUserPermissions();
 
   const [search, setSearch] = useState("");
@@ -28,8 +28,11 @@ export default function InjectionFailedLeads() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
   const pageSizeOptions = [10, 25, 50, 100];
+  const effectivePageSizeOptions = pageSizeOptions.includes(pageSize)
+    ? pageSizeOptions
+    : [...pageSizeOptions, pageSize].sort((a, b) => a - b);
 
   // Fetch only failed injection leads
   const { data: leads, isLoading, error } = useQuery({
@@ -409,7 +412,7 @@ export default function InjectionFailedLeads() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {pageSizeOptions.map((size) => (
+                        {effectivePageSizeOptions.map((size) => (
                           <SelectItem key={size} value={String(size)}>
                             {size}
                           </SelectItem>

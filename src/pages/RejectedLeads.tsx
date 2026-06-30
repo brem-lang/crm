@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
@@ -80,7 +81,7 @@ const PAGE_SIZE_OPTIONS = [5, 10, 15, 25, 50, 100];
 export default function RejectedLeads() {
   const { data: rejectedLeads, isLoading, error } = useRejectedLeads();
   const deleteRejectedLeads = useDeleteRejectedLeads();
-  const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay, defaultPageSize } = useCRMSettings();
+  const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { canDeleteLeads } = useCurrentUserPermissions();
 
   const [showAllDates, setShowAllDates] = useState(false);
@@ -89,7 +90,7 @@ export default function RejectedLeads() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   const handleToggleColumn = (columnId: string) => {
     setColumns(prev => {

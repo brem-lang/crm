@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useGlobalSentLeads, getCooldownStatus } from "@/hooks/useGlobalSentLeads";
 import {
   Select,
@@ -29,7 +30,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { format } from "date-fns";
 
 export default function SendHistory() {
-  const { defaultPageSize, getStartOfMonth, getEndOfMonth, getNow, tzSubMonths } = useCRMSettings();
+  const { getStartOfMonth, getEndOfMonth, getNow, tzSubMonths } = useCRMSettings();
 
   const [emailSearch, setEmailSearch] = useState("");
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
@@ -38,7 +39,7 @@ export default function SendHistory() {
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
   const pageSizeOptions = [5, 10, 15, 25, 50, 100];
 
   // Fetch advertisers for filter dropdown

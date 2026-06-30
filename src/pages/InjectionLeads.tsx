@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useMemo } from "react";
 import { Download, Trash2 } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { LeadColumnSelector, ColumnConfig } from "@/components/leads/LeadColumnSelector";
@@ -55,7 +56,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 ];
 
 export default function InjectionLeads() {
-  const { defaultPageSize, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+  const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { isSuperAdmin } = useAuth();
   const { canViewPhone, canViewEmail, canExportLeads, canDeleteLeads } = useCurrentUserPermissions();
   const queryClient = useQueryClient();
@@ -83,7 +84,7 @@ export default function InjectionLeads() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
   const pageSizeOptions = [5, 10, 15, 25, 50, 100, 200];
   
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {

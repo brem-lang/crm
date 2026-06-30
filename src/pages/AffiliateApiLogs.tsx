@@ -12,6 +12,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { useAffiliateApiLogs } from "@/hooks/useAffiliateApiLogs";
 import { useAffiliates } from "@/hooks/useAffiliates";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
@@ -24,7 +25,7 @@ export default function AffiliateApiLogs() {
   const { getStartOfMonth, getEndOfMonth, getNow } = useCRMSettings();
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = usePageSizeState();
   const [affiliateId, setAffiliateId] = useState("");
   const [status, setStatus] = useState<'accepted' | 'rejected' | ''>("");
   const [showAllDates, setShowAllDates] = useState(false);
@@ -97,6 +98,13 @@ export default function AffiliateApiLogs() {
             onFromDateChange={(d) => { setFromDate(d); setPage(1); }}
             onToDateChange={(d) => { setToDate(d); setPage(1); }}
             onShowAllChange={(v) => { setShowAllDates(v); setPage(1); }}
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={total}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            itemLabel="requests"
           >
             <Select value={affiliateId || "all"} onValueChange={(v) => { setAffiliateId(v === "all" ? "" : v); setPage(1); }}>
               <SelectTrigger className="w-44 h-8 text-sm">

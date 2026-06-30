@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import {
   useBulkAddToTest,
   useBulkDeleteLeads,
@@ -112,7 +113,6 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 export default function Leads() {
   useLeadsRealtime(); // Subscribe to realtime updates
   const {
-    defaultPageSize,
     showLeadId,
     getStartOfMonth,
     getEndOfMonth,
@@ -231,7 +231,7 @@ export default function Leads() {
 
   // Pagination state - use settings default
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = usePageSizeState();
   const pageSizeOptions = [5, 10, 15, 25, 50, 100, 200];
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);

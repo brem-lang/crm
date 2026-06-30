@@ -11,17 +11,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { format } from "date-fns";
-import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle, MoreHorizontal } from "lucide-react";
+import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle, MoreHorizontal, Lock } from "lucide-react";
 
 export function CallbackLogsTable() {
   const { data: logs, isLoading, refetch } = useCallbackLogs(500);
   const { getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
+  const { isSuperAdmin } = useAuth();
+  const { canViewCallbackLogs } = useCurrentUserPermissions();
 
   const [selectedLog, setSelectedLog] = useState<CallbackLog | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = usePageSizeState();
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
@@ -84,6 +89,16 @@ export function CallbackLogsTable() {
     }
   };
 
+  if (!isSuperAdmin && !canViewCallbackLogs) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+        <Lock className="h-10 w-10" />
+        <p className="text-lg font-medium">Access Denied</p>
+        <p className="text-sm">You don't have permission to view Callback Logs.</p>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Date Filter Bar */}
@@ -94,6 +109,13 @@ export function CallbackLogsTable() {
           onFromDateChange={(d) => { setFromDate(d); setCurrentPage(1); }}
           onToDateChange={(d) => { setToDate(d); setCurrentPage(1); }}
           onShowAllChange={(v) => { setShowAllDates(v); setCurrentPage(1); }}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredLogs.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+          itemLabel="logs"
         />
       </Card>
 

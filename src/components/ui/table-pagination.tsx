@@ -25,6 +25,11 @@ export function TablePagination({
   const startItem = totalItems > 0 ? ((currentPage - 1) * pageSize) + 1 : 0;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
+  // Always include the current pageSize in the options so the select never shows blank
+  const effectiveOptions = pageSizeOptions.includes(pageSize)
+    ? pageSizeOptions
+    : [...pageSizeOptions, pageSize].sort((a, b) => a - b);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t">
       <div className="flex items-center gap-2">
@@ -34,7 +39,7 @@ export function TablePagination({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {pageSizeOptions.map((size) => (
+            {effectiveOptions.map((size) => (
               <SelectItem key={size} value={String(size)}>
                 {size}
               </SelectItem>

@@ -16,11 +16,16 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -42,8 +47,10 @@ import {
   type RuleTarget,
   type RuleType,
 } from "@/hooks/useDistributionRules";
-import { GitMerge, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
+import { GitMerge, GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
 
 const RULE_TYPE_META: Record<RuleType, { label: string; color: string }> = {
   priority: {
@@ -72,6 +79,10 @@ export default function DistributionRules() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<DistributionRule | null>(null);
   const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   const { data: rules, isLoading } = useDistributionRules();
   const { data: advertisers } = useAdvertisers();
@@ -81,6 +92,33 @@ export default function DistributionRules() {
   const updateRule = useUpdateDistributionRule();
   const deleteRule = useDeleteDistributionRule();
   const toggleRule = useToggleDistributionRule();
+
+  const filteredRules = useMemo(() => {
+    if (!rules) return [];
+    if (!search.trim()) return rules;
+    const q = search.toLowerCase();
+    return rules.filter(r => r.name.toLowerCase().includes(q));
+  }, [rules, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRules.length / pageSize));
+  const paginatedRules = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRules.slice(start, start + pageSize);
+  }, [filteredRules, currentPage, pageSize]);
+
+  const allSelected = paginatedRules.length > 0 && paginatedRules.every(r => selectedIds.has(r.id));
+  const someSelected = paginatedRules.some(r => selectedIds.has(r.id)) && !allSelected;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(new Set(paginatedRules.map(r => r.id)));
+    else setSelectedIds(new Set());
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    checked ? next.add(id) : next.delete(id);
+    setSelectedIds(next);
+  };
 
   const handleOpenCreate = () => {
     setEditingRule(null);
@@ -164,11 +202,20 @@ export default function DistributionRules() {
         {/* Rules table */}
         <Card>
           <CardHeader>
-            <CardTitle>Active Rules</CardTitle>
-            <CardDescription>
-              Rules are evaluated in priority order (lowest number first). The
-              first matching rule routes the lead.
-            </CardDescription>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Active Rules</CardTitle>
+                <CardDescription>
+                  Rules are evaluated in priority order (lowest number first). The first matching rule routes the lead.
+                </CardDescription>
+              </div>
+              <Input
+                placeholder="Search rules..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                className="w-52 h-8 text-sm"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -177,7 +224,7 @@ export default function DistributionRules() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : !rules?.length ? (
+            ) : filteredRules.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground space-y-3">
                 <GitMerge className="h-12 w-12 mx-auto opacity-20" />
                 <p className="font-medium">No distribution rules yet</p>
@@ -190,10 +237,16 @@ export default function DistributionRules() {
                 </Button>
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={someSelected ? "indeterminate" : allSelected}
+                          onCheckedChange={(c) => handleSelectAll(!!c)}
+                        />
+                      </TableHead>
                       <TableHead className="w-8" />
                       <TableHead className="w-12 text-center">Order</TableHead>
                       <TableHead>Name</TableHead>
@@ -205,7 +258,7 @@ export default function DistributionRules() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rules.map((rule) => {
+                    {paginatedRules.map((rule) => {
                       const meta = RULE_TYPE_META[rule.rule_type as RuleType];
                       const primaryTargets =
                         rule.targets?.filter((t) => !t.is_fallback) || [];
@@ -216,11 +269,19 @@ export default function DistributionRules() {
                         <TableRow
                           key={rule.id}
                           className={
-                            !rule.is_active
+                            selectedIds.has(rule.id)
+                              ? "bg-muted/50"
+                              : !rule.is_active
                               ? "opacity-50 bg-muted/20"
                               : undefined
                           }
                         >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds.has(rule.id)}
+                              onCheckedChange={(c) => handleSelectOne(rule.id, !!c)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                           </TableCell>
@@ -305,22 +366,26 @@ export default function DistributionRules() {
                             />
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleOpenEdit(rule)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeleteRuleId(rule.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenEdit(rule)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteRuleId(rule.id)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -330,6 +395,19 @@ export default function DistributionRules() {
               </div>
             )}
           </CardContent>
+          {filteredRules.length > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredRules.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="rules"
+              />
+            </CardFooter>
+          )}
         </Card>
 
         {/* Routing flow info card */}

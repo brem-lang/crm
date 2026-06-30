@@ -1,13 +1,17 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAffiliates, useCreateAffiliate, useUpdateAffiliate, useDeleteAffiliate } from "@/hooks/useAffiliates";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MoreHorizontal, Plus, Copy, Pencil, Trash2, Power, PowerOff, FlaskConical, Shield, X } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +50,37 @@ export default function Affiliates() {
     allowed_ips: [] as string[],
   });
   const [ipInput, setIpInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
+
+  const filteredAffiliates = useMemo(() => {
+    if (!affiliates) return [];
+    if (!search.trim()) return affiliates;
+    const q = search.toLowerCase();
+    return affiliates.filter(a => a.name.toLowerCase().includes(q));
+  }, [affiliates, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAffiliates.length / pageSize));
+  const paginatedAffiliates = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAffiliates.slice(start, start + pageSize);
+  }, [filteredAffiliates, currentPage, pageSize]);
+
+  const allSelected = paginatedAffiliates.length > 0 && paginatedAffiliates.every(a => selectedIds.has(a.id));
+  const someSelected = paginatedAffiliates.some(a => selectedIds.has(a.id)) && !allSelected;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(new Set(paginatedAffiliates.map(a => a.id)));
+    else setSelectedIds(new Set());
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    checked ? next.add(id) : next.delete(id);
+    setSelectedIds(next);
+  };
 
   const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -168,7 +203,20 @@ export default function Affiliates() {
         </div>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-base">
+                {isLoading ? "Loading..." : `${filteredAffiliates.length} affiliate${filteredAffiliates.length !== 1 ? "s" : ""}`}
+              </CardTitle>
+              <Input
+                placeholder="Search affiliates..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                className="w-56 h-8 text-sm"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
@@ -179,15 +227,21 @@ export default function Affiliates() {
               <p className="text-center text-muted-foreground py-8">
                 Failed to load affiliates. Please try again.
               </p>
-            ) : affiliates?.length === 0 ? (
+            ) : filteredAffiliates.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No affiliates found. Create your first affiliate to get started.
+                {search ? "No affiliates match your search." : "No affiliates found. Create your first affiliate to get started."}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={someSelected ? "indeterminate" : allSelected}
+                          onCheckedChange={(c) => handleSelectAll(!!c)}
+                        />
+                      </TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>API Key</TableHead>
                       <TableHead>Callback URL</TableHead>
@@ -199,8 +253,14 @@ export default function Affiliates() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {affiliates?.map((affiliate) => (
-                      <TableRow key={affiliate.id}>
+                    {paginatedAffiliates.map((affiliate) => (
+                      <TableRow key={affiliate.id} className={selectedIds.has(affiliate.id) ? "bg-muted/50" : undefined}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(affiliate.id)}
+                            onCheckedChange={(c) => handleSelectOne(affiliate.id, !!c)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {affiliate.name}
                         </TableCell>
@@ -302,6 +362,19 @@ export default function Affiliates() {
               </div>
             )}
           </CardContent>
+          {filteredAffiliates.length > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredAffiliates.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="affiliates"
+              />
+            </CardFooter>
+          )}
         </Card>
 
         {/* Create Dialog */}
