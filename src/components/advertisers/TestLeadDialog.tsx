@@ -220,38 +220,6 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            {testResult.success && testResult.autologin_url && (
-              <div className="space-y-1.5 border rounded-lg p-3 bg-blue-500/5 border-blue-500/20">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-blue-600">Autologin Tracker URL</p>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                      onClick={() => {
-                        navigator.clipboard.writeText(testResult.autologin_url!);
-                        toast.success("Tracker URL copied");
-                      }}
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                      onClick={() => window.open(testResult.autologin_url!, '_blank')}
-                    >
-                      Open ↗
-                    </Button>
-                  </div>
-                </div>
-                <p className="font-mono text-xs break-all text-muted-foreground">
-                  {testResult.autologin_url}
-                </p>
-              </div>
-            )}
 
             <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
               <div className="flex justify-between items-center">

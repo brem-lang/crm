@@ -2213,8 +2213,9 @@ Deno.serve(async (req) => {
             request_payload: requestMetadata?.payload || null,
           });
           
+          const publicUrl = Deno.env.get('TRACKING_BASE_URL') || supabaseUrl;
           const trackerUrl = createdLeadId
-            ? `${supabaseUrl}/functions/v1/track-autologin?lead_id=${createdLeadId}`
+            ? `${publicUrl}/functions/v1/track-autologin?lead_id=${createdLeadId}`
             : null;
           return new Response(
             JSON.stringify({
