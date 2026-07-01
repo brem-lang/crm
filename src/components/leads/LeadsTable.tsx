@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { cn } from "@/lib/utils";
+import { cn, shortId } from "@/lib/utils";
 import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
@@ -137,8 +137,8 @@ export function LeadsTable({
         return (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
-                <span className="truncate">Lead ID</span>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-mono font-normal max-w-[120px]">
+                <span className="truncate">{shortId(lead.id)}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-3" align="start">
@@ -159,8 +159,8 @@ export function LeadsTable({
         return (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal max-w-[120px]">
-                <span className="truncate">Request ID</span>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-mono font-normal max-w-[120px]">
+                <span className="truncate">{shortId(lead.request_id)}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-3" align="start">
@@ -241,13 +241,13 @@ export function LeadsTable({
       case "affiliate_id":
         return lead.affiliate_id ? (
           <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.affiliate_id}>
-            {lead.affiliate_id.slice(0, 8)}
+            {shortId(lead.affiliate_id)}
           </span>
         ) : <span className="text-muted-foreground">-</span>;
       case "advertiser_id":
         return lead.advertiser_id ? (
           <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.advertiser_id}>
-            {lead.advertiser_id.slice(0, 8)}
+            {shortId(lead.advertiser_id)}
           </span>
         ) : <span className="text-muted-foreground">-</span>;
       case "advertiser":
@@ -330,7 +330,11 @@ export function LeadsTable({
       case "ftd_date":
         return lead.ftd_date ? formatDate(lead.ftd_date) : "-";
       case "ftd_id":
-        return lead.ftd_id || "-";
+        return lead.ftd_id ? (
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.ftd_id}>
+            {shortId(lead.ftd_id)}
+          </span>
+        ) : <span className="text-muted-foreground">-</span>;
       case "autologin": {
         if (!lead.autologin) return "-";
         const trackerUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-autologin?lead_id=${lead.id}`;

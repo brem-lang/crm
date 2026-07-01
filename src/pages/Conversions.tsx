@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CalendarIcon, ChevronLeft, ChevronRight, Send, Eye, Copy, Download, Trash2, X, Loader2, RefreshCw, MoreHorizontal, Link, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, shortId } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 import { LeadColumnSelector, type ColumnConfig } from "@/components/leads/LeadColumnSelector";
 import {
@@ -224,7 +224,7 @@ export default function Conversions() {
   });
 
   const { data: conversions, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['conversions', showAllDates, fromDate, toDate, searchEmail, advertiserFilter, affiliateFilter],
+    queryKey: ['conversions', showAllDates, fromDate, toDate, advertiserFilter, affiliateFilter],
     queryFn: async () => {
       let query = supabase
         .from('leads')
@@ -282,10 +282,6 @@ export default function Conversions() {
           .lte('ftd_date', toDate.toISOString());
       }
 
-      if (searchEmail) {
-        query = query.ilike('email', `%${searchEmail}%`);
-      }
-
       if (affiliateFilter !== "all") {
         query = query.eq('affiliate_id', affiliateFilter);
       }
@@ -320,8 +316,28 @@ export default function Conversions() {
       filtered = filtered.filter((lead: any) => lead.country_code === countryFilter);
     }
 
+    if (searchEmail.trim()) {
+      const searchLower = searchEmail.toLowerCase().trim();
+      filtered = filtered.filter((lead: any) => {
+        const email = (lead.email || "").toLowerCase();
+        const leadIdVal = (lead.id || "").toLowerCase();
+        const reqIdVal = (lead.request_id || "").toLowerCase();
+        const affIdVal = (lead.affiliate_id || "").toLowerCase();
+        const advIdVal = (lead.advertiser_id || "").toLowerCase();
+        const ftdIdVal = (lead.ftd_id || "").toLowerCase();
+        return (
+          email.includes(searchLower) ||
+          leadIdVal.includes(searchLower) ||
+          reqIdVal.includes(searchLower) ||
+          affIdVal.includes(searchLower) ||
+          advIdVal.includes(searchLower) ||
+          ftdIdVal.includes(searchLower)
+        );
+      });
+    }
+
     return filtered;
-  }, [conversions, advertiserFilter, statusFilter, countryFilter]);
+  }, [conversions, advertiserFilter, statusFilter, countryFilter, searchEmail]);
 
   const uniqueCountries = useMemo(() => {
     if (!conversions) return [];
@@ -459,8 +475,8 @@ export default function Conversions() {
     switch (columnId) {
       case "request_id":
         return (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-            {(lead.request_id || lead.id).slice(0, 8)}
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.request_id || lead.id}>
+            {shortId(lead.request_id || lead.id)}
           </span>
         );
       case "firstname": return lead.firstname || '-';
@@ -490,10 +506,10 @@ export default function Conversions() {
       case "ip_address": return lead.ip_address || '-';
       case "affiliate":  return affiliateName;
       case "affiliate_id":
-        return lead.affiliate_id ? <span className="font-mono text-xs">{lead.affiliate_id}</span> : '-';
+        return lead.affiliate_id ? <span className="font-mono text-xs" title={lead.affiliate_id}>{shortId(lead.affiliate_id)}</span> : '-';
       case "advertiser": return advertiserName;
       case "advertiser_id":
-        return lead.advertiser_id ? <span className="font-mono text-xs">{lead.advertiser_id}</span> : '-';
+        return lead.advertiser_id ? <span className="font-mono text-xs" title={lead.advertiser_id}>{shortId(lead.advertiser_id)}</span> : '-';
       case "created_at":
         return lead.created_at ? formatDate(lead.created_at, "yyyy-MM-dd HH:mm") : '-';
       case "status":
@@ -507,7 +523,8 @@ export default function Conversions() {
         ) : '-';
       case "ftd_date":
         return lead.ftd_date ? formatDate(lead.ftd_date, "yyyy-MM-dd HH:mm") : '-';
-      case "ftd_id": return lead.ftd_id || '-';
+      case "ftd_id":
+        return lead.ftd_id ? <span className="font-mono text-xs" title={lead.ftd_id}>{shortId(lead.ftd_id)}</span> : '-';
       case "injection_ftd":
         return lead.injection_ftd
           ? <Badge className="bg-purple-100 text-purple-800">FTD</Badge>
@@ -830,7 +847,7 @@ export default function Conversions() {
               </Select>
 
               <Input
-                placeholder="Search by email"
+                placeholder="Search by email or ID"
                 value={searchEmail}
                 onChange={(e) => setSearchEmail(e.target.value)}
                 className="col-span-2 sm:col-span-1 w-full sm:w-[180px] h-9"

@@ -390,12 +390,20 @@ export default function Leads() {
         let matchesFreeSearch = true;
         if (freeSearch.trim()) {
           const searchLower = freeSearch.toLowerCase().trim();
-          const leadId = (lead.request_id || lead.id || "").toLowerCase();
+          const leadIdVal = (lead.id || "").toLowerCase();
+          const reqIdVal = (lead.request_id || "").toLowerCase();
+          const affIdVal = ((lead as any).affiliate_id || "").toLowerCase();
+          const advIdVal = ((lead as any).advertiser_id || "").toLowerCase();
+          const ftdIdVal = ((lead as any).ftd_id || "").toLowerCase();
           const email = (lead.email || "").toLowerCase();
           const phone = (lead.mobile || "").toLowerCase();
           const ip = (lead.ip_address || "").toLowerCase();
           matchesFreeSearch =
-            leadId.includes(searchLower) ||
+            leadIdVal.includes(searchLower) ||
+            reqIdVal.includes(searchLower) ||
+            affIdVal.includes(searchLower) ||
+            advIdVal.includes(searchLower) ||
+            ftdIdVal.includes(searchLower) ||
             email.includes(searchLower) ||
             phone.includes(searchLower) ||
             ip.includes(searchLower);

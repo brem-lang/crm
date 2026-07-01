@@ -21,6 +21,7 @@ import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
+import { shortId } from "@/lib/utils";
 
 const STORAGE_KEY = "rejected-leads-column-visibility";
 
@@ -245,7 +246,7 @@ export default function RejectedLeads() {
         return <Badge variant="outline">{advertiser?.name || "Unknown"}</Badge>;
       case "advertiser_id":
         return lead?.advertiser_id
-          ? <span className="font-mono text-xs">{lead.advertiser_id}</span>
+          ? <span className="font-mono text-xs" title={lead.advertiser_id}>{shortId(lead.advertiser_id)}</span>
           : "-";
       case "is_ftd":
         return lead?.is_ftd
@@ -254,7 +255,9 @@ export default function RejectedLeads() {
       case "ftd_date":
         return lead?.ftd_date ? format(new Date(lead.ftd_date), "MMM d, yyyy") : "-";
       case "ftd_id":
-        return lead?.ftd_id || "-";
+        return lead?.ftd_id
+          ? <span className="font-mono text-xs" title={lead.ftd_id}>{shortId(lead.ftd_id)}</span>
+          : "-";
       case "injection_ftd":
         return lead?.injection_ftd
           ? <Badge className="bg-green-100 text-green-800">Yes</Badge>
@@ -263,7 +266,7 @@ export default function RejectedLeads() {
         return lead?.affiliates?.name || "-";
       case "affiliate_id":
         return lead?.affiliate_id
-          ? <span className="font-mono text-xs">{lead.affiliate_id}</span>
+          ? <span className="font-mono text-xs" title={lead.affiliate_id}>{shortId(lead.affiliate_id)}</span>
           : "-";
       case "offer_name":
         return lead?.offer_name || "-";
