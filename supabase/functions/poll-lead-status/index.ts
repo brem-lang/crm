@@ -61,6 +61,7 @@ interface StatusResponse {
   status?: string;
   is_ftd?: boolean;
   ftd_date?: string;
+  ftd_id?: string;
   converted?: boolean;
   deposited?: boolean;
 }
@@ -233,6 +234,7 @@ async function pollEnigmaLeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = enigmaLead.signupDate || now;
+          leadUpdates.ftd_id = String(enigmaLead.customerID || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id} (Enigma ID: ${dist.external_lead_id})`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -366,6 +368,7 @@ async function pollEliteCRMLeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = eliteCRMLead.ftd_date || now;
+          leadUpdates.ftd_id = String(eliteCRMLead.lead_code || eliteCRMLead.id || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id} (EliteCRM ID: ${dist.external_lead_id})`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -844,6 +847,7 @@ async function pollGSILeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = gsiLead.ftd_date || gsiLead.deposit_date || now;
+          leadUpdates.ftd_id = String(gsiLead.id || gsiLead.lead_id || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id}`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -1141,6 +1145,7 @@ async function pollTrackBoxLeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = customer.ftd_date || customer.deposit_date || now;
+          leadUpdates.ftd_id = String(customer.customer_id || customer.uniqueid || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id}`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -1417,6 +1422,7 @@ async function pollElnopyLeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = elnopyLead.created_at || now;
+          leadUpdates.ftd_id = String(elnopyLead.id || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id} (ELNOPY ID: ${dist.external_lead_id})`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -1667,6 +1673,7 @@ async function pollNoxWealthLeads(
         if (hasFtd && !dist.leads.is_ftd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = (noxLead.ftd_date as string | undefined) || now;
+          leadUpdates.ftd_id = String(noxLead.lead_id || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id} (NoxWealth pipeline_stage: ${pipelineStage})`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -1912,6 +1919,7 @@ async function pollAffilioLeads(
         if (hasFtd) {
           leadUpdates.is_ftd = true;
           leadUpdates.ftd_date = String(affilioLead.ftd);
+          leadUpdates.ftd_id = String(affilioLead.id || dist.external_lead_id);
           console.log(`FTD detected for lead ${dist.lead_id} (Affilio ftd: ${affilioLead.ftd})`);
           collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
           ftdCount++;
@@ -2166,6 +2174,7 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
         status: data.lead_status,
         is_ftd: data.has_deposited,
         ftd_date: data.first_deposit_date,
+        ftd_id: distribution.external_lead_id ?? undefined,
       };
     } catch {
       return null;
@@ -2234,6 +2243,7 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
         status: data.status,
         is_ftd: data.ftd === true || data.ftd === 'yes',
         ftd_date: data.ftd_date,
+        ftd_id: distribution.external_lead_id ?? undefined,
       };
     } catch {
       return null;
@@ -2269,6 +2279,7 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
         status: data.status,
         is_ftd: data.is_ftd || data.ftd || data.converted || data.deposited,
         ftd_date: data.ftd_date || data.deposit_date,
+        ftd_id: String(data.id ?? data.lead_id ?? data.customer_id ?? data.transaction_id ?? distribution.external_lead_id ?? ''),
       };
     } catch {
       return null;
@@ -2595,6 +2606,7 @@ Deno.serve(async (req) => {
             if (statusResult.is_ftd && !dist.leads.is_ftd) {
               leadUpdates.is_ftd = true;
               leadUpdates.ftd_date = statusResult.ftd_date || new Date().toISOString();
+              leadUpdates.ftd_id = statusResult.ftd_id;
               console.log(`FTD detected for lead ${dist.lead_id}`);
               
               // Update conversion stats

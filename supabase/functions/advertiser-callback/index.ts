@@ -12,6 +12,7 @@ interface StatusUpdate {
   status?: string;
   is_ftd?: boolean;
   ftd_date?: string;
+  ftd_id?: string;
   message?: string;
 }
 
@@ -153,6 +154,9 @@ Deno.serve(async (req) => {
         updates.is_ftd = statusUpdate.is_ftd;
         if (statusUpdate.is_ftd && !lead.ftd_date) {
           updates.ftd_date = statusUpdate.ftd_date || new Date().toISOString();
+        }
+        if (statusUpdate.is_ftd && statusUpdate.ftd_id) {
+          updates.ftd_id = statusUpdate.ftd_id;
         }
       }
     }

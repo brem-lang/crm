@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -186,7 +187,7 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isResendOpen, setIsResendOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ status: "", is_ftd: false });
+  const [editForm, setEditForm] = useState({ status: "", is_ftd: false, ftd_id: "" });
   const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
   const [releaseFtdId, setReleaseFtdId] = useState<string | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -526,7 +527,7 @@ export default function Leads() {
 
   const handleEdit = (lead: any) => {
     setSelectedLead(lead);
-    setEditForm({ status: lead.status, is_ftd: lead.is_ftd });
+    setEditForm({ status: lead.status, is_ftd: lead.is_ftd, ftd_id: lead.ftd_id || "" });
     setIsEditOpen(true);
   };
 
@@ -540,6 +541,7 @@ export default function Leads() {
           editForm.is_ftd && !selectedLead.is_ftd
             ? new Date().toISOString()
             : selectedLead.ftd_date,
+        ftd_id: editForm.ftd_id || null,
       });
       setIsEditOpen(false);
     }
@@ -871,6 +873,15 @@ export default function Leads() {
                   className="h-4 w-4"
                 />
                 <Label htmlFor="is_ftd">Mark as FTD (First Time Deposit)</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ftd_id">FTD ID</Label>
+                <Input
+                  id="ftd_id"
+                  value={editForm.ftd_id}
+                  onChange={(e) => setEditForm({ ...editForm, ftd_id: e.target.value })}
+                  placeholder="Advertiser's FTD/conversion ID (optional)"
+                />
               </div>
             </div>
             <DialogFooter>
