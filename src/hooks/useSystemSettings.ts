@@ -33,6 +33,8 @@ export interface SystemSettings {
   audit_log_retention_days: number;
   // Restricted Countries
   restricted_countries: string[];
+  // Leads page column order (super_admin-managed, shared with all roles)
+  leads_column_order: string[];
   updated_at: string;
   updated_by: string | null;
 }
@@ -59,6 +61,7 @@ export const SYSTEM_SETTINGS_DEFAULTS: Omit<SystemSettings, "id" | "updated_at" 
   maintenance_message: "System is under maintenance. Please check back later.",
   audit_log_retention_days: 0,
   restricted_countries: [],
+  leads_column_order: [],
 };
 
 export function useSystemSettings() {

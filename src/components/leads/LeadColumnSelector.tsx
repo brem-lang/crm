@@ -90,7 +90,7 @@ export function LeadColumnSelector({ columns, onToggle, onReorder, isSuperAdmin 
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Toggle Columns</span>
           {isSuperAdmin && (
-            <span className="text-xs text-muted-foreground font-normal">Drag to reorder</span>
+            <span className="text-xs text-muted-foreground font-normal">Drag to reorder for everyone</span>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

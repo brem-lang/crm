@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { useSystemSettings, useUpdateSystemSettings } from "@/hooks/useSystemSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import {
   useBulkAddToTest,
@@ -110,6 +111,19 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "live_lead_score",  label: "Live Score", visible: false },
   { id: "created_at", label: "Created", visible: true },
 ];
+
+// Reorders `current` to match `orderIds` (the super_admin-managed global order),
+// preserving each column's own `visible` flag. Columns not present in `orderIds`
+// (e.g. newly added columns not yet in the saved order) are appended at the end.
+function applyColumnOrder(current: ColumnConfig[], orderIds: string[]): ColumnConfig[] {
+  const byId = new Map(current.map((c) => [c.id, c]));
+  const ordered = orderIds
+    .map((id) => byId.get(id))
+    .filter((c): c is ColumnConfig => !!c);
+  const orderedIds = new Set(orderIds);
+  const remaining = current.filter((c) => !orderedIds.has(c.id));
+  return [...ordered, ...remaining];
+}
 
 export default function Leads() {
   useLeadsRealtime(); // Subscribe to realtime updates
@@ -270,6 +284,17 @@ export default function Leads() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
   }, [columns]);
 
+  // Super_admin-managed global column order, shared with all roles. Overrides
+  // the locally-saved order while preserving each user's own visibility toggles.
+  const { data: systemSettings } = useSystemSettings();
+  const updateSystemSettings = useUpdateSystemSettings();
+  useEffect(() => {
+    const orderIds = systemSettings?.leads_column_order;
+    if (orderIds && orderIds.length > 0) {
+      setColumns((prev) => applyColumnOrder(prev, orderIds));
+    }
+  }, [systemSettings?.leads_column_order]);
+
   const handleToggleColumn = (columnId: string) => {
     setColumns((prev) =>
       prev.map((col) =>
@@ -280,6 +305,9 @@ export default function Leads() {
 
   const handleReorderColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
+    if (isSuperAdmin) {
+      updateSystemSettings.mutate({ leads_column_order: newColumns.map((col) => col.id) });
+    }
   };
 
   // Map each column set to its required permission (super admins bypass all)
