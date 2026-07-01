@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { countryData } from "@/components/advertisers/countryData";
 import { useSystemSettings, useUpdateSystemSettings } from "@/hooks/useSystemSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import {
@@ -135,6 +136,7 @@ export default function Leads() {
     getNow,
     getStartOfDay,
     getEndOfDay,
+    formatDate,
   } = useCRMSettings();
   // null = no restriction; string[] = scoped to these IDs; undefined = still loading
   const { data: affiliateRestriction } = useMyAffiliateRestriction();
@@ -611,6 +613,53 @@ export default function Leads() {
     setIsBulkDeleteOpen(false);
   };
 
+  // Plain-text counterpart to LeadsTable's renderCellValue, used for CSV export
+  // so the exported columns/values match what's actually visible in the table.
+  const getExportValue = (lead: any, columnId: string): string => {
+    switch (columnId) {
+      case "request_id": return lead.id || "";
+      case "api_request_id": return lead.request_id || "";
+      case "firstname": return lead.firstname || "";
+      case "lastname": return lead.lastname || "";
+      case "email": return canViewEmail ? (lead.email || "") : "***";
+      case "mobile": return canViewPhone ? (lead.mobile || "") : "***";
+      case "country_code": return lead.country_code || "";
+      case "country": return lead.country || countryData[lead.country_code?.toUpperCase()]?.name || "";
+      case "city": return lead.city || "";
+      case "ip_address": return lead.ip_address || "";
+      case "locale": return lead.locale || "";
+      case "status": return lead.is_ftd ? "converted" : lead.status || "";
+      case "sale_status": return lead.sale_status || "";
+      case "advertiser": {
+        const sentDist = lead.lead_distributions?.find((d: any) => d.status === "sent");
+        return sentDist?.advertisers?.name || "";
+      }
+      case "advertiser_id": return lead.advertiser_id || "";
+      case "is_ftd": return lead.is_ftd ? (lead.ftd_released ? "Released" : "Pending") : "No";
+      case "ftd_date": return lead.ftd_date ? formatDate(lead.ftd_date) : "";
+      case "ftd_id": return lead.ftd_id || "";
+      case "injection_ftd": return lead.injection_ftd ? "FTD" : "";
+      case "affiliate": return lead.affiliates?.name || "";
+      case "affiliate_id": return lead.affiliate_id || "";
+      case "offer_name": return lead.offer_name || "";
+      case "click_id": return lead.click_id || "";
+      case "autologin": return lead.autologin || "";
+      case "user_agent": return lead.user_agent || "";
+      case "platform": return lead.platform || "";
+      case "browser": return lead.browser || "";
+      case "comment": return lead.comment || "";
+      case "custom1": return lead.custom1 || "";
+      case "custom2": return lead.custom2 || "";
+      case "custom3": return lead.custom3 || "";
+      case "custom4": return lead.custom4 || "";
+      case "custom5": return lead.custom5 || "";
+      case "live_lead_status": return lead.live_lead_status || "";
+      case "live_lead_score": return lead.live_lead_score != null ? String(lead.live_lead_score) : "";
+      case "created_at": return lead.created_at ? formatDate(lead.created_at) : "";
+      default: return "";
+    }
+  };
+
   const handleBulkExport = () => {
     if (!filteredLeads) return;
 
@@ -624,31 +673,17 @@ export default function Leads() {
       return;
     }
 
-    // Build CSV
-    const headers = [
-      "Lead ID",
-      "First Name",
-      "Last Name",
-      "Email",
-      "Phone",
-      "Country",
-      "Status",
-      "FTD",
-      "Affiliate",
-      "Created",
-    ];
-    const rows = leadsToExport.map((lead) => [
-      lead.request_id || "",
-      lead.firstname,
-      lead.lastname,
-      lead.email,
-      lead.mobile,
-      lead.country_code,
-      lead.status,
-      lead.is_ftd ? "Yes" : "No",
-      (lead as any).affiliates?.name || "",
-      new Date(lead.created_at).toISOString(),
-    ]);
+    // Export only the columns currently visible (and in the same order) in the table
+    const exportColumns = effectiveColumns.filter((c) => c.visible);
+    if (exportColumns.length === 0) {
+      toast.error("No columns selected to export");
+      return;
+    }
+
+    const headers = exportColumns.map((c) => c.label);
+    const rows = leadsToExport.map((lead) =>
+      exportColumns.map((c) => getExportValue(lead, c.id)),
+    );
 
     const csvContent = [
       headers.join(","),

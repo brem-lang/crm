@@ -404,9 +404,6 @@ export default function AdvertiserConfig() {
                   </div>
 
                   <h3 className="mt-3 truncate text-sm font-semibold">{a.name}</h3>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {(a as any).advertiser_type}
-                  </p>
 
                   <div className="mt-3 flex items-baseline justify-between">
                     <span className="text-xs text-muted-foreground">24h sent</span>
