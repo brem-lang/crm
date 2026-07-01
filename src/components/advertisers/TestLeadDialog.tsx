@@ -205,6 +205,17 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               <div className="text-sm text-muted-foreground flex items-center gap-1">
                 <span className="font-medium">Email sent:</span>
                 <span className="font-mono break-all">{testResult.email}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(testResult.email!);
+                    toast.success("Email copied");
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
               </div>
             )}
 
