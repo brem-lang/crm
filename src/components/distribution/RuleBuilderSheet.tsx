@@ -202,28 +202,13 @@ export function RuleBuilderSheet({
         <ScrollArea className="flex-1">
           <div className="px-6 py-4 space-y-6">
             {/* Basic Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Rule Name</Label>
-                <Input
-                  placeholder="e.g. UAE Mobile Traffic"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Evaluation Priority</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={priority}
-                  onChange={(e) => setPriority(Number(e.target.value))}
-                  placeholder="0 = first"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Lower number = evaluated first
-                </p>
-              </div>
+            <div className="space-y-1.5">
+              <Label>Rule Name</Label>
+              <Input
+                placeholder="e.g. UAE Mobile Traffic"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
 
             <Separator />

@@ -124,6 +124,116 @@ function extractExternalLeadId(responseText: string): string | null {
   }
 }
 
+// Resolves the current weekday/time in a given IANA timezone. Falls back to UTC if the
+// timezone string is invalid.
+function getTimeInTimezone(tz: string): { day: keyof WeeklySchedule; time: string } {
+  const now = new Date();
+  const days: (keyof WeeklySchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      weekday: 'long'
+    };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(now);
+
+    const hourPart = parts.find(p => p.type === 'hour');
+    const minutePart = parts.find(p => p.type === 'minute');
+    const weekdayPart = parts.find(p => p.type === 'weekday');
+
+    const hour = hourPart?.value || '00';
+    const minute = minutePart?.value || '00';
+    const weekday = weekdayPart?.value?.toLowerCase() || 'monday';
+
+    return {
+      day: weekday as keyof WeeklySchedule,
+      time: `${hour}:${minute}`
+    };
+  } catch {
+    return {
+      day: days[now.getUTCDay()],
+      time: `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')}`
+    };
+  }
+}
+
+// Checks whether "now" falls within a schedule container's configured working hours.
+// Understands three shapes, checked in order:
+//  1. Heatmap schedule: weekly_schedule = {format:'heatmap', matrix: boolean[7][24], timezone, ...}
+//     (day 0=Monday...6=Sunday, hour local to the heatmap's own timezone — matches src/lib/scheduleUtils.ts)
+//  2. Legacy per-day schedule: weekly_schedule = {monday: {is_active, start_time, end_time}, ...}
+//  3. Simple daily window: start_time/end_time directly on the container
+// Returns true (unrestricted) if no schedule is configured at all — preserves the existing
+// default for advertisers that have never set working hours.
+// deno-lint-ignore no-explicit-any
+function isWithinWorkingHours(
+  container: { weekly_schedule?: any; start_time?: string | null; end_time?: string | null; timezone?: string | null } | null | undefined,
+  defaultTimezone: string,
+): boolean {
+  if (!container) return true;
+  const tz = container.timezone || defaultTimezone;
+
+  if (container.weekly_schedule?.format === 'heatmap') {
+    const matrix = container.weekly_schedule.matrix;
+    if (!Array.isArray(matrix) || !matrix.length) return true;
+    const heatmapTz = container.weekly_schedule.timezone || tz;
+    const dayOrder: (keyof WeeklySchedule)[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const { day: dayName } = getTimeInTimezone(heatmapTz);
+    const dayIndex = dayOrder.indexOf(dayName);
+    const hourStr = new Intl.DateTimeFormat('en-US', { timeZone: heatmapTz, hour: 'numeric', hour12: false }).format(new Date());
+    const hour = parseInt(hourStr, 10) % 24;
+    return !!matrix[dayIndex]?.[hour];
+  }
+
+  if (container.weekly_schedule) {
+    const { day: currentDay, time: currentTimeStr } = getTimeInTimezone(tz);
+    const daySchedule = (container.weekly_schedule as WeeklySchedule)[currentDay];
+    if (!daySchedule?.is_active) return false;
+    if (!daySchedule.start_time || !daySchedule.end_time) return true;
+    const startTime = daySchedule.start_time.slice(0, 5);
+    const endTime = daySchedule.end_time.slice(0, 5);
+    return startTime <= endTime
+      ? currentTimeStr >= startTime && currentTimeStr <= endTime
+      : currentTimeStr >= startTime || currentTimeStr <= endTime;
+  }
+
+  if (container.start_time && container.end_time) {
+    const { time: currentTimeStr } = getTimeInTimezone(tz);
+    const startTime = container.start_time.slice(0, 5);
+    const endTime = container.end_time.slice(0, 5);
+    return startTime <= endTime
+      ? currentTimeStr >= startTime && currentTimeStr <= endTime
+      : currentTimeStr >= startTime || currentTimeStr <= endTime;
+  }
+
+  return true;
+}
+
+// Returns the name of the first inactive distribution rule whose conditions match this
+// affiliate/country, or null if none match. Inactive rules act as a rejection gate —
+// only leads matching their scope are blocked; everything else routes normally.
+// deno-lint-ignore no-explicit-any
+async function getStoppedRuleReason(
+  supabase: any,
+  { affiliateId, countryCode }: { affiliateId?: string | null; countryCode?: string | null },
+): Promise<string | null> {
+  const { data: rules } = await supabase
+    .from('distribution_rules')
+    .select('name, conditions')
+    .eq('is_active', false);
+  for (const rule of rules ?? []) {
+    const c = rule.conditions ?? {};
+    const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    if (affiliateMatches && countryMatches) return rule.name;
+  }
+  return null;
+}
+
 // Helper to extract autologin URL from advertiser response
 function extractAutologinUrl(responseText: string): string | null {
   try {
@@ -1435,44 +1545,6 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
         rulesMap.set(rule.advertiser_id, rule);
       }
 
-      // Helper to get current time in a specific timezone
-      const getTimeInTimezone = (tz: string): { day: keyof WeeklySchedule; time: string } => {
-        const now = new Date();
-        const days: (keyof WeeklySchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        
-        try {
-          // Use Intl.DateTimeFormat to get time in the specified timezone
-          const options: Intl.DateTimeFormatOptions = { 
-            timeZone: tz, 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            hour12: false,
-            weekday: 'long'
-          };
-          const formatter = new Intl.DateTimeFormat('en-US', options);
-          const parts = formatter.formatToParts(now);
-          
-          const hourPart = parts.find(p => p.type === 'hour');
-          const minutePart = parts.find(p => p.type === 'minute');
-          const weekdayPart = parts.find(p => p.type === 'weekday');
-          
-          const hour = hourPart?.value || '00';
-          const minute = minutePart?.value || '00';
-          const weekday = weekdayPart?.value?.toLowerCase() || 'monday';
-          
-          return {
-            day: weekday as keyof WeeklySchedule,
-            time: `${hour}:${minute}`
-          };
-        } catch {
-          // Fallback to UTC if timezone is invalid
-          return {
-            day: days[now.getUTCDay()],
-            time: `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')}`
-          };
-        }
-      };
-
       for (const advRaw of advertisers) {
         const adv = advRaw as Advertiser;
         const rule = rulesMap.get(adv.id);
@@ -1484,56 +1556,10 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
           continue;
         }
 
-        // Get current time in the rule's timezone (default to UTC)
-        const ruleTimezone = rule.timezone || 'UTC';
-        const { day: currentDay, time: currentTimeStr } = getTimeInTimezone(ruleTimezone);
-
-        // Check working hours from rule
-        if (rule.weekly_schedule) {
-          console.log(`${adv.name}: Checking weekly schedule in ${ruleTimezone} (${currentDay} ${currentTimeStr})`);
-          // Advanced weekly schedule - check day and time
-          const daySchedule = rule.weekly_schedule[currentDay];
-          if (!daySchedule?.is_active) {
-            console.log(`${adv.name}: Day ${currentDay} is not active in weekly schedule`);
-            continue;
-          }
-          if (daySchedule.start_time && daySchedule.end_time) {
-            const startTime = daySchedule.start_time.slice(0, 5);
-            const endTime = daySchedule.end_time.slice(0, 5);
-            // Check if current time is within window (supports overnight windows)
-            if (startTime <= endTime) {
-              // Normal window (e.g., 09:00-18:00)
-              if (currentTimeStr < startTime || currentTimeStr > endTime) {
-                console.log(`${adv.name}: Outside working hours ${startTime}-${endTime} (now: ${currentTimeStr} ${ruleTimezone})`);
-                continue;
-              }
-            } else {
-              // Overnight window (e.g., 22:00-04:00)
-              if (currentTimeStr < startTime && currentTimeStr > endTime) {
-                console.log(`${adv.name}: Outside overnight hours ${startTime}-${endTime} (now: ${currentTimeStr} ${ruleTimezone})`);
-                continue;
-              }
-            }
-          }
-        } else if (rule.start_time && rule.end_time) {
-          console.log(`${adv.name}: Checking daily schedule in ${ruleTimezone} (${currentTimeStr})`);
-          // Simple daily time window
-          const startTime = rule.start_time.slice(0, 5);
-          const endTime = rule.end_time.slice(0, 5);
-          // Check if current time is within window (supports overnight windows)
-          if (startTime <= endTime) {
-            // Normal window (e.g., 09:00-18:00)
-            if (currentTimeStr < startTime || currentTimeStr > endTime) {
-              console.log(`${adv.name}: Outside working hours ${startTime}-${endTime} (now: ${currentTimeStr} ${ruleTimezone})`);
-              continue;
-            }
-          } else {
-            // Overnight window (e.g., 22:00-04:00)
-            if (currentTimeStr < startTime && currentTimeStr > endTime) {
-              console.log(`${adv.name}: Outside overnight hours ${startTime}-${endTime} (now: ${currentTimeStr} ${ruleTimezone})`);
-              continue;
-            }
-          }
+        // Check working hours from rule (heatmap, legacy weekly schedule, or simple daily window)
+        if (!isWithinWorkingHours(rule, rule.timezone || 'UTC')) {
+          console.log(`${adv.name}: Outside working hours`);
+          continue;
         }
 
         const weight = rule.weight || 100;
@@ -1635,13 +1661,6 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
     }
   }
 
-  // Current time for time window check - using UTC/GMT
-  const now = new Date();
-  const days: (keyof WeeklySchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const currentDay = days[now.getUTCDay()];
-  const currentTime = `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')}:00`;
-  console.log(`Time check: ${currentDay} ${currentTime} (GMT)`);
-
   // Filter eligible advertisers - all go to primary for default settings
   for (const advRaw of advertisers) {
     const adv = advRaw as Advertiser;
@@ -1694,27 +1713,10 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
       }
     }
 
-    // Check time window - use weekly_schedule if available, otherwise fall back to start_time/end_time
-    if (setting?.weekly_schedule) {
-      const daySchedule = setting.weekly_schedule[currentDay];
-      if (!daySchedule?.is_active) {
-        console.log(`${adv.name}: ${currentDay} is a day off`);
-        continue;
-      }
-      if (daySchedule.start_time && daySchedule.end_time) {
-        const startTime = daySchedule.start_time + ':00';
-        const endTime = daySchedule.end_time + ':00';
-        if (currentTime < startTime || currentTime > endTime) {
-          console.log(`${adv.name}: Outside ${currentDay} time window (${daySchedule.start_time}-${daySchedule.end_time})`);
-          continue;
-        }
-      }
-    } else if (setting?.start_time && setting?.end_time) {
-      // Fallback to legacy start_time/end_time
-      if (currentTime < setting.start_time || currentTime > setting.end_time) {
-        console.log(`${adv.name}: Outside time window (${setting.start_time}-${setting.end_time})`);
-        continue;
-      }
+    // Check time window - heatmap, legacy weekly schedule, or simple daily window
+    if (!isWithinWorkingHours(setting, (setting as any)?.timezone || 'UTC')) {
+      console.log(`${adv.name}: Outside working hours`);
+      continue;
     }
 
     result.primary.push({ ...adv, weight, priority_type: 'primary' });
@@ -2071,7 +2073,54 @@ Deno.serve(async (req) => {
     // Test mode: Try distribution first, create lead only if successful
     // This is used by both manual "Send Test Lead" and affiliate API submissions
     if (test_mode && test_lead_data) {
-      
+      // Saves a rejected test lead (e.g. stopped rule, outside working hours) so it's visible
+      // in the Leads table like any other rejection, instead of being silently discarded.
+      const saveRejectedTestLead = async (): Promise<string | null> => {
+        const { data: rejectedLead, error: rejectedLeadError } = await supabase
+          .from('leads')
+          .insert({
+            firstname: test_lead_data.firstname,
+            lastname: test_lead_data.lastname,
+            email: test_lead_data.email,
+            mobile: test_lead_data.mobile,
+            country_code: test_lead_data.country_code,
+            country: test_lead_data.country,
+            ip_address: test_lead_data.ip_address,
+            offer_name: test_lead_data.offer_name,
+            custom1: test_lead_data.custom1,
+            custom2: test_lead_data.custom2,
+            custom3: test_lead_data.custom3,
+            affiliate_id: test_lead_data.affiliate_id || null,
+            locale: test_lead_data.locale || null,
+            click_id: test_lead_data.click_id || null,
+            status: 'rejected',
+          })
+          .select('id')
+          .single();
+        if (rejectedLeadError) {
+          console.error('Failed to save rejected test lead:', rejectedLeadError);
+          return null;
+        }
+        return rejectedLead?.id ?? null;
+      };
+
+      // Distribution rule stop check — an inactive rule scoped to this affiliate/country rejects the lead outright
+      const stoppedRuleName = await getStoppedRuleReason(supabase, {
+        affiliateId: test_lead_data.affiliate_id,
+        countryCode: test_lead_data.country_code,
+      });
+      if (stoppedRuleName) {
+        const rejectedLeadId = await saveRejectedTestLead();
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'Distribution rule is stopped. All leads rejected.',
+            lead_id: rejectedLeadId,
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // If specific advertiser_id is provided, use that advertiser only
       if (advertiser_id) {
         const { data: advertiser, error: advError } = await supabase
@@ -2088,9 +2137,34 @@ Deno.serve(async (req) => {
           );
         }
 
+        const { data: testAdvSetting } = await supabase
+          .from('advertiser_distribution_settings')
+          .select('weekly_schedule, start_time, end_time, timezone')
+          .eq('advertiser_id', advertiser_id)
+          .maybeSingle();
+
+        if (!isWithinWorkingHours(testAdvSetting, testAdvSetting?.timezone || 'UTC')) {
+          const rejectedLeadId = await saveRejectedTestLead();
+          if (rejectedLeadId) {
+            await supabase.from('rejected_leads').insert({
+              lead_id: rejectedLeadId,
+              advertiser_id,
+              reason: 'Advertiser is outside working hours',
+            });
+          }
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Advertiser is outside working hours. Lead rejected.',
+              lead_id: rejectedLeadId,
+            }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         const typedAdvertiser = advertiser as Advertiser;
         const adapter = advertiserAdapters[typedAdvertiser.advertiser_type] || advertiserAdapters.custom;
-        
+
         // Create a mock lead object from test data for the API call
         const testLead: Lead = {
           id: 'test-' + Date.now(),
@@ -2589,6 +2663,25 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ success: false, message: 'Advertiser not found or inactive' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: targetAdvSetting } = await supabase
+        .from('advertiser_distribution_settings')
+        .select('weekly_schedule, start_time, end_time, timezone')
+        .eq('advertiser_id', targetAdvertiserId)
+        .maybeSingle();
+
+      if (!isWithinWorkingHours(targetAdvSetting, targetAdvSetting?.timezone || 'UTC')) {
+        await supabase.from('leads').update({ status: 'rejected' }).eq('id', typedLead.id);
+        await supabase.from('rejected_leads').insert({
+          lead_id: typedLead.id,
+          advertiser_id: targetAdvertiserId,
+          reason: 'Advertiser is outside working hours',
+        });
+        return new Response(
+          JSON.stringify({ success: false, message: 'Advertiser is outside working hours. Lead rejected.', lead_id }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 

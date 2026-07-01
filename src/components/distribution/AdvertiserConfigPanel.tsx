@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus } from "lucide-react";
+import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus, Check, ClipboardCheck } from "lucide-react";
 import { ScheduleHeatmap, type HeatmapConfig } from "./ScheduleHeatmap";
 import { countryData } from "@/components/advertisers/countryData";
 import {
@@ -20,6 +20,15 @@ import {
 import type { WeeklySchedule } from "./WeeklyScheduleSelector";
 import { useAdvertiserHourlyStats } from "@/hooks/useAdvertiserHourlyStats";
 import { useUpdateAdvertiser } from "@/hooks/useAdvertisers";
+import { cn } from "@/lib/utils";
+
+const STEPS = [
+  { id: "caps", label: "Caps & Pacing", icon: Zap },
+  { id: "geo", label: "Geo and Affiliate", icon: Globe },
+  { id: "schedule", label: "Working Hours", icon: Clock },
+  { id: "overrides", label: "Overrides", icon: Sliders },
+  { id: "review", label: "Review", icon: ClipboardCheck },
+] as const;
 
 interface Advertiser {
   id: string;
@@ -109,6 +118,7 @@ export function AdvertiserConfigPanel({
   };
 
   const current = setting ?? defaultSetting;
+  const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<DistSetting>({ ...current });
   const [heatmap, setHeatmap] = useState<HeatmapConfig>(() =>
     initHeatmapConfig(current.weekly_schedule)
@@ -128,6 +138,23 @@ export function AdvertiserConfigPanel({
 
   const update = (fields: Partial<DistSetting>) =>
     setDraft(prev => ({ ...prev, ...fields }));
+
+  // Required-field validity per step. "Overrides" and "Review" have no requirements.
+  const stepValidity: Record<string, boolean> = {
+    caps: draft.default_daily_cap != null && draft.default_hourly_cap != null && !!draft.base_weight,
+    geo: (draft.countries?.length ?? 0) > 0 && (draft.affiliates?.length ?? 0) > 0,
+    schedule: heatmap.matrix.some(row => row.some(Boolean)),
+    overrides: true,
+    review: true,
+  };
+
+  // Can't reach a step past the first one whose required fields aren't filled in yet.
+  const maxReachableIndex = (() => {
+    for (let i = 0; i < STEPS.length - 1; i++) {
+      if (!stepValidity[STEPS[i].id]) return i;
+    }
+    return STEPS.length - 1;
+  })();
 
   const updateAdvertiser = useUpdateAdvertiser();
 
@@ -178,27 +205,39 @@ export function AdvertiserConfigPanel({
         </div>
       </div>
 
-      <Tabs defaultValue="caps" className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* TabsList in a scrollable row so all 4 tabs fit on narrow screens */}
+      <Tabs value={STEPS[stepIndex].id} className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Step indicator in a scrollable row so all 5 steps fit on narrow screens */}
         <div className="px-3 sm:px-6 mt-3 sm:mt-4 overflow-x-auto shrink-0">
-          <TabsList className="w-max">
-            <TabsTrigger value="caps" className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <Zap className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Caps & Pacing</span>
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Schedule</span>
-            </TabsTrigger>
-            <TabsTrigger value="geo" className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <Globe className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Geo & Affiliates</span>
-            </TabsTrigger>
-            <TabsTrigger value="overrides" className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <Sliders className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Overrides</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center w-max">
+            {STEPS.map((step, idx) => {
+              const reachable = idx <= maxReachableIndex;
+              return (
+                <div key={step.id} className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => reachable && setStepIndex(idx)}
+                    disabled={!reachable}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs sm:text-sm font-medium transition-colors",
+                      !reachable
+                        ? "bg-muted/50 text-muted-foreground/50 cursor-not-allowed"
+                        : idx === stepIndex
+                          ? "bg-primary text-primary-foreground"
+                          : idx < stepIndex
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    <span className="flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full border text-[10px] sm:text-xs shrink-0">
+                      {idx < stepIndex ? <Check className="h-3 w-3" /> : idx + 1}
+                    </span>
+                    <span className="hidden sm:inline">{step.label}</span>
+                  </button>
+                  {idx < STEPS.length - 1 && <div className="w-3 sm:w-6 h-px bg-border shrink-0" />}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -207,17 +246,17 @@ export function AdvertiserConfigPanel({
             <Card>
               <CardHeader>
                 <CardTitle>Daily & Hourly Caps</CardTitle>
-                <CardDescription>Maximum leads accepted per time period.</CardDescription>
+                <CardDescription>Maximum leads accepted per time period. All fields on this step are required.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Daily cap */}
                 <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
                   <div className="space-y-1 flex-1 max-w-xs">
-                    <Label>Daily cap</Label>
+                    <Label>Daily cap <span className="text-destructive">*</span></Label>
                     <Input
                       type="number"
                       min={0}
-                      placeholder="No limit"
+                      placeholder="Required"
                       value={draft.default_daily_cap ?? ""}
                       onChange={e =>
                         update({ default_daily_cap: e.target.value ? parseInt(e.target.value) : null })
@@ -238,11 +277,11 @@ export function AdvertiserConfigPanel({
 
                 {/* Hourly cap */}
                 <div className="space-y-1 max-w-xs">
-                  <Label>Hourly cap</Label>
+                  <Label>Hourly cap <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
                     min={0}
-                    placeholder="No limit"
+                    placeholder="Required"
                     value={draft.default_hourly_cap ?? ""}
                     onChange={e =>
                       update({ default_hourly_cap: e.target.value ? parseInt(e.target.value) : null })
@@ -252,7 +291,7 @@ export function AdvertiserConfigPanel({
 
                 {/* Base weight */}
                 <div className="space-y-1 max-w-xs">
-                  <Label>Base weight</Label>
+                  <Label>Base weight <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
                     min={1}
@@ -279,7 +318,7 @@ export function AdvertiserConfigPanel({
                 </CardTitle>
                 <CardDescription>
                   Spread the daily cap evenly across active schedule hours.
-                  Configure in the Schedule tab.
+                  Configure in the Working Hours step.
                 </CardDescription>
               </CardHeader>
               {heatmap.smart_pacing && cap != null && (
@@ -303,7 +342,7 @@ export function AdvertiserConfigPanel({
                   </Badge>
                 </CardTitle>
                 <CardDescription>
-                  Alert when this advertiser reaches the threshold. Configure in the Schedule tab.
+                  Alert when this advertiser reaches the threshold. Configure in the Working Hours step.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -313,10 +352,11 @@ export function AdvertiserConfigPanel({
           <TabsContent value="schedule" className="m-2 sm:m-6">
             <Card className="overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
-                <CardTitle>Schedule</CardTitle>
+                <CardTitle>Working Hours <span className="text-destructive">*</span></CardTitle>
                 <CardDescription>
                   Click or drag cells to toggle active hours. Blue overlay shows actual received
                   volume (last 30 days). Smart pacing and soft-cap are saved with the schedule.
+                  At least one active hour is required.
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 pt-0 overflow-hidden">
@@ -354,12 +394,101 @@ export function AdvertiserConfigPanel({
             />
           </TabsContent>
 
-          {/* Save footer — sticky so it stays at the bottom of the scroll area */}
-          <div className="sticky bottom-0 z-10 bg-background border-t px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-end">
-            <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
-              <Save className="h-4 w-4 mr-1" />
-              {isSaving ? "Saving…" : "Save"}
+          {/* Review tab — read-only summary of everything before saving */}
+          <TabsContent value="review" className="m-3 sm:m-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Review configuration</CardTitle>
+                <CardDescription>Confirm everything below before saving.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Daily cap</p>
+                    <p className="text-lg font-semibold">{draft.default_daily_cap ?? "No limit"}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Hourly cap</p>
+                    <p className="text-lg font-semibold">{draft.default_hourly_cap ?? "No limit"}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Base weight</p>
+                    <p className="text-lg font-semibold">{draft.base_weight ?? 100}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Countries</p>
+                  <p className="text-sm text-muted-foreground">
+                    {!draft.countries?.length
+                      ? "All countries"
+                      : draft.countries
+                          .map(code => (countryData as Record<string, { name: string }>)[code]?.name ?? code)
+                          .join(", ")}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Affiliates</p>
+                  <p className="text-sm text-muted-foreground">
+                    {!draft.affiliates?.length
+                      ? "All affiliates"
+                      : draft.affiliates
+                          .map(id => affiliates.find(a => a.id === id)?.name ?? id)
+                          .join(", ")}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Working hours</p>
+                  <p className="text-sm text-muted-foreground">
+                    {heatmap.matrix.flat().filter(Boolean).length} active hours/week · Timezone {heatmap.timezone}
+                    {heatmap.smart_pacing && " · Smart pacing on"}
+                    {heatmap.soft_cap_pct != null && ` · Soft-cap warning at ${heatmap.soft_cap_pct}%`}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Per-country overrides</p>
+                  {Object.keys(countryCaps).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">None</p>
+                  ) : (
+                    <ul className="text-sm text-muted-foreground space-y-0.5">
+                      {Object.entries(countryCaps).map(([code, cap]) => (
+                        <li key={code}>
+                          {code} — {cap}/day
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Navigation footer — sticky so it stays at the bottom of the scroll area.
+              Save is only reachable from the Review step, after walking through every section. */}
+          <div className="sticky bottom-0 z-10 bg-background border-t px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setStepIndex(i => Math.max(0, i - 1))}
+              disabled={stepIndex === 0}
+            >
+              Back
             </Button>
+            {stepIndex < STEPS.length - 1 ? (
+              <Button
+                onClick={() => setStepIndex(i => Math.min(STEPS.length - 1, i + 1))}
+                disabled={!stepValidity[STEPS[stepIndex].id]}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button onClick={handleSave} disabled={isSaving}>
+                <Save className="h-4 w-4 mr-1" />
+                {isSaving ? "Saving…" : "Save"}
+              </Button>
+            )}
           </div>
 
         </div>
@@ -448,17 +577,17 @@ function CountriesCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          Countries allow-list
-          <Badge variant="secondary" className="max-w-[240px] truncate block text-right">
+          <span>Countries allow-list <span className="text-destructive">*</span></span>
+          <Badge variant={selected.length === 0 ? "destructive" : "secondary"} className="max-w-[240px] truncate block text-right">
             {selected.length === 0
-              ? "All"
+              ? "None selected"
               : selected.length <= 6
               ? selected.join(", ")
               : `${selected.slice(0, 6).join(", ")} +${selected.length - 6} more`}
           </Badge>
         </CardTitle>
         <CardDescription>
-          Leave empty to accept all countries. Search to restrict.
+          Select at least one country. Search to filter.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -506,6 +635,7 @@ function AffiliatesCard({
   allSettings: DistSetting[];
 }) {
   const [copyFromId, setCopyFromId] = useState("");
+  const [search, setSearch] = useState("");
 
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter(a => a !== id) : [...selected, id]);
@@ -521,19 +651,32 @@ function AffiliatesCard({
   };
 
   const otherAdvertisers = allAdvertisers.filter(a => a.id !== currentAdvertiserId && a.is_active);
+  const filtered = search
+    ? affiliates.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+    : affiliates;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          Affiliates allow-list
-          <Badge variant="secondary">{selected.length || "All"}</Badge>
+          <span>Affiliates allow-list <span className="text-destructive">*</span></span>
+          <Badge variant={selected.length === 0 ? "destructive" : "secondary"}>
+            {selected.length === 0 ? "None selected" : selected.length}
+          </Badge>
         </CardTitle>
         <CardDescription>
-          Leave empty to accept leads from all affiliates. Select specific affiliates to restrict.
+          Select at least one affiliate. Search to filter.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search affiliates..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
         <div className="flex gap-2 flex-wrap items-center">
           <Button size="sm" variant="outline" className="h-8" onClick={() => onChange([])}>
             Clear all
@@ -569,7 +712,7 @@ function AffiliatesCard({
         </div>
         <ScrollArea className="h-48 rounded border">
           <div className="space-y-1 p-2">
-            {affiliates.map(affiliate => (
+            {filtered.map(affiliate => (
               <div
                 key={affiliate.id}
                 className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"

@@ -219,10 +219,13 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            {testResult.success && testResult.lead_id ? (
+            {testResult.lead_id ? (
               <div className="text-sm text-muted-foreground">
                 <span className="font-medium">Lead ID:</span>{" "}
                 <span className="font-mono text-xs">{testResult.lead_id}</span>
+                {!testResult.success && (
+                  <span className="ml-1">(saved as rejected)</span>
+                )}
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">

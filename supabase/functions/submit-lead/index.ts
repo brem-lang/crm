@@ -102,6 +102,26 @@ function validatePhone(phone: string, countryCode: string): { valid: boolean; er
   return { valid: true, cleaned };
 }
 
+// Returns the name of the first inactive distribution rule whose conditions match this
+// affiliate/country, or null if none match. Inactive rules act as a rejection gate —
+// only leads matching their scope are blocked; everything else routes normally.
+async function getStoppedRuleReason(
+  supabase: any,
+  { affiliateId, countryCode }: { affiliateId?: string | null; countryCode?: string | null },
+): Promise<string | null> {
+  const { data: rules } = await supabase
+    .from('distribution_rules')
+    .select('name, conditions')
+    .eq('is_active', false);
+  for (const rule of rules ?? []) {
+    const c = rule.conditions ?? {};
+    const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    if (affiliateMatches && countryMatches) return rule.name;
+  }
+  return null;
+}
+
 function getClientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     ?? req.headers.get('cf-connecting-ip')
@@ -497,6 +517,28 @@ Deno.serve(async (req) => {
         ip_address: leadIp,
       });
     } catch { /* non-critical */ }
+
+    // === Distribution rule stop check — an inactive rule scoped to this affiliate/country rejects the lead outright.
+    //     Checked after creation so the rejected lead is still saved (status: 'rejected'), not silently dropped. ===
+    const stoppedRuleName = await getStoppedRuleReason(supabase, {
+      affiliateId: affiliate.id,
+      countryCode: normalizedCountryCode,
+    });
+    if (stoppedRuleName) {
+      await supabase.from('leads').update({ status: 'rejected' }).eq('id', newLead.id);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Distribution rule is stopped. All leads rejected.',
+          rejection: {
+            code: 'DISTRIBUTION_STOPPED',
+            message: 'Distribution rule is stopped. All leads rejected.',
+          },
+          lead_id: newLead.id,
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // === STEP 8: Attempt distribution using the real lead_id ===
     let distributionResult = null;

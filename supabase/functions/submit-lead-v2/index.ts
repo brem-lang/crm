@@ -100,6 +100,26 @@ async function isRateLimited(supabase: any, affiliateId: string): Promise<boolea
   return (count ?? 0) >= RATE_LIMIT_RPM;
 }
 
+// Returns the name of the first inactive distribution rule whose conditions match this
+// affiliate/country, or null if none match. Inactive rules act as a rejection gate —
+// only leads matching their scope are blocked; everything else routes normally.
+async function getStoppedRuleReason(
+  supabase: any,
+  { affiliateId, countryCode }: { affiliateId?: string | null; countryCode?: string | null },
+): Promise<string | null> {
+  const { data: rules } = await supabase
+    .from('distribution_rules')
+    .select('name, conditions')
+    .eq('is_active', false);
+  for (const rule of rules ?? []) {
+    const c = rule.conditions ?? {};
+    const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    if (affiliateMatches && countryMatches) return rule.name;
+  }
+  return null;
+}
+
 function getClientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     ?? req.headers.get('cf-connecting-ip')
@@ -363,6 +383,39 @@ Deno.serve(async (req) => {
         errors: { database: leadError.message },
         api_version: API_VERSION,
       }, 500);
+    }
+
+    // Distribution rule stop check — an inactive rule scoped to this affiliate/country rejects the lead outright.
+    // Checked after creation so the rejected lead is still saved (status: 'rejected'), not silently dropped.
+    const stoppedRuleName = await getStoppedRuleReason(supabase, {
+      affiliateId: affiliate.id,
+      countryCode: leadData.country_code,
+    });
+    if (stoppedRuleName) {
+      await supabase.from('leads').update({ status: 'rejected' }).eq('id', lead.id);
+      try {
+        await supabase.from('affiliate_api_logs').insert({
+          affiliate_id: affiliate.id,
+          api_key_hint: apiKey.slice(-4),
+          request_ip: clientIp,
+          payload: body,
+          status: 'rejected',
+          reason: `Distribution rule stopped: ${stoppedRuleName}`,
+        });
+      } catch { /* non-critical */ }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Distribution rule is stopped. All leads rejected.',
+          rejection: {
+            code: 'DISTRIBUTION_STOPPED',
+            message: 'Distribution rule is stopped. All leads rejected.',
+          },
+          data: { lead_id: lead.id, request_id: requestId },
+          api_version: API_VERSION,
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Log accepted request

@@ -43,7 +43,7 @@ export function useDistributionRules() {
       const { data: rules, error } = await supabase
         .from("distribution_rules")
         .select("id, name, rule_type, is_active, priority, conditions, created_at, updated_at")
-        .order("priority", { ascending: true });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
