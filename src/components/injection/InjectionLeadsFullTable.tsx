@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Copy, Upload, Users, ExternalLink, Check, X } from "lucide-react";
 import { ColumnConfig } from "@/components/leads/LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { cn } from "@/lib/utils";
+import { cn, shortId } from "@/lib/utils";
 import { SortableHeader, SortConfig } from "@/components/leads/SortableHeader";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -70,8 +70,8 @@ export function InjectionLeadsFullTable({
     switch (columnId) {
       case "id":
         return (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-            {lead.id.slice(0, 8)}...
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.id}>
+            {shortId(lead.id)}
           </span>
         );
       case "injection_name":
@@ -193,8 +193,8 @@ export function InjectionLeadsFullTable({
         ) : "-";
       case "external_lead_id":
         return lead.external_lead_id ? (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-            {lead.external_lead_id}
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.external_lead_id}>
+            {shortId(lead.external_lead_id)}
           </span>
         ) : "-";
       case "error_message":

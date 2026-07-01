@@ -144,7 +144,7 @@ export function LeadsTable({
             <PopoverContent className="w-80 p-3" align="start">
               <p className="text-xs font-medium mb-2 text-muted-foreground">Lead ID</p>
               <div className="flex items-start gap-2">
-                <p className="text-xs font-mono break-all flex-1">{lead.id}</p>
+                <p className="text-xs font-mono flex-1" title={lead.id}>{shortId(lead.id, 12)}</p>
                 <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
                   onClick={() => { navigator.clipboard.writeText(lead.id); toast.success("Lead ID copied"); }}>
                   <Copy className="h-3 w-3" />
@@ -166,7 +166,7 @@ export function LeadsTable({
             <PopoverContent className="w-80 p-3" align="start">
               <p className="text-xs font-medium mb-2 text-muted-foreground">API Request ID</p>
               <div className="flex items-start gap-2">
-                <p className="text-xs font-mono break-all flex-1">{lead.request_id}</p>
+                <p className="text-xs font-mono flex-1" title={lead.request_id}>{shortId(lead.request_id, 12)}</p>
                 <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
                   onClick={() => { navigator.clipboard.writeText(lead.request_id!); toast.success("Request ID copied"); }}>
                   <Copy className="h-3 w-3" />
