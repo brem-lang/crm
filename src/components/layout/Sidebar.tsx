@@ -39,6 +39,7 @@ import {
   Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "./NotificationBell";
 import { useState, useEffect } from "react";
 interface NavItem {
   title: string;
@@ -153,9 +154,10 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { signOut, roles, customRoleNames, user, username, isChatSupport } = useAuth();
+  const { signOut, roles, customRoleNames, user, username, isChatSupport, isSuperAdmin, isManager } = useAuth();
   const { isCollapsed, toggleCollapsed } = useSidebarState();
   const { formatDate, crmName } = useCRMSettings();
+  const canSeeNotifications = isSuperAdmin || isManager;
   const crmInitials = crmName
     .split(" ")
     .map((w) => w[0])
@@ -336,6 +338,7 @@ export function Sidebar() {
             </p>
           </div>
         )}
+        {canSeeNotifications && <NotificationBell isCollapsed={isCollapsed} />}
         <Button
           variant="ghost"
           className={cn("w-full gap-3", isCollapsed ? "justify-center px-2" : "justify-start")}
