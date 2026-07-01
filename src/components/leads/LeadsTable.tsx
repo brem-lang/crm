@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink } from "lucide-react";
+import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
 import { countryData } from "@/components/advertisers/countryData";
+import { getScoreBreakdown, type ScoreFactor } from "@/lib/liveLeadScoring";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-100 text-blue-800",
@@ -73,6 +74,61 @@ export function LeadsTable({
     if (!value) return "-";
     if (value.length <= 4) return "****";
     return value.slice(0, 2) + "****" + value.slice(-2);
+  };
+
+  const renderLiveLeadReasonPopover = (lead: any, trigger: React.ReactNode, headerLabel: string) => {
+    const hasClickData = !!lead.click_ip || !!lead.click_ua || lead.time_to_click != null;
+    const hasUnclickedAutologin = lead.lead_distributions?.some(
+      (d: any) => d.status === "sent" && d.autologin_url
+    ) && lead.time_to_click == null;
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent className="w-80 p-3" align="start">
+          <p className="text-xs font-medium mb-2 text-muted-foreground">{headerLabel}</p>
+          {!hasClickData ? (
+            <p className="text-xs text-muted-foreground">
+              {hasUnclickedAutologin
+                ? "Autologin link was sent but has not been clicked yet — no click-side data to compare against the submission."
+                : "No click-side data recorded yet for this lead."}
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {getScoreBreakdown({
+                submissionIp: lead.ip_address ?? null,
+                clickIp: lead.click_ip ?? null,
+                submissionCountry: lead.submission_country ?? null,
+                clickCountry: lead.click_country ?? null,
+                submissionAsn: lead.submission_asn ?? null,
+                clickAsn: lead.click_asn ?? null,
+                isProxy: !!lead.is_proxy,
+                timeToClick: lead.time_to_click ?? null,
+                submissionUa: lead.user_agent ?? null,
+                clickUa: lead.click_ua ?? null,
+              }).map((f: ScoreFactor) => (
+                <li key={f.key} className="flex items-start gap-2">
+                  {f.passed === true ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                  ) : f.passed === false ? (
+                    <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <MinusCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium">{f.label}</span>
+                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">+{f.points}/{f.maxPoints}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{f.reason}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   const renderCellValue = (lead: any, columnId: string) => {
@@ -237,13 +293,16 @@ export function LeadsTable({
           const hasUnclickedAutologin = (lead as any).lead_distributions?.some(
             (d: any) => d.status === 'sent' && d.autologin_url
           ) && lead.time_to_click == null;
-          if (hasUnclickedAutologin) {
-            return <Badge className="bg-red-100 text-red-800 text-xs font-medium">NO</Badge>;
-          }
-          return <span className="text-muted-foreground text-xs">—</span>;
+          const trigger = hasUnclickedAutologin ? (
+            <Badge className="bg-red-100 text-red-800 text-xs font-medium cursor-pointer hover:opacity-80">NO</Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs cursor-pointer hover:opacity-80">—</span>
+          );
+          return renderLiveLeadReasonPopover(lead, trigger, hasUnclickedAutologin ? "NO" : "No data yet");
         }
         const cfg = statusMap[s] ?? { label: s, className: "bg-gray-100 text-gray-800" };
-        return <Badge className={`${cfg.className} text-xs font-medium`}>{cfg.label}</Badge>;
+        const trigger = <Badge className={`${cfg.className} text-xs font-medium cursor-pointer hover:opacity-80`}>{cfg.label}</Badge>;
+        return renderLiveLeadReasonPopover(lead, trigger, cfg.label);
       }
       case "live_lead_score": {
         const score = (lead as any).live_lead_score;
@@ -253,11 +312,12 @@ export function LeadsTable({
           score >= 50 ? "bg-amber-100 text-amber-800" :
           score >= 25 ? "bg-orange-100 text-orange-800" :
                         "bg-red-100 text-red-800";
-        return (
-          <Badge className={`${scoreClass} text-xs font-medium tabular-nums`}>
+        const trigger = (
+          <Badge className={`${scoreClass} text-xs font-medium tabular-nums cursor-pointer hover:opacity-80`}>
             {score}<span className="opacity-60 font-normal">/100</span>
           </Badge>
         );
+        return renderLiveLeadReasonPopover(lead, trigger, `Score: ${score}/100`);
       }
       case "comment":
         return lead.comment ? (
