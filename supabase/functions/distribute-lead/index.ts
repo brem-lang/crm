@@ -2133,6 +2133,8 @@ Deno.serve(async (req) => {
                 custom2: test_lead_data.custom2,
                 custom3: test_lead_data.custom3,
                 affiliate_id: test_lead_data.affiliate_id || null,
+                locale: test_lead_data.locale || null,
+                click_id: test_lead_data.click_id || null,
                 status: 'contacted',
                 distributed_at: new Date().toISOString(),
               })

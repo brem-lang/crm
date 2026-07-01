@@ -94,6 +94,8 @@ function PrintLayout({ crmName }: { crmName: string }) {
               ["custom2", "string", false, "Custom tracking parameter 2"],
               ["custom3", "string", false, "Custom tracking parameter 3"],
               ["comment", "string", false, "Additional notes"],
+              ["click_id", "string", false, "Ad click tracking ID — unique ID generated when user clicks an affiliate ad link. Pass this to trace the lead back to the exact ad click for attribution and reporting."],
+              ["locale", "string", false, "Browser/language locale of the lead (e.g. en-US, fr-FR). Auto-derived from country_code if not provided."],
             ].map(([param, type, req, desc]) => (
               <tr key={param as string}>
                 <td style={{ ...ps.td, fontFamily: "monospace" }}>{param}</td>
@@ -120,7 +122,9 @@ Body:
   "country_code": "CA",
   "country": "Canada",
   "offer_name": "Summer Promo",
-  "custom1": "tracking123"
+  "custom1": "tracking123",
+  "click_id": "abc123",
+  "locale": "en-CA"
 }`}</div>
 
         <div style={ps.h3}>Success Response</div>
@@ -467,7 +471,9 @@ export default function ApiDocs() {
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">custom1</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Custom tracking parameter 1</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">custom2</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Custom tracking parameter 2</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">custom3</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Custom tracking parameter 3</td></tr>
-                      <tr><td className="py-2 pr-4 font-mono">comment</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Additional notes</td></tr>
+                      <tr className="border-b"><td className="py-2 pr-4 font-mono">comment</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Additional notes</td></tr>
+                      <tr className="border-b"><td className="py-2 pr-4 font-mono">click_id</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Ad click tracking ID — unique ID generated when user clicks an affiliate ad link. Used for attribution, reporting, and fraud detection.</td></tr>
+                      <tr><td className="py-2 pr-4 font-mono">locale</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Browser/language locale of the lead (e.g. en-US, fr-FR). Auto-derived from country_code if not provided.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -480,7 +486,7 @@ export default function ApiDocs() {
                 </TabsList>
                 <TabsContent value="request">
                   <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                    <pre>{`POST ${BASE_URL}/submit-lead\nHeaders:\n  Api-Key: your_api_key_here\n  Content-Type: application/json\n\nBody:\n{\n  "firstname": "John",\n  "lastname": "Doe",\n  "email": "john.doe@example.com",\n  "mobile": "+14165551234",\n  "country_code": "CA",\n  "country": "Canada",\n  "offer_name": "Summer Promo",\n  "custom1": "tracking123"\n}`}</pre>
+                    <pre>{`POST ${BASE_URL}/submit-lead\nHeaders:\n  Api-Key: your_api_key_here\n  Content-Type: application/json\n\nBody:\n{\n  "firstname": "John",\n  "lastname": "Doe",\n  "email": "john.doe@example.com",\n  "mobile": "+14165551234",\n  "country_code": "CA",\n  "country": "Canada",\n  "offer_name": "Summer Promo",\n  "custom1": "tracking123",\n  "click_id": "abc123",\n  "locale": "en-CA"\n}`}</pre>
                   </div>
                 </TabsContent>
                 <TabsContent value="success">
