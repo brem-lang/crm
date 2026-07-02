@@ -395,7 +395,8 @@ export default function Leads() {
           const leadIdVal = (lead.id || "").toLowerCase();
           const reqIdVal = (lead.request_id || "").toLowerCase();
           const affIdVal = ((lead as any).affiliate_id || "").toLowerCase();
-          const advIdVal = ((lead as any).advertiser_id || "").toLowerCase();
+          const sentDistForSearch = (lead as any).lead_distributions?.find((d: any) => d.status === "sent");
+          const advIdVal = (sentDistForSearch?.advertiser_id || "").toLowerCase();
           const ftdIdVal = ((lead as any).ftd_id || "").toLowerCase();
           const email = (lead.email || "").toLowerCase();
           const phone = (lead.mobile || "").toLowerCase();
@@ -634,7 +635,10 @@ export default function Leads() {
         const sentDist = lead.lead_distributions?.find((d: any) => d.status === "sent");
         return sentDist?.advertisers?.name || "";
       }
-      case "advertiser_id": return lead.advertiser_id || "";
+      case "advertiser_id": {
+        const sentDist = lead.lead_distributions?.find((d: any) => d.status === "sent");
+        return sentDist?.advertiser_id || "";
+      }
       case "is_ftd": return lead.is_ftd ? (lead.ftd_released ? "Released" : "Pending") : "No";
       case "ftd_date": return lead.ftd_date ? formatDate(lead.ftd_date) : "";
       case "ftd_id": return lead.ftd_id || "";

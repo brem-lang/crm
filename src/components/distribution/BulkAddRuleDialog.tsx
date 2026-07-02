@@ -22,23 +22,38 @@ interface Advertiser {
   is_active: boolean;
 }
 
+interface Affiliate {
+  id: string;
+  name: string;
+  is_active?: boolean;
+}
+
 interface BulkAddRuleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  affiliateId: string;
+  affiliates: Affiliate[];
   advertisers: Advertiser[];
-  existingRules: Array<{ country_code: string; advertiser_id: string }>;
+  // Existing rules across ALL affiliates, used to skip duplicates for whichever
+  // affiliates end up selected in this dialog.
+  existingRules: Array<{ affiliate_id: string; country_code: string; advertiser_id: string }>;
+  // Optional: pre-select a single affiliate when opened from an affiliate-scoped context.
+  initialAffiliateId?: string;
 }
 
 export function BulkAddRuleDialog({
   open,
   onOpenChange,
-  affiliateId,
+  affiliates,
   advertisers,
   existingRules,
+  initialAffiliateId,
 }: BulkAddRuleDialogProps) {
+  const [selectedAffiliates, setSelectedAffiliates] = useState<Set<string>>(
+    () => new Set(initialAffiliateId ? [initialAffiliateId] : [])
+  );
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set());
   const [selectedAdvertisers, setSelectedAdvertisers] = useState<Set<string>>(new Set());
+  const [affiliateSearch, setAffiliateSearch] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [advertiserSearch, setAdvertiserSearch] = useState("");
 
@@ -49,6 +64,17 @@ export function BulkAddRuleDialog({
     () => advertisers.filter((a) => a.is_active),
     [advertisers]
   );
+
+  const activeAffiliates = useMemo(
+    () => affiliates.filter((a) => a.is_active !== false),
+    [affiliates]
+  );
+
+  // Filter affiliates by search
+  const filteredAffiliates = useMemo(() => {
+    const search = affiliateSearch.toLowerCase();
+    return activeAffiliates.filter((a) => a.name.toLowerCase().includes(search));
+  }, [affiliateSearch, activeAffiliates]);
 
   // Filter countries by search
   const filteredCountries = useMemo(() => {
@@ -71,29 +97,51 @@ export function BulkAddRuleDialog({
   // Calculate how many rules will be created (excluding duplicates)
   const { totalRules, newRules, duplicateCount } = useMemo(() => {
     const existingSet = new Set(
-      existingRules.map((r) => `${r.country_code}:${r.advertiser_id}`)
+      existingRules.map((r) => `${r.affiliate_id}:${r.country_code}:${r.advertiser_id}`)
     );
-    
+
     let newCount = 0;
     let dupCount = 0;
-    
-    selectedCountries.forEach((country) => {
-      selectedAdvertisers.forEach((advertiser) => {
-        const key = `${country}:${advertiser}`;
-        if (existingSet.has(key)) {
-          dupCount++;
-        } else {
-          newCount++;
-        }
+
+    selectedAffiliates.forEach((affiliate) => {
+      selectedCountries.forEach((country) => {
+        selectedAdvertisers.forEach((advertiser) => {
+          const key = `${affiliate}:${country}:${advertiser}`;
+          if (existingSet.has(key)) {
+            dupCount++;
+          } else {
+            newCount++;
+          }
+        });
       });
     });
 
     return {
-      totalRules: selectedCountries.size * selectedAdvertisers.size,
+      totalRules: selectedAffiliates.size * selectedCountries.size * selectedAdvertisers.size,
       newRules: newCount,
       duplicateCount: dupCount,
     };
-  }, [selectedCountries, selectedAdvertisers, existingRules]);
+  }, [selectedAffiliates, selectedCountries, selectedAdvertisers, existingRules]);
+
+  const handleAffiliateToggle = (id: string) => {
+    setSelectedAffiliates((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllAffiliates = () => {
+    setSelectedAffiliates(new Set(filteredAffiliates.map((a) => a.id)));
+  };
+
+  const handleClearAffiliates = () => {
+    setSelectedAffiliates(new Set());
+  };
 
   const handleCountryToggle = (code: string) => {
     setSelectedCountries((prev) => {
@@ -139,7 +187,7 @@ export function BulkAddRuleDialog({
     if (newRules === 0) return;
 
     const existingSet = new Set(
-      existingRules.map((r) => `${r.country_code}:${r.advertiser_id}`)
+      existingRules.map((r) => `${r.affiliate_id}:${r.country_code}:${r.advertiser_id}`)
     );
 
     const rulesToCreate: Array<{
@@ -149,17 +197,19 @@ export function BulkAddRuleDialog({
       is_active: boolean;
     }> = [];
 
-    selectedCountries.forEach((country) => {
-      selectedAdvertisers.forEach((advertiser) => {
-        const key = `${country}:${advertiser}`;
-        if (!existingSet.has(key)) {
-          rulesToCreate.push({
-            affiliate_id: affiliateId,
-            country_code: country,
-            advertiser_id: advertiser,
-            is_active: true,
-          });
-        }
+    selectedAffiliates.forEach((affiliate) => {
+      selectedCountries.forEach((country) => {
+        selectedAdvertisers.forEach((advertiser) => {
+          const key = `${affiliate}:${country}:${advertiser}`;
+          if (!existingSet.has(key)) {
+            rulesToCreate.push({
+              affiliate_id: affiliate,
+              country_code: country,
+              advertiser_id: advertiser,
+              is_active: true,
+            });
+          }
+        });
       });
     });
 
@@ -172,23 +222,82 @@ export function BulkAddRuleDialog({
   };
 
   const resetForm = () => {
+    setSelectedAffiliates(new Set(initialAffiliateId ? [initialAffiliateId] : []));
     setSelectedCountries(new Set());
     setSelectedAdvertisers(new Set());
+    setAffiliateSearch("");
     setCountrySearch("");
     setAdvertiserSearch("");
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Bulk Add Distribution Rules</DialogTitle>
           <DialogDescription>
-            Select multiple countries and advertisers to create rules for all combinations.
+            Select multiple affiliates, countries, and advertisers to create rules for all combinations.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+        <div className="flex-1 overflow-hidden grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
+          {/* Affiliates Selection */}
+          <div className="flex flex-col space-y-2">
+            <Label className="font-semibold">Affiliates</Label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search affiliates..."
+                value={affiliateSearch}
+                onChange={(e) => setAffiliateSearch(e.target.value)}
+                className="pl-8"
+              />
+              {affiliateSearch && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1 h-7 w-7"
+                  onClick={() => setAffiliateSearch("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleSelectAllAffiliates}>
+                Select All
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleClearAffiliates}>
+                Clear
+              </Button>
+              <span className="ml-auto text-sm text-muted-foreground">
+                {selectedAffiliates.size} selected
+              </span>
+            </div>
+            <ScrollArea className="h-48 border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredAffiliates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No active affiliates found
+                  </p>
+                ) : (
+                  filteredAffiliates.map((affiliate) => (
+                    <label
+                      key={affiliate.id}
+                      className="flex items-center gap-2 p-1.5 rounded hover:bg-muted cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedAffiliates.has(affiliate.id)}
+                        onCheckedChange={() => handleAffiliateToggle(affiliate.id)}
+                      />
+                      <span className="text-sm truncate">{affiliate.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
           {/* Countries Selection */}
           <div className="flex flex-col space-y-2">
             <Label className="font-semibold">Countries</Label>

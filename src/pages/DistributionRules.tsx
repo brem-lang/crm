@@ -44,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAdvertisers } from "@/hooks/useAdvertisers";
 import { useAffiliates } from "@/hooks/useAffiliates";
 import {
@@ -57,11 +58,18 @@ import {
   type RuleTarget,
   type RuleType,
 } from "@/hooks/useDistributionRules";
+import {
+  useAffiliateDistributionRules,
+  useAllDistributionRules as useAllAffiliateDistributionRules,
+  useUpdateDistributionRule as useUpdateAffiliateRule,
+  useDeleteDistributionRule as useDeleteAffiliateRule,
+} from "@/hooks/useAffiliateDistributionRules";
+import { BulkAddRuleDialog } from "@/components/distribution/BulkAddRuleDialog";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { countryData } from "@/components/advertisers/countryData";
 import { shortId } from "@/lib/utils";
-import { ArrowUpDown, GitMerge, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, GitMerge, List, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useState, useMemo } from "react";
 
 const RULE_TYPE_META: Record<RuleType, { label: string; color: string }> = {
@@ -88,6 +96,7 @@ const RULE_TYPE_META: Record<RuleType, { label: string; color: string }> = {
 
 
 export default function DistributionRules() {
+  const [activeTab, setActiveTab] = useState<"rules" | "affiliate">("rules");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<DistributionRule | null>(null);
   const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
@@ -101,6 +110,13 @@ export default function DistributionRules() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = usePageSizeState();
 
+  // "By Affiliate" tab state — manages affiliate_distribution_rules (used by
+  // getEligibleAdvertisers for any lead that has an affiliate_id).
+  const [selectedAffiliateId, setSelectedAffiliateId] = useState<string>("");
+  const [isAddAffiliateRuleOpen, setIsAddAffiliateRuleOpen] = useState(false);
+  const [affiliateRuleSearch, setAffiliateRuleSearch] = useState("");
+  const [affiliateRulePage, setAffiliateRulePage] = useState(1);
+
   const { data: rules, isLoading } = useDistributionRules();
   const { data: advertisers } = useAdvertisers();
   const { data: affiliates } = useAffiliates();
@@ -109,6 +125,45 @@ export default function DistributionRules() {
   const updateRule = useUpdateDistributionRule();
   const deleteRule = useDeleteDistributionRule();
   const toggleRule = useToggleDistributionRule();
+
+  const { data: affiliateRules, isLoading: loadingAffiliateRules } = useAffiliateDistributionRules(
+    selectedAffiliateId || undefined
+  );
+  const { data: allAffiliateRules } = useAllAffiliateDistributionRules();
+  const updateAffiliateRule = useUpdateAffiliateRule();
+  const deleteAffiliateRule = useDeleteAffiliateRule();
+
+  const affiliateRulesByCountry = useMemo(() => {
+    return (affiliateRules || []).reduce((acc, rule) => {
+      if (!acc[rule.country_code]) acc[rule.country_code] = [];
+      acc[rule.country_code].push(rule);
+      return acc;
+    }, {} as Record<string, typeof affiliateRules>);
+  }, [affiliateRules]);
+
+  const filteredAffiliateRules = useMemo(() => {
+    if (!affiliateRules) return [];
+    const q = affiliateRuleSearch.trim().toLowerCase();
+    if (!q) return affiliateRules;
+    return affiliateRules.filter((rule) => {
+      const countryName = (countryData as Record<string, { name: string }>)[rule.country_code]?.name || "";
+      return (
+        rule.country_code.toLowerCase().includes(q) ||
+        countryName.toLowerCase().includes(q) ||
+        (rule.advertiser_name || "").toLowerCase().includes(q)
+      );
+    });
+  }, [affiliateRules, affiliateRuleSearch]);
+
+  const affiliateRuleTotalPages = Math.max(1, Math.ceil(filteredAffiliateRules.length / pageSize));
+  const paginatedAffiliateRules = useMemo(() => {
+    const start = (affiliateRulePage - 1) * pageSize;
+    return filteredAffiliateRules.slice(start, start + pageSize);
+  }, [filteredAffiliateRules, affiliateRulePage, pageSize]);
+
+  const handleDeleteAffiliateRule = (id: string) => {
+    if (confirm('Delete this distribution rule?')) deleteAffiliateRule.mutate(id);
+  };
 
   // Countries actually referenced by at least one rule, for the filter dropdown
   const usedCountryCodes = useMemo(() => {
@@ -231,12 +286,27 @@ export default function DistributionRules() {
               </p>
             </div>
           </div>
-          <Button onClick={handleOpenCreate} className="self-start sm:self-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            New Rule
-          </Button>
+          {activeTab === "rules" && (
+            <Button onClick={handleOpenCreate} className="self-start sm:self-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Rule
+            </Button>
+          )}
         </div>
 
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "rules" | "affiliate")}>
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="rules" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              Rules
+            </TabsTrigger>
+            <TabsTrigger value="affiliate" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              By Affiliate
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="rules" className="mt-6 space-y-6">
         {/* Legend */}
         <div className="flex items-center gap-3 flex-wrap">
           {(Object.keys(RULE_TYPE_META) as RuleType[]).map((t) => (
@@ -560,6 +630,178 @@ export default function DistributionRules() {
             </ol>
           </CardContent>
         </Card> */}
+          </TabsContent>
+
+          <TabsContent value="affiliate" className="mt-6 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <CardTitle>By Affiliate</CardTitle>
+                      <CardDescription>
+                        Leads from an affiliate only go to advertisers listed here (by country). No active rule for a
+                        country means that affiliate's leads from that country are rejected outright.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={() => setIsAddAffiliateRuleOpen(true)} className="self-start shrink-0">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Rules
+                    </Button>
+                    <BulkAddRuleDialog
+                      open={isAddAffiliateRuleOpen}
+                      onOpenChange={setIsAddAffiliateRuleOpen}
+                      affiliates={affiliates || []}
+                      advertisers={advertisers || []}
+                      initialAffiliateId={selectedAffiliateId || undefined}
+                      existingRules={(allAffiliateRules || []).map((r) => ({
+                        affiliate_id: r.affiliate_id,
+                        country_code: r.country_code,
+                        advertiser_id: r.advertiser_id,
+                      }))}
+                    />
+                  </div>
+
+                  {/* Filters */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select value={selectedAffiliateId} onValueChange={(v) => { setSelectedAffiliateId(v); setAffiliateRulePage(1); }}>
+                      <SelectTrigger className="h-8 w-56 text-xs">
+                        <SelectValue placeholder="Select an affiliate..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {affiliates?.map((a) => (
+                          <SelectItem key={a.id} value={a.id} className="text-xs">
+                            {a.name}{!a.is_active && " (Inactive)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedAffiliateId && (
+                      <Input
+                        placeholder="Search country or advertiser..."
+                        value={affiliateRuleSearch}
+                        onChange={(e) => { setAffiliateRuleSearch(e.target.value); setAffiliateRulePage(1); }}
+                        className="w-56 h-8 text-sm"
+                      />
+                    )}
+                    {selectedAffiliateId && affiliateRules && affiliateRules.length > 0 && (
+                      <Badge variant="secondary" className="h-8 flex items-center">
+                        {affiliateRules.length} rule{affiliateRules.length !== 1 && "s"} · {Object.keys(affiliateRulesByCountry).length} countr{Object.keys(affiliateRulesByCountry).length !== 1 ? "ies" : "y"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!selectedAffiliateId ? (
+                  <div className="text-center py-16 text-muted-foreground space-y-3">
+                    <Users className="h-12 w-12 mx-auto opacity-20" />
+                    <p className="font-medium">Select an affiliate above</p>
+                    <p className="text-sm">Pick an affiliate to view or manage its distribution rules.</p>
+                  </div>
+                ) : loadingAffiliateRules ? (
+                  <div className="space-y-3">
+                    {[...Array(4)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : filteredAffiliateRules.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground space-y-3">
+                    <GitMerge className="h-12 w-12 mx-auto opacity-20" />
+                    <p className="font-medium">
+                      {affiliateRuleSearch ? "No rules match your search" : "No distribution rules configured for this affiliate"}
+                    </p>
+                    {!affiliateRuleSearch && (
+                      <Button variant="outline" onClick={() => setIsAddAffiliateRuleOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Rules
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Country</TableHead>
+                          <TableHead>Advertiser</TableHead>
+                          <TableHead className="w-24">Priority</TableHead>
+                          <TableHead className="w-20 text-right">Weight</TableHead>
+                          <TableHead className="w-20 text-center">Active</TableHead>
+                          <TableHead className="w-16 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedAffiliateRules.map((rule) => {
+                          const advertiserInactive = rule.advertiser_is_active === false;
+                          return (
+                            <TableRow key={rule.id} className={advertiserInactive ? "opacity-60 bg-muted/30" : ""}>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs font-mono px-1.5 py-0 mr-1.5">
+                                  {rule.country_code}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {(countryData as Record<string, { name: string }>)[rule.country_code]?.name || rule.country_code}
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {rule.advertiser_name}
+                                  {advertiserInactive && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      Inactive
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={rule.priority_type === "fallback" ? "outline" : "secondary"} className="text-xs">
+                                  {rule.priority_type === "fallback" ? "Fallback" : "Primary"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">{rule.weight}</TableCell>
+                              <TableCell className="text-center">
+                                <Switch
+                                  checked={advertiserInactive ? false : rule.is_active}
+                                  onCheckedChange={(v) => updateAffiliateRule.mutate({ id: rule.id, is_active: v })}
+                                  disabled={advertiserInactive || updateAffiliateRule.isPending}
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteAffiliateRule(rule.id)}
+                                  disabled={deleteAffiliateRule.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+              {selectedAffiliateId && filteredAffiliateRules.length > 0 && (
+                <CardFooter className="pt-0">
+                  <TablePagination
+                    currentPage={affiliateRulePage}
+                    totalPages={affiliateRuleTotalPages}
+                    pageSize={pageSize}
+                    totalItems={filteredAffiliateRules.length}
+                    onPageChange={setAffiliateRulePage}
+                    onPageSizeChange={(s) => { setPageSize(s); setAffiliateRulePage(1); }}
+                    itemLabel="rules"
+                  />
+                </CardFooter>
+              )}
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Rule Builder Sheet */}

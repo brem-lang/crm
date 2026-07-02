@@ -244,12 +244,18 @@ export function LeadsTable({
             {shortId(lead.affiliate_id)}
           </span>
         ) : <span className="text-muted-foreground">-</span>;
-      case "advertiser_id":
-        return lead.advertiser_id ? (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={lead.advertiser_id}>
-            {shortId(lead.advertiser_id)}
+      case "advertiser_id": {
+        // leads.advertiser_id is never populated (a lead can have multiple distribution
+        // attempts) — derive the sent distribution's advertiser_id instead, same source
+        // as the "advertiser" (name) column below.
+        const dists = (lead as any).lead_distributions;
+        const sentAdvertiserId = dists?.find((d: any) => d.status === 'sent')?.advertiser_id;
+        return sentAdvertiserId ? (
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={sentAdvertiserId}>
+            {shortId(sentAdvertiserId)}
           </span>
         ) : <span className="text-muted-foreground">-</span>;
+      }
       case "advertiser":
         // Get the first successful distribution's advertiser name
         const distributions = (lead as any).lead_distributions;
