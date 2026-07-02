@@ -37,13 +37,35 @@ function parseBrowser(ua: string): string {
   return 'Other';
 }
 
-function getClientIp(req: Request): string {
+// Private/internal ranges — Docker bridge networks (e.g. 172.17-18.x.x) and other
+// non-routable hops end up in X-Forwarded-For when a proxy appends its own address
+// instead of only the original client. Skip these when picking the client IP.
+function isPrivateIp(ip: string): boolean {
   return (
-    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    req.headers.get('cf-connecting-ip') ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
+    /^10\./.test(ip) ||
+    /^127\./.test(ip) ||
+    /^192\.168\./.test(ip) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+    ip === '::1' ||
+    /^f[cd][0-9a-f]{2}:/i.test(ip)
   );
+}
+
+function getClientIp(req: Request): string {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const candidates = forwardedFor.split(',').map((ip) => ip.trim()).filter(Boolean);
+    const publicIp = candidates.find((ip) => !isPrivateIp(ip));
+    if (publicIp) return publicIp;
+  }
+
+  const cfIp = req.headers.get('cf-connecting-ip');
+  if (cfIp && !isPrivateIp(cfIp)) return cfIp;
+
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp && !isPrivateIp(realIp)) return realIp;
+
+  return 'unknown';
 }
 
 Deno.serve(async (req) => {
