@@ -103,9 +103,13 @@ function extractExternalLeadId(responseText: string): string | null {
     if (data.details?.leadRequest?.ID) {
       return String(data.details.leadRequest.ID);
     }
+    // Johan MarketLink format: top-level "lead" object contains id/login
+    if (data.lead?.id) {
+      return String(data.lead.id);
+    }
     // Common patterns for external lead IDs
     return String(data.lead_id || data.leadId || data.id || data.signupId || data.signupID ||
-           data.data?.lead_id || data.data?.leadId || data.data?.id || 
+           data.data?.lead_id || data.data?.leadId || data.data?.id ||
            data.data?.signupId || data.data?.signupID ||
            data.leadRequestID || '');
   } catch {
@@ -246,6 +250,11 @@ function extractAutologinUrl(responseText: string): string | null {
     // TrackBox/Nolimits format: addonData.data.loginURL or top-level data as URL
     if (data.addonData?.data?.loginURL) {
       return String(data.addonData.data.loginURL);
+    }
+
+    // Johan MarketLink format: top-level "lead" object contains a "login" autologin URL
+    if (data.lead?.login) {
+      return String(data.lead.login);
     }
     
     // TrackBox alternative: top-level "data" field contains the URL directly
