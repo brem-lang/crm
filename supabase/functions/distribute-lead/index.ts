@@ -2104,20 +2104,6 @@ Deno.serve(async (req) => {
         return rejectedLead?.id ?? null;
       };
 
-      // Best-effort admin notification — must never block the 403 response itself.
-      const notifyTestLeadRejected = async (message: string, leadId: string | null, advId: string | null) => {
-        try {
-          await supabase.from('notifications').insert({
-            type: 'test_lead_rejected',
-            title: 'Test lead rejected',
-            message,
-            metadata: { lead_id: leadId, advertiser_id: advId },
-          });
-        } catch (err) {
-          console.error('Failed to insert notification:', err);
-        }
-      };
-
       // Distribution rule stop check — an inactive rule scoped to this affiliate/country rejects the lead outright
       const stoppedRuleName = await getStoppedRuleReason(supabase, {
         affiliateId: test_lead_data.affiliate_id,
@@ -2125,12 +2111,10 @@ Deno.serve(async (req) => {
       });
       if (stoppedRuleName) {
         const rejectedLeadId = await saveRejectedTestLead();
-        const message = 'Distribution rule is stopped. All leads rejected.';
-        await notifyTestLeadRejected(message, rejectedLeadId, null);
         return new Response(
           JSON.stringify({
             success: false,
-            message,
+            message: 'Distribution rule is stopped. All leads rejected.',
             lead_id: rejectedLeadId,
           }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -2168,12 +2152,10 @@ Deno.serve(async (req) => {
               reason: 'Advertiser is outside working hours',
             });
           }
-          const message = 'Advertiser is outside working hours. Lead rejected.';
-          await notifyTestLeadRejected(message, rejectedLeadId, advertiser_id);
           return new Response(
             JSON.stringify({
               success: false,
-              message,
+              message: 'Advertiser is outside working hours. Lead rejected.',
               lead_id: rejectedLeadId,
             }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
