@@ -15,7 +15,7 @@ import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
 import { countryData } from "@/components/advertisers/countryData";
-import { getScoreBreakdown, type ScoreFactor } from "@/lib/liveLeadScoring";
+import { getScoreBreakdown, SCORE_THRESHOLDS, type ScoreFactor } from "@/lib/liveLeadScoring";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-100 text-blue-800",
@@ -308,9 +308,9 @@ export function LeadsTable({
         const score = (lead as any).live_lead_score;
         if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">—</span>;
         const scoreClass =
-          score >= 75 ? "bg-green-100 text-green-800" :
-          score >= 50 ? "bg-amber-100 text-amber-800" :
-          score >= 25 ? "bg-orange-100 text-orange-800" :
+          score >= SCORE_THRESHOLDS.GREEN ? "bg-green-100 text-green-800" :
+          score >= SCORE_THRESHOLDS.ORANGE ? "bg-amber-100 text-amber-800" :
+          score >= SCORE_THRESHOLDS.LIGHT_RED ? "bg-orange-100 text-orange-800" :
                         "bg-red-100 text-red-800";
         const trigger = (
           <Badge className={`${scoreClass} text-xs font-medium tabular-nums cursor-pointer hover:opacity-80`}>

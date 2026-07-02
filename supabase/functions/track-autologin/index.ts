@@ -129,6 +129,9 @@ Deno.serve(async (req) => {
     }
   }
 
+  // TEMP DEBUG — remove once the missing click IP is diagnosed.
+  console.log('[track-autologin] incoming headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
+
   // Capture click signals from request
   const clickIp = getClientIp(req);
   const clickUa = req.headers.get('user-agent') || null;
