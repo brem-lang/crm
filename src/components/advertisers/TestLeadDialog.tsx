@@ -266,8 +266,9 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
             </div>
           </div>
         ) : (
-          // Show form view
-          <div className="space-y-4">
+          // Show form view — scrolls internally so the footer stays fixed instead of
+          // overflowing past the dialog's max-h-[90vh] when the form content is tall.
+          <div className="space-y-4 flex-1 overflow-y-auto pr-1 -mr-1">
             {/* Mode toggle */}
             <div className="flex rounded-lg border p-1 gap-1">
               <button
