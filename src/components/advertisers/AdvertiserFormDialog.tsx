@@ -90,6 +90,7 @@ export function AdvertiserFormDialog({
       gsi: "https://www.gsimarkets.com/api_add2.php",
       elnopy: "https://tracking.mpowertraffic2.com/api/v3/integration",
       affilio: "",
+      johanmarketlink: "https://api.capital-trading-group.com",
       streamline11: "https://gpapi.org/leads",
       saxo: "https://platform.saxoltd.com/api/external",
       custom: "",
@@ -539,6 +540,26 @@ export function AdvertiserFormDialog({
                   value={formData.config.funnel_name || ''}
                   onChange={(e) => updateConfig('funnel_name', e.target.value)}
                 />
+              </div>
+            </>
+          )}
+
+          {/* === JOHAN MARKETLINK === */}
+          {formData.advertiser_type === 'johanmarketlink' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">Johan MarketLink Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Authorization Token <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="AFF_x_..."
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sent as the `authorization` header on every lead submission
+                </p>
               </div>
             </>
           )}

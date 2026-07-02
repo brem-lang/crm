@@ -2479,6 +2479,7 @@ export type Database = {
         | "elnopy"
         | "reacto"
         | "affilio"
+        | "johanmarketlink"
       app_role: "super_admin" | "manager" | "agent" | "affiliate"
       distribution_status: "pending" | "sent" | "failed"
       injection_lead_status:
@@ -2649,6 +2650,7 @@ export const Constants = {
         "elnopy",
         "reacto",
         "affilio",
+        "johanmarketlink",
       ],
       app_role: ["super_admin", "manager", "agent", "affiliate"],
       distribution_status: ["pending", "sent", "failed"],

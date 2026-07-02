@@ -1298,6 +1298,54 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
+  // Johan MarketLink (Capital Trading Group) — JSON POST, single authorization header
+  johanmarketlink: async (lead, advertiser) => {
+    const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/api/lead_management/api/affiliates`;
+
+    const payload = {
+      country_name: lead.country_code?.toLowerCase() || '',
+      description: lead.offer_name || '',
+      phone: lead.mobile,
+      email: lead.email,
+      first_name: lead.firstname,
+      last_name: lead.lastname,
+      custom_fields: {
+        Source_ID: lead.custom1 || '',
+        How_Much_Invested: lead.custom2 || '',
+        Outline_Your_Case: lead.custom3 || '',
+      },
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'authorization': advertiser.api_key || '',
+    };
+
+    const payloadStr = JSON.stringify(payload);
+    console.log('Johan MarketLink endpoint:', endpoint);
+    console.log('Johan MarketLink payload:', payloadStr);
+
+    let responseText = '';
+    let isSuccess = false;
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers, body: payloadStr });
+      responseText = await response.text();
+      console.log('Johan MarketLink raw response:', response.status, responseText);
+      isSuccess = response.ok; // API returns no body on success — 2xx = accepted
+    } catch (err) {
+      console.error('Johan MarketLink fetch error:', err);
+      responseText = String(err);
+      isSuccess = false;
+    }
+
+    return {
+      success: isSuccess,
+      response: responseText,
+      requestMetadata: { url: endpoint, headers, payload: payloadStr },
+    };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');
