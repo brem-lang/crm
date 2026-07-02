@@ -86,23 +86,25 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
 
     setIsLoading(true);
     setTestResult(null);
+
+    // Declared outside the try block so it's still accessible from catch —
+    // the response payload it's used for is displayed even on rejection (403 etc).
+    const testLeadData = {
+      ...generatedData,
+      offer_name: offerName || undefined,
+      custom1: custom1 || undefined,
+      custom2: custom2 || undefined,
+      custom3: custom3 || undefined,
+      locale: navigator.language || undefined,
+    };
+
     try {
       // Get current user for logging
       const { data: { user } } = await supabase.auth.getUser();
-      
-      // Prepare test lead data with additional fields
-      const testLeadData = {
-        ...generatedData,
-        offer_name: offerName || undefined,
-        custom1: custom1 || undefined,
-        custom2: custom2 || undefined,
-        custom3: custom3 || undefined,
-        locale: navigator.language || undefined,
-      };
-      
+
       // Use test mode - sends directly to advertiser and logs the result
       const { data: funcData, error: funcError } = await supabase.functions.invoke('distribute-lead', {
-        body: { 
+        body: {
           test_mode: true,
           advertiser_id: advertiserId,
           test_lead_data: testLeadData,
@@ -110,7 +112,21 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
         },
       });
 
-      if (funcError) throw funcError;
+      if (funcError) {
+        // supabase.functions.invoke treats any non-2xx response (e.g. our 403 rejections)
+        // as an error and discards the body by default — recover the actual JSON payload
+        // (message, lead_id) from the underlying Response so the real reason is shown.
+        const errorBody = await (funcError as { context?: Response }).context?.json?.().catch(() => null);
+        setTestResult({
+          success: false,
+          message: errorBody?.message || funcError.message || "Test lead was rejected",
+          response: errorBody ?? { error: funcError.message },
+          email: testLeadData.email,
+          lead_id: errorBody?.lead_id,
+        });
+        toast.warning("Test lead was rejected");
+        return;
+      }
 
       // Set the test result with full response
       setTestResult({
