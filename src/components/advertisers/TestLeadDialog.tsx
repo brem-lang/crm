@@ -17,7 +17,14 @@ interface TestLeadDialogProps {
   onOpenChange: (open: boolean) => void;
   advertiserId: string;
   advertiserName: string;
+  advertiserType?: string;
 }
+
+// Advertiser types whose custom_fields have a fixed, documented meaning —
+// shown as field labels/placeholders instead of the generic custom1/2/3.
+const CUSTOM_FIELD_LABELS: Record<string, [string, string, string]> = {
+  johanmarketlink: ["Source ID", "How Much Invested", "Outline Your Case"],
+};
 
 interface TestResult {
   success: boolean;
@@ -27,7 +34,8 @@ interface TestResult {
   lead_id?: string;
 }
 
-export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName }: TestLeadDialogProps) {
+export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName, advertiserType }: TestLeadDialogProps) {
+  const customFieldLabels = (advertiserType && CUSTOM_FIELD_LABELS[advertiserType]) || ["custom1", "custom2", "custom3"];
   const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [selectedCountry, setSelectedCountry] = useState("US");
   const [isLoading, setIsLoading] = useState(false);
@@ -491,17 +499,17 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                 <Input
                   value={custom1}
                   onChange={(e) => setCustom1(e.target.value)}
-                  placeholder="custom1"
+                  placeholder={customFieldLabels[0]}
                 />
                 <Input
                   value={custom2}
                   onChange={(e) => setCustom2(e.target.value)}
-                  placeholder="custom2"
+                  placeholder={customFieldLabels[1]}
                 />
                 <Input
                   value={custom3}
                   onChange={(e) => setCustom3(e.target.value)}
-                  placeholder="custom3"
+                  placeholder={customFieldLabels[2]}
                 />
               </div>
             </div>

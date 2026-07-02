@@ -438,6 +438,7 @@ export default function Advertisers() {
             onOpenChange={setIsTestLeadOpen}
             advertiserId={selectedAdvertiser.id}
             advertiserName={selectedAdvertiser.name}
+            advertiserType={selectedAdvertiser.advertiser_type}
           />
         )}
 
