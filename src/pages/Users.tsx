@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +64,17 @@ export default function Users() {
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserName, setDeleteUserName] = useState<string>("");
+  const [search, setSearch] = useState("");
+
+  const filteredUsers = users?.filter((u) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    return (
+      u.username?.toLowerCase().includes(term) ||
+      u.email?.toLowerCase().includes(term) ||
+      u.full_name?.toLowerCase().includes(term)
+    );
+  });
 
   const handleEditUser = (userToEdit: typeof users extends (infer T)[] | undefined ? T : never) => {
     setEditingUser({
@@ -176,6 +189,15 @@ export default function Users() {
         <Card>
           <CardHeader>
             <CardTitle>All Users</CardTitle>
+            <div className="relative mt-2 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by username, email, or name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -195,7 +217,7 @@ export default function Users() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users?.map((tableUser) => (
+                  {filteredUsers?.map((tableUser) => (
                     <TableRow key={tableUser.id} className={!tableUser.is_active ? "opacity-50 bg-muted/20" : undefined}>
                       <TableCell className="font-mono">
                         <div className="flex items-center gap-2">

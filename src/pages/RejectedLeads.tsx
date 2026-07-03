@@ -15,6 +15,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
@@ -103,6 +105,7 @@ export default function RejectedLeads() {
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
+  const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,17 +129,28 @@ export default function RejectedLeads() {
   const visibleColumns = columns.filter(c => c.visible);
 
   const filteredLeads = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return rejectedLeads?.filter((rejection) => {
-      if (showAllDates) return true;
-      const rejectedDate = new Date(rejection.created_at);
-      const fromStart = getStartOfDay(fromDate);
-      const toEnd = getEndOfDay(toDate);
-      return rejectedDate >= fromStart && rejectedDate <= toEnd;
+      if (!showAllDates) {
+        const rejectedDate = new Date(rejection.created_at);
+        const fromStart = getStartOfDay(fromDate);
+        const toEnd = getEndOfDay(toDate);
+        if (rejectedDate < fromStart || rejectedDate > toEnd) return false;
+      }
+      if (term) {
+        const lead = rejection.leads as any;
+        const haystack = [lead?.firstname, lead?.lastname, lead?.email, lead?.mobile, lead?.request_id]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
     }) || [];
-  }, [rejectedLeads, showAllDates, fromDate, toDate]);
+  }, [rejectedLeads, showAllDates, fromDate, toDate, search]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [showAllDates, fromDate, toDate]);
+  useEffect(() => { setCurrentPage(1); }, [showAllDates, fromDate, toDate, search]);
 
   const totalPages = Math.ceil(filteredLeads.length / pageSize);
   const paginatedLeads = useMemo(() => {
@@ -400,7 +414,7 @@ export default function RejectedLeads() {
           </div>
         </div>
 
-        <Card className="p-4">
+        <Card className="p-4 space-y-4">
           <DateFilterBar
             fromDate={fromDate}
             toDate={toDate}
@@ -408,6 +422,15 @@ export default function RejectedLeads() {
             onToDateChange={setToDate}
             onShowAllChange={setShowAllDates}
           />
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search name, email, phone, or lead ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
         </Card>
 
         <Card>

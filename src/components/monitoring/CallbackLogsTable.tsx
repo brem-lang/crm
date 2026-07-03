@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,7 +16,7 @@ import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
 import { format } from "date-fns";
-import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle, MoreHorizontal, Lock } from "lucide-react";
+import { Webhook, RefreshCw, Eye, CheckCircle2, XCircle, Clock, AlertTriangle, MoreHorizontal, Lock, Search } from "lucide-react";
 
 export function CallbackLogsTable() {
   const { data: logs, isLoading, refetch } = useCallbackLogs(500);
@@ -30,14 +31,25 @@ export function CallbackLogsTable() {
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
+  const [search, setSearch] = useState("");
 
   const filteredLogs = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return (logs ?? []).filter((log) => {
-      if (showAllDates) return true;
-      const d = new Date(log.created_at);
-      return d >= getStartOfDay(fromDate) && d <= getEndOfDay(toDate);
+      if (!showAllDates) {
+        const d = new Date(log.created_at);
+        if (d < getStartOfDay(fromDate) || d > getEndOfDay(toDate)) return false;
+      }
+      if (term) {
+        const haystack = [log.advertiser_name, log.callback_type, log.processing_status, log.matched_by]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
     });
-  }, [logs, showAllDates, fromDate, toDate]);
+  }, [logs, showAllDates, fromDate, toDate, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const paginatedLogs = useMemo(() => {
@@ -135,6 +147,15 @@ export function CallbackLogsTable() {
           <CardDescription>
             Incoming webhook callbacks from advertisers (autologin URLs, status updates, FTD notifications)
           </CardDescription>
+          <div className="relative mt-2 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search advertiser, type, status..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              className="pl-8"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
