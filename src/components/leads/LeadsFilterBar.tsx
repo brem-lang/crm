@@ -299,13 +299,6 @@ export function LeadsFilterBar({
           className="w-full sm:w-[160px]"
         />
 
-        <Input
-          placeholder="Search ID, email, phone, IP..."
-          value={freeSearch}
-          onChange={(e) => onFreeSearchChange(e.target.value)}
-          className="col-span-2 sm:col-span-1 w-full sm:w-[220px] h-9"
-        />
-
         <SearchableSelect
           value={statusFilter}
           onValueChange={onStatusFilterChange}
@@ -364,6 +357,14 @@ export function LeadsFilterBar({
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
           itemLabel="leads"
+          extra={
+            <Input
+              placeholder="Search ID, email, phone, IP..."
+              value={freeSearch}
+              onChange={(e) => onFreeSearchChange(e.target.value)}
+              className="w-full sm:w-64 h-8 ml-0 sm:ml-2"
+            />
+          }
         />
       )}
     </div>

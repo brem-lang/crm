@@ -846,13 +846,6 @@ export default function Conversions() {
                 </SelectContent>
               </Select>
 
-              <Input
-                placeholder="Search by email or ID"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                className="col-span-2 sm:col-span-1 w-full sm:w-[180px] h-9"
-              />
-
               <div className="col-span-2 sm:col-span-1 sm:ml-auto flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
                   <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
@@ -1015,6 +1008,14 @@ export default function Conversions() {
                 onPageChange={setCurrentPage}
                 onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
                 itemLabel="conversions"
+                extra={
+                  <Input
+                    placeholder="Search by email or ID"
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    className="w-full sm:w-64 h-8 ml-0 sm:ml-2"
+                  />
+                }
               />
             </CardFooter>
           )}

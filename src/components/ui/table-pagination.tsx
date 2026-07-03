@@ -10,6 +10,7 @@ export interface TablePaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   itemLabel?: string;
+  extra?: React.ReactNode;
 }
 
 export function TablePagination({
@@ -21,6 +22,7 @@ export function TablePagination({
   onPageChange,
   onPageSizeChange,
   itemLabel = "items",
+  extra,
 }: TablePaginationProps) {
   const startItem = totalItems > 0 ? ((currentPage - 1) * pageSize) + 1 : 0;
   const endItem = Math.min(currentPage * pageSize, totalItems);
@@ -47,8 +49,9 @@ export function TablePagination({
           </SelectContent>
         </Select>
         <span className="text-sm text-muted-foreground">per page</span>
+        {extra}
       </div>
-      
+
       <div className="flex items-center gap-2">
         <Button
           variant="outline"

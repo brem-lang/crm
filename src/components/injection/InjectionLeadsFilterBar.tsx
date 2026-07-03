@@ -289,16 +289,6 @@ export function InjectionLeadsFilterBar({
           </SelectContent>
         </Select>
 
-        {/* Email Search with accent border */}
-        <div className="relative">
-          <Input
-            placeholder="Emails (supports % wildcard)"
-            value={emailSearch}
-            onChange={(e) => onEmailSearchChange(e.target.value)}
-            className="w-[200px] h-9 border-destructive/50 focus-visible:ring-destructive/30"
-          />
-        </div>
-
         {/* Sale Status Multi-Select Filter with icon */}
         <MultiSelect
           options={saleStatusOptions}
@@ -326,6 +316,14 @@ export function InjectionLeadsFilterBar({
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
           itemLabel="leads"
+          extra={
+            <Input
+              placeholder="Emails (supports % wildcard)"
+              value={emailSearch}
+              onChange={(e) => onEmailSearchChange(e.target.value)}
+              className="w-full sm:w-64 h-8 ml-0 sm:ml-2 border-destructive/50 focus-visible:ring-destructive/30"
+            />
+          }
         />
       )}
     </div>

@@ -188,15 +188,17 @@ export default function Users() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
-            <div className="relative mt-2 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by username, email, or name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle>All Users</CardTitle>
+              <div className="relative w-full sm:max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by username, email, or name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>

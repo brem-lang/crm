@@ -147,15 +147,6 @@ export function CallbackLogsTable() {
           <CardDescription>
             Incoming webhook callbacks from advertisers (autologin URLs, status updates, FTD notifications)
           </CardDescription>
-          <div className="relative mt-2 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search advertiser, type, status..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-              className="pl-8"
-            />
-          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -235,6 +226,17 @@ export function CallbackLogsTable() {
               onPageChange={setCurrentPage}
               onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
               itemLabel="logs"
+              extra={
+                <div className="relative w-full sm:w-64 ml-0 sm:ml-2">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search advertiser, type, status..."
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                    className="pl-8 h-8"
+                  />
+                </div>
+              }
             />
           </CardFooter>
         )}
