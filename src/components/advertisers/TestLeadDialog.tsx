@@ -23,7 +23,7 @@ interface TestLeadDialogProps {
 // Advertiser types whose custom_fields have a fixed, documented meaning —
 // shown as field labels/placeholders instead of the generic custom1/2/3.
 const CUSTOM_FIELD_LABELS: Record<string, [string, string, string]> = {
-  johanmarketlink: ["Source ID", "How Much Invested", "Outline Your Case"],
+  capitaltrading: ["Source ID", "How Much Invested", "Outline Your Case"],
 };
 
 interface TestResult {

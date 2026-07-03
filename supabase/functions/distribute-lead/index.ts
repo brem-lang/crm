@@ -103,7 +103,7 @@ function extractExternalLeadId(responseText: string): string | null {
     if (data.details?.leadRequest?.ID) {
       return String(data.details.leadRequest.ID);
     }
-    // Johan MarketLink format: top-level "lead" object contains id/login
+    // Capital Trading format: top-level "lead" object contains id/login
     if (data.lead?.id) {
       return String(data.lead.id);
     }
@@ -252,7 +252,7 @@ function extractAutologinUrl(responseText: string): string | null {
       return String(data.addonData.data.loginURL);
     }
 
-    // Johan MarketLink format: top-level "lead" object contains a "login" autologin URL
+    // Capital Trading format: top-level "lead" object contains a "login" autologin URL
     if (data.lead?.login) {
       return String(data.lead.login);
     }
@@ -1307,8 +1307,8 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
-  // Johan MarketLink (Capital Trading Group) — JSON POST, single authorization header
-  johanmarketlink: async (lead, advertiser) => {
+  // Capital Trading (Capital Trading Group) — JSON POST, single authorization header
+  capitaltrading: async (lead, advertiser) => {
     const baseUrl = (advertiser.url || '').replace(/\/$/, '');
     const endpoint = `${baseUrl}/api/lead_management/api/affiliates`;
 
@@ -1332,18 +1332,18 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
 
     const payloadStr = JSON.stringify(payload);
-    console.log('Johan MarketLink endpoint:', endpoint);
-    console.log('Johan MarketLink payload:', payloadStr);
+    console.log('Capital Trading endpoint:', endpoint);
+    console.log('Capital Trading payload:', payloadStr);
 
     let responseText = '';
     let isSuccess = false;
     try {
       const response = await fetch(endpoint, { method: 'POST', headers, body: payloadStr });
       responseText = await response.text();
-      console.log('Johan MarketLink raw response:', response.status, responseText);
+      console.log('Capital Trading raw response:', response.status, responseText);
       isSuccess = response.ok; // API returns no body on success — 2xx = accepted
     } catch (err) {
-      console.error('Johan MarketLink fetch error:', err);
+      console.error('Capital Trading fetch error:', err);
       responseText = String(err);
       isSuccess = false;
     }

@@ -95,9 +95,9 @@ const advertiserTypes = [
     fields: ["url", "api_key", "username", "auth_password", "lid", "funnel_name", "language"],
   },
   {
-    value: "johanmarketlink",
-    label: "Johan MarketLink",
-    description: "Johan MarketLink (Capital Trading Group) — JSON POST, single authorization header, custom_fields for Source_ID/investment/case",
+    value: "capitaltrading",
+    label: "Capital Trading",
+    description: "Capital Trading — JSON POST, single authorization header, custom_fields for Source_ID/investment/case",
     fields: ["url", "api_key"],
   },
 ];
@@ -284,7 +284,7 @@ export default function Advertisers() {
   const handleFormSubmit = () => {
     const payload = {
       name: formData.name,
-      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "johanmarketlink",
+      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "capitaltrading",
       url: formData.url,
       api_key: formData.api_key,
       is_active: formData.is_active,

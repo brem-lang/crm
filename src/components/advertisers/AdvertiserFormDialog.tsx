@@ -90,7 +90,7 @@ export function AdvertiserFormDialog({
       gsi: "https://www.gsimarkets.com/api_add2.php",
       elnopy: "https://tracking.mpowertraffic2.com/api/v3/integration",
       affilio: "",
-      johanmarketlink: "https://api.capital-trading-group.com",
+      capitaltrading: "https://api.capital-trading-group.com",
       streamline11: "https://gpapi.org/leads",
       saxo: "https://platform.saxoltd.com/api/external",
       custom: "",
@@ -544,11 +544,11 @@ export function AdvertiserFormDialog({
             </>
           )}
 
-          {/* === JOHAN MARKETLINK === */}
-          {formData.advertiser_type === 'johanmarketlink' && (
+          {/* === CAPITAL TRADING === */}
+          {formData.advertiser_type === 'capitaltrading' && (
             <>
               <div className="border-t pt-4 mt-4">
-                <Label className="text-sm font-medium text-muted-foreground">Johan MarketLink Configuration</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Capital Trading Configuration</Label>
               </div>
               <div className="space-y-2">
                 <Label>Authorization Token <span className="text-destructive">*</span></Label>
