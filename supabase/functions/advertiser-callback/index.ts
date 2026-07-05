@@ -110,6 +110,28 @@ Deno.serve(async (req) => {
 
     const updates: Record<string, unknown> = {};
 
+    // For plain API leads (not matched via injection_leads above), verify this
+    // advertiser was actually sent this lead before allowing any status/FTD update.
+    // Without this check any active advertiser could update/tamper with leads that
+    // were only ever distributed to a different advertiser.
+    if (!injectionLead) {
+      const { data: distribution, error: distError } = await supabase
+        .from('lead_distributions')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('advertiser_id', advertiser.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (distError || !distribution) {
+        console.error(`Advertiser ${advertiser.name} (${advertiser.id}) is not associated with lead ${lead.id}`);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Lead not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (injectionLead) {
       // --- INJECTION LEAD: only update sale_status and injection_ftd, never touch status/is_ftd ---
       const injectionLeadUpdates: Record<string, unknown> = {};

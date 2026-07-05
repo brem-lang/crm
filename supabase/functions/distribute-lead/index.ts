@@ -232,7 +232,7 @@ async function getStoppedRuleReason(
   for (const rule of rules ?? []) {
     const c = rule.conditions ?? {};
     const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
-    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.some((cc: string) => cc.toUpperCase() === countryCode.toUpperCase()));
     if (affiliateMatches && countryMatches) return rule.name;
   }
   return null;

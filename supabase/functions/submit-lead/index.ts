@@ -116,7 +116,7 @@ async function getStoppedRuleReason(
   for (const rule of rules ?? []) {
     const c = rule.conditions ?? {};
     const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
-    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.some((cc: string) => cc.toUpperCase() === countryCode.toUpperCase()));
     if (affiliateMatches && countryMatches) return rule.name;
   }
   return null;
@@ -181,6 +181,21 @@ async function isRateLimited(supabase: any, affiliateId: string): Promise<boolea
   return (count ?? 0) >= RATE_LIMIT_RPM;
 }
 
+// Invalid-API-key attempts are logged with affiliate_id: null, so they never
+// count against isRateLimited() above — without this, brute-forcing API keys
+// is completely unthrottled. Bucket those by request IP instead.
+const INVALID_KEY_RATE_LIMIT_PER_IP = 20;
+async function isIpRateLimitedForInvalidKeys(supabase: any, clientIp: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .is('affiliate_id', null)
+    .eq('request_ip', clientIp)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= INVALID_KEY_RATE_LIMIT_PER_IP;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -243,6 +258,19 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const clientIp = getClientIp(req);
+
+    if (await isIpRateLimitedForInvalidKeys(supabase, clientIp)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Too many invalid API key attempts. Try again later.',
+          rejection: { code: 'RATE_LIMITED', message: 'Too many invalid API key attempts from this IP' }
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate API key and get affiliate
     const { data: affiliate, error: affiliateError } = await supabase
       .from('affiliates')
@@ -250,8 +278,6 @@ Deno.serve(async (req) => {
       .eq('api_key', apiKey)
       .eq('is_active', true)
       .maybeSingle();
-
-    const clientIp = getClientIp(req);
 
     if (affiliateError || !affiliate) {
       // Log rejected request with unknown affiliate
@@ -492,6 +518,24 @@ Deno.serve(async (req) => {
       .single();
 
     if (leadInsertError || !newLead) {
+      // Unique violation on the email index means a concurrent request for the
+      // same email won the race between the earlier duplicate check and this
+      // insert — treat it the same as the STEP 4 duplicate check above.
+      if (leadInsertError?.code === '23505') {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'Duplicate email',
+            errors: { email: 'Email already exists in the system' },
+            rejection: {
+              code: 'DUPLICATE_EMAIL',
+              message: 'A lead with this email address already exists'
+            }
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       console.error('Failed to insert lead:', leadInsertError);
       return new Response(
         JSON.stringify({

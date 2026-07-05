@@ -100,6 +100,21 @@ async function isRateLimited(supabase: any, affiliateId: string): Promise<boolea
   return (count ?? 0) >= RATE_LIMIT_RPM;
 }
 
+// Invalid-API-key attempts are logged with affiliate_id: null, so they never
+// count against isRateLimited() above — without this, brute-forcing API keys
+// is completely unthrottled. Bucket those by request IP instead.
+const INVALID_KEY_RATE_LIMIT_PER_IP = 20;
+async function isIpRateLimitedForInvalidKeys(supabase: any, clientIp: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .is('affiliate_id', null)
+    .eq('request_ip', clientIp)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= INVALID_KEY_RATE_LIMIT_PER_IP;
+}
+
 // Returns the name of the first inactive distribution rule whose conditions match this
 // affiliate/country, or null if none match. Inactive rules act as a rejection gate —
 // only leads matching their scope are blocked; everything else routes normally.
@@ -114,7 +129,7 @@ async function getStoppedRuleReason(
   for (const rule of rules ?? []) {
     const c = rule.conditions ?? {};
     const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
-    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.includes(countryCode.toUpperCase()));
+    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.some((cc: string) => cc.toUpperCase() === countryCode.toUpperCase()));
     if (affiliateMatches && countryMatches) return rule.name;
   }
   return null;
@@ -134,32 +149,75 @@ function createResponse(body: ApiResponse, status: number): Response {
   );
 }
 
+// Mirrors submit-lead's validatePhone so v2 enforces the same per-country
+// digit-length rules instead of a generic character-class check.
+function validatePhone(phone: string, countryCode: string): { valid: boolean; error?: string; cleaned?: string } {
+  const cleaned = phone.replace(/\D+/g, '');
+
+  if (cleaned.length < 7) {
+    return { valid: false, error: 'Phone number too short (minimum 7 digits)' };
+  }
+  if (cleaned.length > 15) {
+    return { valid: false, error: 'Phone number too long (maximum 15 digits)' };
+  }
+
+  const countryPhoneRules: Record<string, { minLength: number; maxLength: number; prefix: string }> = {
+    'US': { minLength: 10, maxLength: 10, prefix: '1' },
+    'UK': { minLength: 10, maxLength: 10, prefix: '44' },
+    'GB': { minLength: 10, maxLength: 10, prefix: '44' },
+    'DE': { minLength: 10, maxLength: 11, prefix: '49' },
+    'FR': { minLength: 9, maxLength: 9, prefix: '33' },
+    'AU': { minLength: 9, maxLength: 9, prefix: '61' },
+    'CA': { minLength: 10, maxLength: 10, prefix: '1' },
+    'IL': { minLength: 9, maxLength: 9, prefix: '972' },
+  };
+
+  const rules = countryPhoneRules[countryCode.toUpperCase()];
+  if (rules) {
+    let localNumber = cleaned;
+    if (cleaned.startsWith(rules.prefix)) {
+      localNumber = cleaned.slice(rules.prefix.length);
+    }
+    if (localNumber.length < rules.minLength) {
+      return { valid: false, error: `Phone number too short for ${countryCode} (minimum ${rules.minLength} local digits)` };
+    }
+    if (localNumber.length > rules.maxLength) {
+      return { valid: false, error: `Phone number too long for ${countryCode} (maximum ${rules.maxLength} local digits)` };
+    }
+    return { valid: true, cleaned };
+  }
+
+  return { valid: true, cleaned };
+}
+
 function validateLeadData(body: LeadData): Record<string, string> {
   const errors: Record<string, string> = {};
-  
+
   // Required field validation
   if (!body.firstname?.trim()) errors.firstname = 'First name is required';
   if (!body.lastname?.trim()) errors.lastname = 'Last name is required';
   if (!body.email?.trim()) errors.email = 'Email is required';
   if (!body.mobile?.trim()) errors.mobile = 'Mobile is required';
   if (!body.country_code?.trim()) errors.country_code = 'Country code is required';
-  
+
   // Email format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (body.email && !emailRegex.test(body.email.trim())) {
     errors.email = 'Invalid email format';
   }
-  
-  // Mobile format validation (digits, spaces, dashes, plus, parentheses)
-  const mobileRegex = /^[\d\s\-+()]+$/;
-  if (body.mobile && !mobileRegex.test(body.mobile)) {
-    errors.mobile = 'Invalid mobile format';
+
+  // Country code validation (2-letter ISO codes, matching submit-lead)
+  const countryCodeRegex = /^[A-Za-z]{2}$/;
+  if (body.country_code && !countryCodeRegex.test(body.country_code.trim())) {
+    errors.country_code = 'Country code must be a 2-letter ISO code';
   }
 
-  // Country code validation (2-3 letter ISO codes)
-  const countryCodeRegex = /^[A-Za-z]{2,3}$/;
-  if (body.country_code && !countryCodeRegex.test(body.country_code.trim())) {
-    errors.country_code = 'Country code must be 2-3 letter ISO code';
+  // Mobile validation — same per-country digit-length rules as submit-lead
+  if (body.mobile && body.country_code) {
+    const phoneValidation = validatePhone(body.mobile, body.country_code.trim());
+    if (!phoneValidation.valid) {
+      errors.mobile = phoneValidation.error!;
+    }
   }
 
   // Length validations
@@ -172,7 +230,7 @@ function validateLeadData(body: LeadData): Record<string, string> {
   if (body.email && body.email.length > 255) {
     errors.email = 'Email must be less than 255 characters';
   }
-  
+
   return errors;
 }
 
@@ -228,16 +286,24 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const clientIp = getClientIp(req);
+    const submissionUa = req.headers.get('user-agent') || null;
+
+    if (await isIpRateLimitedForInvalidKeys(supabase, clientIp)) {
+      return createResponse({
+        success: false,
+        message: 'Too many invalid API key attempts. Try again later.',
+        api_version: API_VERSION,
+      }, 429);
+    }
+
     // Validate API key and get affiliate
     const { data: affiliate, error: affiliateError } = await supabase
       .from('affiliates')
-      .select('id, name, is_active, ip_whitelist_required, allowed_ips')
+      .select('id, name, is_active, allowed_countries, ip_whitelist_required, allowed_ips')
       .eq('api_key', apiKey)
       .eq('is_active', true)
       .maybeSingle();
-
-    const clientIp = getClientIp(req);
-    const submissionUa = req.headers.get('user-agent') || null;
 
     if (affiliateError || !affiliate) {
       try {
@@ -326,6 +392,25 @@ Deno.serve(async (req) => {
       }, 422);
     }
 
+    // Check if affiliate is allowed to send leads from this country
+    // allowed_countries: null = all countries, [] = none, ['US', 'UK'] = only these
+    const normalizedCountryCode = leadData.country_code.trim().toUpperCase();
+    if (affiliate.allowed_countries !== null) {
+      const allowedCountries = Array.isArray(affiliate.allowed_countries) ? affiliate.allowed_countries : [];
+      if (!allowedCountries.includes(normalizedCountryCode)) {
+        return createResponse({
+          success: false,
+          message: `Country '${normalizedCountryCode}' is not allowed for your affiliate account`,
+          rejection: {
+            code: 'COUNTRY_NOT_ALLOWED',
+            message: `Your affiliate account is not authorized to send leads from country '${normalizedCountryCode}'`,
+            details: allowedCountries.length > 0 ? `Allowed countries: ${allowedCountries.join(', ')}` : 'No countries are configured for this affiliate. Contact support.',
+          },
+          api_version: API_VERSION,
+        }, 422);
+      }
+    }
+
     // Check for duplicate email
     const normalizedEmail = leadData.email.trim().toLowerCase();
     const { data: existingLead } = await supabase
@@ -358,11 +443,11 @@ Deno.serve(async (req) => {
         country: leadData.country?.trim() || null,
         ip_address: clientIp,
         affiliate_id: affiliate.id,
-        custom1: leadData.custom1 || null,
-        custom2: leadData.custom2 || null,
-        custom3: leadData.custom3 || null,
-        offer_name: leadData.offer_name || null,
-        comment: leadData.comment || null,
+        custom1: leadData.custom1?.substring(0, 255) || null,
+        custom2: leadData.custom2?.substring(0, 255) || null,
+        custom3: leadData.custom3?.substring(0, 255) || null,
+        offer_name: leadData.offer_name?.substring(0, 100) || null,
+        comment: leadData.comment?.substring(0, 500) || null,
         status: 'new',
         request_id: requestId,
         click_ip: leadData.click_ip?.trim() || null,
@@ -376,6 +461,18 @@ Deno.serve(async (req) => {
       .single();
 
     if (leadError) {
+      // Unique violation on the email index means a concurrent request for the
+      // same email won the race between the duplicate check above and this
+      // insert — treat it the same as the earlier duplicate check.
+      if (leadError.code === '23505') {
+        return createResponse({
+          success: false,
+          message: 'Email already exists',
+          errors: { email: 'Duplicate email' },
+          api_version: API_VERSION,
+        }, 409);
+      }
+
       console.error('Lead creation error:', leadError);
       return createResponse({
         success: false,
