@@ -107,6 +107,10 @@ function extractExternalLeadId(responseText: string): string | null {
     if (data.lead?.id) {
       return String(data.lead.id);
     }
+    // We Bull Up format: id nested under data.lead
+    if (data.data?.lead?.id) {
+      return String(data.data.lead.id);
+    }
     // Common patterns for external lead IDs
     return String(data.lead_id || data.leadId || data.id || data.signupId || data.signupID ||
            data.data?.lead_id || data.data?.leadId || data.data?.id ||
@@ -1148,6 +1152,48 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     } catch {
       return { success: response.ok, response: text, requestMetadata: saxoMeta };
     }
+  },
+
+  // We Bull Up — JSON POST, x-api-key header, dedup by phone/email (409 = already known)
+  webullup: async (lead, advertiser) => {
+    const baseUrl = (advertiser.url || 'https://trading.we-bull-up.com/api/external').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/leads`;
+
+    const payload: Record<string, unknown> = { phone: lead.mobile };
+    if (lead.firstname) payload.firstName = lead.firstname;
+    if (lead.lastname) payload.lastName = lead.lastname;
+    if (lead.email) payload.email = lead.email;
+    if (lead.country) payload.country = lead.country;
+    if (lead.city) payload.city = lead.city;
+    if (lead.offer_name) payload.campaign = lead.offer_name;
+    if (lead.comment) payload.agentComment = lead.comment;
+    if (advertiser.config?.source) payload.source = String(advertiser.config.source);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': advertiser.api_key || '',
+    };
+    const body = JSON.stringify(payload);
+    const meta = { url: endpoint, headers, payload: body };
+
+    console.log('We Bull Up endpoint:', endpoint);
+    console.log('We Bull Up payload:', body);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, { method: 'POST', headers, body });
+    } catch (err) {
+      console.error('We Bull Up fetch error:', err);
+      return { success: false, response: JSON.stringify({ error: 'Network error contacting We Bull Up' }), requestMetadata: meta };
+    }
+
+    const text = await response.text();
+    console.log('We Bull Up raw response:', response.status, text);
+
+    // 409 = duplicate phone/email, existing leadId returned — docs say treat as
+    // known/success rather than resubmitting or failing over to another advertiser.
+    const isSuccess = response.ok || response.status === 409;
+    return { success: isSuccess, response: text, requestMetadata: meta };
   },
 
   // NoxWealth — Forex CRM, Bearer token auth, affiliate_id required

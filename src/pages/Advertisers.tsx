@@ -100,6 +100,12 @@ const advertiserTypes = [
     description: "Capital Trading — JSON POST, single authorization header, custom_fields for Source_ID/investment/case",
     fields: ["url", "api_key"],
   },
+  {
+    value: "webullup",
+    label: "We Bull Up",
+    description: "We Bull Up — JSON POST with x-api-key header, dedup by phone/email, paginated status polling",
+    fields: ["url", "api_key"],
+  },
 ];
 
 interface AdvertiserConfig {
@@ -284,7 +290,7 @@ export default function Advertisers() {
   const handleFormSubmit = () => {
     const payload = {
       name: formData.name,
-      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "capitaltrading",
+      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "capitaltrading" | "webullup",
       url: formData.url,
       api_key: formData.api_key,
       is_active: formData.is_active,

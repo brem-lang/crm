@@ -46,6 +46,7 @@ const SYSTEM_TYPES = [
   { code: "noxwealth",  name: "NoxWealth",        description: "NoxWealth Forex CRM — Bearer token, affiliate_id required, JSON POST to /leads/add", request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "affiliate_id"] },
   { code: "affilio",    name: "Affilio",          description: "JSON POST with username/password/apiKey header auth, lid + funnelName routing",          request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "username", "auth_password", "lid"] },
   { code: "capitaltrading", name: "Capital Trading", description: "Capital Trading API — JSON POST with single authorization header, custom_fields for Source_ID/investment amount/case notes", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
+  { code: "webullup",    name: "We Bull Up",       description: "We Bull Up provider API — JSON POST, x-api-key header, dedup by phone/email, paginated status polling", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
   { code: "custom",      name: "Custom",           description: "User-defined fields and auth",                            request_format: "json",             auth_type: "none",        required_fields: [] },
 ];
 

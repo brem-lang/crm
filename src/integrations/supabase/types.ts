@@ -2480,6 +2480,7 @@ export type Database = {
         | "reacto"
         | "affilio"
         | "capitaltrading"
+        | "webullup"
       app_role: "super_admin" | "manager" | "agent" | "affiliate"
       distribution_status: "pending" | "sent" | "failed"
       injection_lead_status:
@@ -2651,6 +2652,7 @@ export const Constants = {
         "reacto",
         "affilio",
         "capitaltrading",
+        "webullup",
       ],
       app_role: ["super_admin", "manager", "agent", "affiliate"],
       distribution_status: ["pending", "sent", "failed"],

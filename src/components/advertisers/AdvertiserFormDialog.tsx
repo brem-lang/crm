@@ -93,6 +93,7 @@ export function AdvertiserFormDialog({
       capitaltrading: "https://api.capital-trading-group.com",
       streamline11: "https://gpapi.org/leads",
       saxo: "https://platform.saxoltd.com/api/external",
+      webullup: "https://trading.we-bull-up.com/api/external",
       custom: "",
     };
     
@@ -449,6 +450,34 @@ export function AdvertiserFormDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Overrides the lead's source field when sending to SAXO
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* === We Bull Up === */}
+          {formData.advertiser_type === 'webullup' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">We Bull Up Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>API Key <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="Your We Bull Up x-api-key"
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Default Source (optional)</Label>
+                <Input
+                  placeholder="e.g. Facebook Ads"
+                  value={formData.config.source || ''}
+                  onChange={(e) => updateConfig('source', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Overrides the default "API - ProviderName" source shown on the We Bull Up side
                 </p>
               </div>
             </>

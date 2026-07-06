@@ -2064,6 +2064,135 @@ async function pollAffilioInjectionLeads(
   return { updated, errors };
 }
 
+// Poll We Bull Up using their paginated updatedFrom list endpoint (documented
+// as the recommended integration pattern — matches primarily by external_lead_id,
+// falling back to email).
+async function pollWeBullUpLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const baseUrl = (advertiser.url || 'https://trading.we-bull-up.com/api/external').replace(/\/$/, '');
+  const updatedFrom = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  console.log(`We Bull Up status polling from: ${updatedFrom}`);
+
+  const now = new Date().toISOString();
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  const allLeads: Record<string, unknown>[] = [];
+  const MAX_PAGES = 10;
+
+  try {
+    let page = 1;
+    let hasNext = true;
+
+    while (hasNext && page <= MAX_PAGES) {
+      const url = new URL(`${baseUrl}/leads`);
+      url.searchParams.set('updatedFrom', updatedFrom);
+      url.searchParams.set('limit', '200');
+      url.searchParams.set('page', String(page));
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'x-api-key': advertiser.api_key || '' },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`We Bull Up status check failed (page ${page}): ${response.status}, body: ${errorText}`);
+        return { updated: 0, errors: 1 };
+      }
+
+      const data = await response.json();
+      const pageLeads: Record<string, unknown>[] = Array.isArray(data.data?.leads) ? data.data.leads : [];
+      allLeads.push(...pageLeads);
+
+      hasNext = !!data.data?.pagination?.hasNext;
+      page++;
+    }
+
+    if (hasNext && page > MAX_PAGES) {
+      console.log(`We Bull Up has more than ${MAX_PAGES} pages of updates — remaining pages were not polled this run`);
+    }
+
+    console.log(`We Bull Up returned ${allLeads.length} updated leads across ${page - 1} page(s)`);
+
+    const byId = new Map<string, Record<string, unknown>>();
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const item of allLeads) {
+      if (item.id) byId.set(String(item.id), item);
+      if (item.email) byEmail.set(String(item.email).toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      distIds.push(dist.id);
+
+      let item = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
+      if (!item && dist.leads?.email) {
+        item = byEmail.get(dist.leads.email.toLowerCase());
+      }
+
+      if (item) {
+        const status = item.status as string | undefined;
+        console.log(`We Bull Up match for ${dist.external_lead_id || dist.leads?.email}: status=${status}`);
+
+        const leadUpdates: Record<string, unknown> = {};
+
+        const oldSaleStatus = (dist.leads as any).sale_status;
+        if (status && status !== oldSaleStatus) {
+          leadUpdates.sale_status = status;
+          console.log(`Sale status updated for lead ${dist.lead_id}: ${status}`);
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
+        }
+
+        const hasFtd = status === 'FTD' && !dist.leads.is_ftd;
+        if (hasFtd) {
+          leadUpdates.is_ftd = true;
+          leadUpdates.ftd_date = (item.statusChangedAt as string) || now;
+          leadUpdates.ftd_id = String(item.id);
+          console.log(`FTD detected for lead ${dist.lead_id} (We Bull Up id: ${item.id})`);
+          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+          ftdCount++;
+        }
+
+        if (Object.keys(leadUpdates).length > 0) {
+          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+          updated++;
+        }
+      }
+    }
+
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling We Bull Up: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -2559,6 +2688,14 @@ Deno.serve(async (req) => {
       // Affilio uses bulk POST /api/pull-leads
       if (advertiserType === 'affilio') {
         const result = await pollAffilioLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
+      // We Bull Up uses bulk paginated GET /leads?updatedFrom=
+      if (advertiserType === 'webullup') {
+        const result = await pollWeBullUpLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;
