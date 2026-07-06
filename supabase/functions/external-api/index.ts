@@ -224,6 +224,26 @@ async function createLeadHandler(
     req.headers.get("x-real-ip") ??
     "unknown";
 
+  // Duplicate IP address check
+  if (clientIp !== "unknown") {
+    const { data: dupIp } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("ip_address", clientIp)
+      .maybeSingle();
+
+    if (dupIp) {
+      return json(
+        {
+          success: false,
+          error: { message: "Lead with this IP address already exists" },
+          data: { leadId: dupIp.id },
+        },
+        409
+      );
+    }
+  }
+
   const { data: newLead, error: insertError } = await supabase
     .from("leads")
     .insert({

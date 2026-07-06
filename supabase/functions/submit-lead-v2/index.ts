@@ -428,6 +428,24 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
+    // Check for duplicate IP address
+    if (clientIp && clientIp !== 'unknown') {
+      const { data: existingIpLead } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('ip_address', clientIp)
+        .maybeSingle();
+
+      if (existingIpLead) {
+        return createResponse({
+          success: false,
+          message: 'IP address already exists',
+          errors: { ip_address: 'Duplicate IP address' },
+          api_version: API_VERSION,
+        }, 409);
+      }
+    }
+
     // Generate request_id here so the API response and DB value are guaranteed identical
     const requestId = crypto.randomUUID();
 

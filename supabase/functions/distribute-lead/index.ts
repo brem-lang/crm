@@ -2178,6 +2178,27 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Duplicate IP address check — applies before any advertiser is contacted,
+      // so a duplicate test lead never wastes a real outbound call to the advertiser.
+      if (test_lead_data.ip_address) {
+        const { data: dupIpLead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('ip_address', test_lead_data.ip_address)
+          .maybeSingle();
+
+        if (dupIpLead) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Lead with this IP address already exists',
+              lead_id: dupIpLead.id,
+            }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       // If specific advertiser_id is provided, use that advertiser only
       if (advertiser_id) {
         const { data: advertiser, error: advError } = await supabase
