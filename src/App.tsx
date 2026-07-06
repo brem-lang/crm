@@ -53,7 +53,6 @@ const InjectionDetail = lazy(() => import("./pages/InjectionDetail"));
 const InjectionLeads = lazy(() => import("./pages/InjectionLeads"));
 const InjectionFailedLeads = lazy(() => import("./pages/InjectionFailedLeads"));
 const SendHistory = lazy(() => import("./pages/SendHistory"));
-const AffiliateRejectedLeads = lazy(() => import("./pages/AffiliateRejectedLeads"));
 const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const CallbackLogs = lazy(() => import("./pages/CallbackLogs"));
 const RolesPermissions = lazy(() => import("./pages/RolesPermissions"));
@@ -123,8 +122,7 @@ const App = () => (
                 <Route path="/injections/failed" element={<InjectionFailedLeads />} />
                 <Route path="/injections/send-history" element={<SendHistory />} />
                 <Route path="/injections/:id" element={<InjectionDetail />} />
-                <Route path="/affiliate-rejected" element={<AffiliateRejectedLeads />} />
-                
+
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/logs/callback-logs" element={<CallbackLogs />} />
                 <Route path="/roles" element={<RolesPermissions />} />

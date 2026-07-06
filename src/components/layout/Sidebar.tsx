@@ -90,9 +90,6 @@ const navItems: NavItem[] = [
     icon: XCircle,
     roles: ["super_admin", "manager"],
     customRoles: ["Admin"],
-    children: [
-      { title: "Affiliate Rejections", href: "/affiliate-rejected", icon: XCircle, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
-    ]
   },
   {
     title: "Reports",

@@ -384,11 +384,6 @@ export const helpArticles: HelpArticle[] = [
           "Each row includes a rejection reason column. Common reasons: 'No matching rule' (no distribution rule matched the lead), 'Caps full' (advertiser daily/monthly cap was hit), 'Outside schedule' (lead arrived outside active hours).",
       },
       {
-        title: "Affiliate Rejections",
-        description:
-          "Under Rejected Leads, click Affiliate Rejections to see leads that were rejected at the affiliate submission stage — before they even entered the routing logic. Common reason: duplicate email.",
-      },
-      {
         title: "Fixing Common Rejections",
         description:
           "For 'No matching rule' rejections, review your Distribution Rules to make sure the lead's country and affiliate are covered. For 'Caps full', check the advertiser's daily cap settings in Advertiser Config.",
