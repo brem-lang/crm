@@ -444,30 +444,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // === STEP 4b: Check for duplicate IP address ===
-    if (clientIp && clientIp !== 'unknown') {
-      const { data: existingIpLead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('ip_address', clientIp)
-        .maybeSingle();
-
-      if (existingIpLead) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Duplicate IP address',
-            errors: { ip_address: 'A lead from this IP address already exists' },
-            rejection: {
-              code: 'DUPLICATE_IP',
-              message: 'A lead from this IP address already exists'
-            }
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
     // Get cleaned phone for later use
     const cleanedPhone = phoneValidation.cleaned!;
     const normalizedCountryCode = body.country_code.trim().toUpperCase();
