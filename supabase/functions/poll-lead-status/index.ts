@@ -15,7 +15,6 @@ interface LeadDistribution {
   leads: {
     id: string;
     email: string;
-    mobile: string;
     firstname: string;
     lastname: string;
     status: string;
@@ -75,18 +74,6 @@ interface ElnopyLeadItem {
   link_id: number;
   domain: string;
   acq: number; // 1 = FTD/Yes, 0 = No
-  created_at: string;
-}
-
-interface CapitalTradingLeadItem {
-  id: number;
-  client_id: number | null;
-  email: string;
-  phone: string;
-  status: string;
-  ftd: string | boolean | null;
-  ftd_amount?: string;
-  ftd_update_date?: string;
   created_at: string;
 }
 
@@ -2077,133 +2064,6 @@ async function pollAffilioInjectionLeads(
   return { updated, errors };
 }
 
-// Poll Capital Trading using their date-range list API — matches by email since the
-// create endpoint returns no lead id for us to correlate against (see distribute-lead's
-// capitaltrading adapter, which falls back to our own lead id as a placeholder).
-async function pollCapitalTradingLeads(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
-  advertiser: LeadDistribution['advertisers'],
-  distributions: LeadDistribution[]
-): Promise<{ updated: number; errors: number }> {
-  let updated = 0;
-  let errors = 0;
-
-  const baseUrl = (advertiser.url || '').replace(/\/$/, '');
-  if (!baseUrl) {
-    console.log(`Capital Trading advertiser ${advertiser.name} has no URL configured`);
-    return { updated: 0, errors: 0 };
-  }
-
-  const endpoint = `${baseUrl}/api/lead_management/api/affiliates`;
-
-  // Date window: last 30 days, formatted D.M.YYYY per the doc's example values
-  const formatDMY = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-  const toDate = new Date();
-  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-  const url = new URL(endpoint);
-  url.searchParams.set('start_date', formatDMY(fromDate));
-  url.searchParams.set('end_date', formatDMY(toDate));
-
-  console.log(`Capital Trading status polling: ${url.toString()}`);
-
-  const now = new Date().toISOString();
-  const { data: convRecord } = await supabase
-    .from('advertiser_conversions')
-    .select('id, conversion')
-    .eq('advertiser_id', advertiser.id)
-    .maybeSingle();
-
-  try {
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'authorization': advertiser.api_key || '' },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log(`Capital Trading status check failed: ${response.status}, body: ${errorText}`);
-      return { updated: 0, errors: 1 };
-    }
-
-    const data = await response.json();
-    const leads: CapitalTradingLeadItem[] = Array.isArray(data.leads) ? data.leads : [];
-    console.log(`Capital Trading returned ${leads.length} leads (total_count: ${data.total_count})`);
-
-    if (data.total_pages > 1) {
-      console.log(`Capital Trading has ${data.total_pages} pages — only the first page is polled, results may be incomplete`);
-    }
-
-    const byEmail = new Map<string, CapitalTradingLeadItem>();
-    const byPhone = new Map<string, CapitalTradingLeadItem>();
-    for (const item of leads) {
-      if (item.email) byEmail.set(item.email.toLowerCase(), item);
-      if (item.phone) byPhone.set(item.phone.replace(/\D+/g, ''), item);
-    }
-
-    console.log(`Mapped ${byEmail.size} Capital Trading leads by email`);
-
-    const historyBatch: HistoryEntry[] = [];
-    const distIds: string[] = [];
-    let ftdCount = 0;
-
-    for (const dist of distributions) {
-      distIds.push(dist.id);
-
-      const distEmail = dist.leads?.email;
-      let ctLead = distEmail ? byEmail.get(String(distEmail).toLowerCase()) : undefined;
-      if (!ctLead && dist.leads?.mobile) {
-        ctLead = byPhone.get(String(dist.leads.mobile).replace(/\D+/g, ''));
-      }
-
-      if (ctLead) {
-        console.log(`Capital Trading match for ${distEmail}: status=${ctLead.status}, ftd=${ctLead.ftd}`);
-
-        const leadUpdates: Record<string, unknown> = {};
-
-        const oldSaleStatus = (dist.leads as any).sale_status;
-        if (ctLead.status && ctLead.status !== oldSaleStatus) {
-          leadUpdates.sale_status = ctLead.status;
-          console.log(`Sale status updated for lead ${dist.lead_id}: ${ctLead.status}`);
-          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, ctLead.status);
-        }
-
-        const hasFtd = (ctLead.ftd === 'true' || ctLead.ftd === true) && !dist.leads.is_ftd;
-        if (hasFtd) {
-          leadUpdates.is_ftd = true;
-          leadUpdates.ftd_date = ctLead.ftd_update_date || now;
-          leadUpdates.ftd_id = String(ctLead.id);
-          console.log(`FTD detected for lead ${dist.lead_id} (Capital Trading id: ${ctLead.id})`);
-          collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
-          ftdCount++;
-        }
-
-        if (Object.keys(leadUpdates).length > 0) {
-          await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
-          updated++;
-        }
-      }
-    }
-
-    if (distIds.length > 0) {
-      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
-    }
-
-    if (ftdCount > 0 && convRecord) {
-      const conv = convRecord as { id: string; conversion: number };
-      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
-    }
-
-    await flushHistory(supabase, historyBatch);
-  } catch (error) {
-    console.error(`Error polling Capital Trading: ${error}`);
-    errors++;
-  }
-
-  return { updated, errors };
-}
-
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -2595,7 +2455,7 @@ Deno.serve(async (req) => {
         external_lead_id,
         last_polled_at,
         created_at,
-        leads!inner (id, email, mobile, firstname, lastname, status, is_ftd, sale_status),
+        leads!inner (id, email, firstname, lastname, status, is_ftd, sale_status),
         advertisers!inner (id, name, advertiser_type, api_key, status_endpoint, url, config)
       `)
       .eq('status', 'sent')
@@ -2699,14 +2559,6 @@ Deno.serve(async (req) => {
       // Affilio uses bulk POST /api/pull-leads
       if (advertiserType === 'affilio') {
         const result = await pollAffilioLeads(supabase, advertiser, advDistributions);
-        totalUpdated += result.updated;
-        totalErrors += result.errors;
-        continue;
-      }
-
-      // Capital Trading uses bulk GET date-range list
-      if (advertiserType === 'capitaltrading') {
-        const result = await pollCapitalTradingLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;

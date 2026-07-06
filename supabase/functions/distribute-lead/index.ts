@@ -1941,14 +1941,8 @@ async function distributeLead(
     
     const { success, response, requestMetadata } = await adapter(lead, advertiserWithConfig);
     
-    // Extract external lead ID and autologin URL from response.
-    // Capital Trading's create endpoint returns no response body on success, so it
-    // never yields an external_lead_id — fall back to our own lead id so the
-    // distribution row still passes poll-lead-status's NOT NULL external_lead_id
-    // filter (status is polled back by email, not by this id).
-    const externalLeadId = success
-      ? (extractExternalLeadId(response) ?? (advertiser.advertiser_type === 'capitaltrading' ? lead.id : null))
-      : null;
+    // Extract external lead ID and autologin URL from response
+    const externalLeadId = success ? extractExternalLeadId(response) : null;
     const autologinUrl = success ? extractAutologinUrl(response) : null;
     
     if (externalLeadId) {
