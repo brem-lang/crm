@@ -88,7 +88,7 @@ function PrintLayout({ crmName }: { crmName: string }) {
               ["mobile", "string", true, "Lead's phone number"],
               ["country_code", "string", true, "2-letter ISO country code (e.g., US, GB, CA)"],
               ["country", "string", false, "Full country name"],
-              ["ip_address", "string", false, "Lead's IP address"],
+              ["ip_address", "string", true, "Lead's IP address"],
               ["offer_name", "string", false, "Offer/campaign name"],
               ["custom1", "string", false, "Custom tracking parameter 1"],
               ["custom2", "string", false, "Custom tracking parameter 2"],
@@ -466,7 +466,7 @@ export default function ApiDocs() {
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">mobile</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="destructive">Required</Badge></td><td className="py-2">Lead's phone number</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">country_code</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="destructive">Required</Badge></td><td className="py-2">2-letter ISO country code (e.g., US, GB, CA)</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">country</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Full country name</td></tr>
-                      <tr className="border-b"><td className="py-2 pr-4 font-mono">ip_address</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Lead's IP address</td></tr>
+                      <tr className="border-b"><td className="py-2 pr-4 font-mono">ip_address</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="destructive">Required</Badge></td><td className="py-2">Lead's IP address</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">offer_name</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Offer/campaign name</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">custom1</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Custom tracking parameter 1</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">custom2</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Custom tracking parameter 2</td></tr>

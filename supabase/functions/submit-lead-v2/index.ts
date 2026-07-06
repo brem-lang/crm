@@ -199,6 +199,7 @@ function validateLeadData(body: LeadData): Record<string, string> {
   if (!body.email?.trim()) errors.email = 'Email is required';
   if (!body.mobile?.trim()) errors.mobile = 'Mobile is required';
   if (!body.country_code?.trim()) errors.country_code = 'Country code is required';
+  if (!body.ip_address?.trim()) errors.ip_address = 'IP address is required';
 
   // Email format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

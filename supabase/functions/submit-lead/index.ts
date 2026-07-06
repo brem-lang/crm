@@ -368,6 +368,8 @@ Deno.serve(async (req) => {
     if (!body.country_code?.trim()) errors.country_code = 'Country code is required';
     else if (body.country_code.trim().length !== 2) errors.country_code = 'Country code must be 2 characters (ISO 3166-1 alpha-2)';
 
+    if (!body.ip_address?.trim()) errors.ip_address = 'IP address is required';
+
     if (Object.keys(errors).length > 0) {
       return new Response(
         JSON.stringify({ 
