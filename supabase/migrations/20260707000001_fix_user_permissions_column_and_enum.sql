@@ -188,6 +188,19 @@ USING (
   )
 );
 
+-- === lead_distributions (same bug, from the earlier 20260627000000 fix) ===
+
+DROP POLICY IF EXISTS "lead_distributions_select_direct_permission" ON public.lead_distributions;
+CREATE POLICY "lead_distributions_select_direct_permission"
+ON public.lead_distributions FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.user_permissions
+    WHERE user_id = auth.uid()
+      AND permission = 'view_leads'
+  )
+);
+
 -- === leads ===
 
 DROP POLICY IF EXISTS "leads_select_direct_permission" ON public.leads;
