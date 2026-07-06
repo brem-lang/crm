@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 
 export type UserPermission =
   // Leads
+  | 'view_leads'
   | 'view_phone'
   | 'view_email'
   | 'view_all_leads'
@@ -14,11 +15,13 @@ export type UserPermission =
   | 'resend_leads'
   | 'add_leads_to_test'
   // Advertisers
+  | 'view_advertisers'
   | 'create_advertisers'
   | 'edit_advertisers'
   | 'delete_advertisers'
   | 'edit_advertiser_config'
   // Affiliates
+  | 'view_affiliates'
   | 'create_affiliates'
   | 'edit_affiliates'
   | 'delete_affiliates'
@@ -81,6 +84,7 @@ export type UserPermission =
 
 export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; description: string; group: string }[] = [
   // Leads
+  { group: 'Leads', id: 'view_leads', label: 'View Leads', description: 'Can access the Leads page and view lead records' },
   { group: 'Leads', id: 'view_phone', label: 'View Phone Numbers', description: 'Can see lead phone numbers' },
   { group: 'Leads', id: 'view_email', label: 'View Emails', description: 'Can see lead email addresses' },
   { group: 'Leads', id: 'view_all_leads', label: 'View All Leads', description: 'Can view all leads, not just assigned ones' },
@@ -90,11 +94,13 @@ export const AVAILABLE_PERMISSIONS: { id: UserPermission; label: string; descrip
   { group: 'Leads', id: 'resend_leads', label: 'Resend Leads', description: 'Can resend leads to advertisers' },
   { group: 'Leads', id: 'add_leads_to_test', label: 'Add Leads to Test', description: 'Can add leads to the test pool' },
   // Advertisers
+  { group: 'Advertisers', id: 'view_advertisers', label: 'View Advertisers', description: 'Can access the Advertisers page and view advertiser records' },
   { group: 'Advertisers', id: 'create_advertisers', label: 'Create Advertisers', description: 'Can add new advertisers' },
   { group: 'Advertisers', id: 'edit_advertisers', label: 'Edit Advertisers', description: 'Can edit advertiser details' },
   { group: 'Advertisers', id: 'delete_advertisers', label: 'Delete Advertisers', description: 'Can delete advertisers' },
   { group: 'Advertisers', id: 'edit_advertiser_config', label: 'Edit Advertiser Config', description: 'Can manage advertiser distribution config (pause/activate, cap settings)' },
   // Affiliates
+  { group: 'Affiliates', id: 'view_affiliates', label: 'View Affiliates', description: 'Can access the Affiliates page and view affiliate records' },
   { group: 'Affiliates', id: 'create_affiliates', label: 'Create Affiliates', description: 'Can add new affiliates' },
   { group: 'Affiliates', id: 'edit_affiliates', label: 'Edit Affiliates', description: 'Can edit affiliate details' },
   { group: 'Affiliates', id: 'delete_affiliates', label: 'Delete Affiliates', description: 'Can delete affiliates' },
@@ -258,6 +264,7 @@ export function useCurrentUserPermissions() {
     isLoading,
     hasPermission,
     // Leads
+    canViewLeads: hasPermission('view_leads'),
     canViewPhone: hasPermission('view_phone'),
     canViewEmail: hasPermission('view_email'),
     canViewAllLeads: hasPermission('view_all_leads'),
@@ -267,11 +274,13 @@ export function useCurrentUserPermissions() {
     canResendLeads: hasPermission('resend_leads'),
     canAddLeadsToTest: hasPermission('add_leads_to_test'),
     // Advertisers
+    canViewAdvertisers: hasPermission('view_advertisers'),
     canCreateAdvertisers: hasPermission('create_advertisers'),
     canEditAdvertisers: hasPermission('edit_advertisers'),
     canDeleteAdvertisers: hasPermission('delete_advertisers'),
     canEditAdvertiserConfig: hasPermission('edit_advertiser_config'),
     // Affiliates
+    canViewAffiliates: hasPermission('view_affiliates'),
     canCreateAffiliates: hasPermission('create_affiliates'),
     canEditAffiliates: hasPermission('edit_affiliates'),
     canDeleteAffiliates: hasPermission('delete_affiliates'),
