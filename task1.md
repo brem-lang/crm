@@ -1,2 +1,1 @@
-the ip_address must be a required field when sending leads via api,
-update also the docs to make the ip_address required
+if the ip_address is already exist in the database it should not be save and return error message

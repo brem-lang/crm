@@ -429,22 +429,21 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
-    // Check for duplicate IP address
-    if (clientIp && clientIp !== 'unknown') {
-      const { data: existingIpLead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('ip_address', clientIp)
-        .maybeSingle();
+    // Check for duplicate IP address (client-supplied, required by validateLeadData above)
+    const submittedIp = leadData.ip_address!.trim();
+    const { data: existingIpLead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('ip_address', submittedIp)
+      .maybeSingle();
 
-      if (existingIpLead) {
-        return createResponse({
-          success: false,
-          message: 'IP address already exists',
-          errors: { ip_address: 'Duplicate IP address' },
-          api_version: API_VERSION,
-        }, 409);
-      }
+    if (existingIpLead) {
+      return createResponse({
+        success: false,
+        message: 'IP address already exists',
+        errors: { ip_address: 'Duplicate IP address' },
+        api_version: API_VERSION,
+      }, 409);
     }
 
     // Generate request_id here so the API response and DB value are guaranteed identical
@@ -460,7 +459,7 @@ Deno.serve(async (req) => {
         mobile: leadData.mobile.replace(/\D+/g, ''), // Strip non-digits
         country_code: leadData.country_code.trim().toUpperCase(),
         country: leadData.country?.trim() || null,
-        ip_address: clientIp,
+        ip_address: submittedIp,
         affiliate_id: affiliate.id,
         custom1: leadData.custom1?.substring(0, 255) || null,
         custom2: leadData.custom2?.substring(0, 255) || null,

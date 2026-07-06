@@ -446,28 +446,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // === STEP 4b: Check for duplicate IP address ===
-    if (clientIp && clientIp !== 'unknown') {
-      const { data: existingIpLead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('ip_address', clientIp)
-        .maybeSingle();
+    // === STEP 4b: Check for duplicate IP address (client-supplied, required at STEP 1) ===
+    const submittedIp = body.ip_address.trim();
+    const { data: existingIpLead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('ip_address', submittedIp)
+      .maybeSingle();
 
-      if (existingIpLead) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Duplicate IP address',
-            errors: { ip_address: 'A lead from this IP address already exists' },
-            rejection: {
-              code: 'DUPLICATE_IP',
-              message: 'A lead from this IP address already exists'
-            }
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    if (existingIpLead) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Duplicate IP address',
+          errors: { ip_address: 'A lead from this IP address already exists' },
+          rejection: {
+            code: 'DUPLICATE_IP',
+            message: 'A lead from this IP address already exists'
+          }
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Get cleaned phone for later use
@@ -509,8 +508,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === STEP 6: Use server-detected IP only — never trust client-supplied ip_address ===
-    const leadIp = clientIp;
+    // === STEP 6: ip_address is stored/checked as submitted by the client (required at STEP 1) ===
+    const leadIp = submittedIp;
     const submissionUa = req.headers.get('user-agent') || null;
     const requestId = crypto.randomUUID();
 
