@@ -1,0 +1,14 @@
+-- URGENT FIX: leads_select_advertiser_manager (added in
+-- 20260707000000_fix_leads_affiliates_advertisers_rls.sql) queries
+-- lead_distributions, whose own policy lead_distributions_select_affiliate_manager
+-- (20260627000000_fix_lead_distributions_rls.sql) queries back into leads.
+-- This circular RLS dependency causes Postgres to throw "infinite recursion
+-- detected in policy for relation leads" on EVERY query to leads, for every
+-- role — including super_admin — which is why leads stopped loading
+-- entirely ("Failed to load leads") rather than just being empty for one role.
+--
+-- Drop the offending policy. Advertiser-manager-scoped lead visibility was
+-- extra, optional scope beyond what's actually needed right now (the "Admin"
+-- custom role gap is fixed separately via is_super_admin(), which does not
+-- depend on this policy at all).
+DROP POLICY IF EXISTS "leads_select_advertiser_manager" ON public.leads;
