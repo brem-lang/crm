@@ -542,25 +542,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (leadInsertError || !newLead) {
-      // Unique violation on the email/IP index means a concurrent request won
-      // the race between the earlier duplicate check and this insert — treat
-      // it the same as the STEP 4/4b duplicate checks above.
+      // Unique violation on the email index means a concurrent request for the
+      // same email won the race between the earlier duplicate check and this
+      // insert — treat it the same as the STEP 4 duplicate check above.
       if (leadInsertError?.code === '23505') {
-        if (leadInsertError.message?.includes('idx_leads_ip_address_unique')) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: 'Duplicate IP address',
-              errors: { ip_address: 'A lead from this IP address already exists' },
-              rejection: {
-                code: 'DUPLICATE_IP',
-                message: 'A lead from this IP address already exists'
-              }
-            }),
-            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
         return new Response(
           JSON.stringify({
             success: false,
