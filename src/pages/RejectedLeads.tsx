@@ -1,29 +1,22 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useRejectedLeads, useDeleteRejectedLeads } from "@/hooks/useRejectedLeads";
 import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
-import { useAuth } from "@/hooks/useAuth";
-import { countryData } from "@/components/advertisers/countryData";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { SortConfig } from "@/components/leads/SortableHeader";
+import { RejectedLeadsFilterBar } from "@/components/rejected-leads/RejectedLeadsFilterBar";
+import { RejectedLeadsTable } from "@/components/rejected-leads/RejectedLeadsTable";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns";
-import { AlertCircle, XCircle, Trash2, Copy } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-import { DateFilterBar } from "@/components/filters/DateFilterBar";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
-import { toast } from "sonner";
-import { shortId } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const STORAGE_KEY = "rejected-leads-column-visibility";
 
@@ -61,17 +54,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "live_lead_status", label: "Live Lead",        visible: false },
   { id: "live_lead_score",  label: "Live Score",       visible: false },
   { id: "created_at",       label: "Created",          visible: true  },
-  { id: "rejection_reason", label: "Rejection Reason", visible: true  },
 ];
-
-const statusColors: Record<string, string> = {
-  new:       "bg-blue-100 text-blue-800",
-  contacted: "bg-yellow-100 text-yellow-800",
-  qualified: "bg-purple-100 text-purple-800",
-  converted: "bg-green-100 text-green-800",
-  lost:      "bg-red-100 text-red-800",
-  rejected:  "bg-red-100 text-red-800",
-};
 
 function loadColumns(): ColumnConfig[] {
   try {
@@ -96,7 +79,7 @@ function loadColumns(): ColumnConfig[] {
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 25, 50, 100];
 
 export default function RejectedLeads() {
-  const { data: rejectedLeads, isLoading, error } = useRejectedLeads();
+  const { data: rejectedLeads, isLoading, isFetching, error, refetch } = useRejectedLeads();
   const deleteRejectedLeads = useDeleteRejectedLeads();
   const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { canDeleteLeads } = useCurrentUserPermissions();
@@ -106,10 +89,50 @@ export default function RejectedLeads() {
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [search, setSearch] = useState("");
+  const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
+  const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columns, setColumns] = useState<ColumnConfig[]>(loadColumns);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = usePageSizeState();
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ column: "", direction: null });
+  const [pendingDelete, setPendingDelete] = useState<any | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
+  // Fetch advertisers/affiliates for filter dropdowns
+  const { data: advertisers = [] } = useQuery({
+    queryKey: ["advertisers-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("advertisers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: affiliates = [] } = useQuery({
+    queryKey: ["affiliates-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("affiliates")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const countries = useMemo(() => {
+    const codes = new Set(
+      (rejectedLeads || []).map((r: any) => r.leads?.country_code).filter(Boolean)
+    );
+    return Array.from(codes).sort();
+  }, [rejectedLeads]);
 
   const handleToggleColumn = (columnId: string) => {
     setColumns(prev => {
@@ -130,16 +153,31 @@ export default function RejectedLeads() {
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return rejectedLeads?.filter((rejection) => {
+    return rejectedLeads?.filter((rejection: any) => {
       if (!showAllDates) {
         const rejectedDate = new Date(rejection.created_at);
         const fromStart = getStartOfDay(fromDate);
         const toEnd = getEndOfDay(toDate);
         if (rejectedDate < fromStart || rejectedDate > toEnd) return false;
       }
+      if (advertiserFilter !== "all" && rejection.advertiser_id !== advertiserFilter) return false;
+      if (affiliateFilter !== "all" && rejection.leads?.affiliate_id !== affiliateFilter) return false;
+      if (countryFilter !== "all" && rejection.leads?.country_code !== countryFilter) return false;
       if (term) {
         const lead = rejection.leads as any;
-        const haystack = [lead?.firstname, lead?.lastname, lead?.email, lead?.mobile, lead?.request_id]
+        const haystack = [
+          lead?.firstname,
+          lead?.lastname,
+          lead?.email,
+          lead?.mobile,
+          lead?.request_id,
+          lead?.ip_address,
+          lead?.ftd_id,
+          rejection.id,
+          rejection.lead_id,
+          rejection.advertisers?.name,
+          lead?.affiliates?.name,
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -147,23 +185,74 @@ export default function RejectedLeads() {
       }
       return true;
     }) || [];
-  }, [rejectedLeads, showAllDates, fromDate, toDate, search]);
+  }, [rejectedLeads, showAllDates, fromDate, toDate, advertiserFilter, affiliateFilter, countryFilter, search]);
+
+  const sortedLeads = useMemo(() => {
+    if (!sortConfig.direction) return filteredLeads;
+
+    return [...filteredLeads].sort((a: any, b: any) => {
+      let aVal: any;
+      let bVal: any;
+
+      switch (sortConfig.column) {
+        case "affiliate":
+          aVal = a.leads?.affiliates?.name || "";
+          bVal = b.leads?.affiliates?.name || "";
+          break;
+        case "advertiser":
+          aVal = a.advertisers?.name || "";
+          bVal = b.advertisers?.name || "";
+          break;
+        case "created_at":
+          aVal = new Date(a.created_at).getTime();
+          bVal = new Date(b.created_at).getTime();
+          return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+        case "ftd_date":
+          aVal = a.leads?.ftd_date ? new Date(a.leads.ftd_date).getTime() : 0;
+          bVal = b.leads?.ftd_date ? new Date(b.leads.ftd_date).getTime() : 0;
+          return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+        case "is_ftd":
+          aVal = a.leads?.is_ftd ? 1 : 0;
+          bVal = b.leads?.is_ftd ? 1 : 0;
+          return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+        default:
+          aVal = a.leads?.[sortConfig.column] ?? "";
+          bVal = b.leads?.[sortConfig.column] ?? "";
+      }
+
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortConfig.direction === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      return 0;
+    });
+  }, [filteredLeads, sortConfig]);
+
+  const handleSort = (columnId: string) => {
+    setSortConfig((prev) => {
+      if (prev.column === columnId) {
+        if (prev.direction === "asc") return { column: columnId, direction: "desc" };
+        if (prev.direction === "desc") return { column: "", direction: null };
+      }
+      return { column: columnId, direction: "asc" };
+    });
+  };
 
   // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [showAllDates, fromDate, toDate, search]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [showAllDates, fromDate, toDate, advertiserFilter, affiliateFilter, countryFilter, search]);
 
-  const totalPages = Math.ceil(filteredLeads.length / pageSize);
+  const totalPages = Math.ceil(sortedLeads.length / pageSize);
   const paginatedLeads = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredLeads.slice(start, start + pageSize);
-  }, [filteredLeads, currentPage, pageSize]);
-
-  const allSelected = filteredLeads.length > 0 && filteredLeads.every(lead => selectedIds.has(lead.id));
-  const someSelected = filteredLeads.some(lead => selectedIds.has(lead.id)) && !allSelected;
+    return sortedLeads.slice(start, start + pageSize);
+  }, [sortedLeads, currentPage, pageSize]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(filteredLeads.map(lead => lead.id)));
+      setSelectedIds(new Set(sortedLeads.map((lead: any) => lead.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -177,9 +266,9 @@ export default function RejectedLeads() {
   };
 
   const handleBulkDelete = () => {
-    const itemsToDelete = filteredLeads
-      .filter(lead => selectedIds.has(lead.id))
-      .map(lead => ({
+    const itemsToDelete = sortedLeads
+      .filter((lead: any) => selectedIds.has(lead.id))
+      .map((lead: any) => ({
         id: lead.id,
         source: lead.source,
         lead_id: lead.lead_id,
@@ -190,176 +279,12 @@ export default function RejectedLeads() {
     });
   };
 
-  const renderCellValue = (rejection: any, columnId: string) => {
-    const lead = rejection.leads as any;
-    const advertiser = rejection.advertisers as any;
-
-    switch (columnId) {
-      case "request_id": {
-        const rid = lead?.request_id || "-";
-        return (
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={rid}>
-            {rid !== "-" ? rid.substring(0, 8) : rid}
-          </span>
-        );
-      }
-      case "firstname":
-        return lead?.firstname || "-";
-      case "lastname":
-        return lead?.lastname || "-";
-      case "email":
-        return (
-          <div className="flex items-center gap-1">
-            <span className="text-xs">{lead?.email || "-"}</span>
-            {lead?.email && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 shrink-0"
-                onClick={() => {
-                  navigator.clipboard.writeText(lead.email);
-                  toast.success("Email copied");
-                }}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-        );
-      case "mobile":
-        return lead?.mobile || "-";
-      case "country_code":
-        return lead?.country_code
-          ? <Badge variant="secondary">{lead.country_code}</Badge>
-          : "-";
-      case "country": {
-        const name = lead?.country || countryData[lead?.country_code?.toUpperCase()]?.name;
-        return name || "-";
-      }
-      case "city":
-        return lead?.city || "-";
-      case "ip_address":
-        return lead?.ip_address || "-";
-      case "status":
-        return lead?.status
-          ? (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[lead.status] || "bg-gray-100 text-gray-800"}`}>
-              {lead.status}
-            </span>
-          )
-          : "-";
-      case "sale_status":
-        return lead?.sale_status
-          ? (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[lead.sale_status] || "bg-gray-100 text-gray-800"}`}>
-              {lead.sale_status}
-            </span>
-          )
-          : "-";
-      case "advertiser":
-        return <Badge variant="outline">{advertiser?.name || "Unknown"}</Badge>;
-      case "advertiser_id":
-        return lead?.advertiser_id
-          ? <span className="font-mono text-xs" title={lead.advertiser_id}>{shortId(lead.advertiser_id)}</span>
-          : "-";
-      case "is_ftd":
-        return lead?.is_ftd
-          ? <Badge className="bg-green-100 text-green-800">Yes</Badge>
-          : <Badge variant="secondary">No</Badge>;
-      case "ftd_date":
-        return lead?.ftd_date ? format(new Date(lead.ftd_date), "MMM d, yyyy") : "-";
-      case "ftd_id":
-        return lead?.ftd_id
-          ? <span className="font-mono text-xs" title={lead.ftd_id}>{shortId(lead.ftd_id)}</span>
-          : "-";
-      case "injection_ftd":
-        return lead?.injection_ftd
-          ? <Badge className="bg-green-100 text-green-800">Yes</Badge>
-          : <Badge variant="secondary">No</Badge>;
-      case "affiliate":
-        return lead?.affiliates?.name || "-";
-      case "affiliate_id":
-        return lead?.affiliate_id
-          ? <span className="font-mono text-xs" title={lead.affiliate_id}>{shortId(lead.affiliate_id)}</span>
-          : "-";
-      case "offer_name":
-        return lead?.offer_name || "-";
-      case "autologin":
-        return lead?.autologin || "-";
-      case "user_agent":
-        return <span className="text-xs max-w-[200px] truncate block" title={lead?.user_agent}>{lead?.user_agent || "-"}</span>;
-      case "platform":
-        return lead?.platform || "-";
-      case "browser":
-        return lead?.browser || "-";
-      case "comment":
-        return lead?.comment || "-";
-      case "custom1":
-        return lead?.custom1 || "-";
-      case "custom2":
-        return lead?.custom2 || "-";
-      case "custom3":
-        return lead?.custom3 || "-";
-      case "custom4":
-        return lead?.custom4 || "-";
-      case "custom5":
-        return lead?.custom5 || "-";
-      case "live_lead_status": {
-        const statusMap: Record<string, { label: string; className: string }> = {
-          green:       { label: "Live",        className: "bg-green-100 text-green-800" },
-          orange:      { label: "Likely Live", className: "bg-amber-100 text-amber-800" },
-          "light-red": { label: "Suspicious",  className: "bg-orange-100 text-orange-800" },
-          red:         { label: "NO",          className: "bg-red-100 text-red-800" },
-        };
-        const s = lead?.live_lead_status;
-        if (!s) return "-";
-        const entry = statusMap[s];
-        return entry
-          ? <Badge className={entry.className}>{entry.label}</Badge>
-          : <Badge variant="secondary">{s}</Badge>;
-      }
-      case "live_lead_score":
-        return lead?.live_lead_score != null ? String(lead.live_lead_score) : "-";
-      case "created_at":
-        return rejection.created_at ? formatDate(new Date(rejection.created_at)) : "-";
-      case "rejection_reason":
-        return (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive border-destructive/50 hover:bg-destructive/10"
-              >
-                View Details
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Rejection Details</DialogTitle>
-                <DialogDescription>
-                  Full error response from {advertiser?.name}
-                </DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="max-h-[400px] border rounded-lg bg-muted/50">
-                <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                  {rejection.reason
-                    ? (() => {
-                        try {
-                          return JSON.stringify(JSON.parse(rejection.reason), null, 2);
-                        } catch {
-                          return rejection.reason;
-                        }
-                      })()
-                    : "No details available"}
-                </pre>
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-        );
-      default:
-        return "-";
-    }
+  const handleConfirmSingleDelete = () => {
+    if (!pendingDelete) return;
+    deleteRejectedLeads.mutate(
+      [{ id: pendingDelete.id, source: pendingDelete.source, lead_id: pendingDelete.lead_id }],
+      { onSuccess: () => setPendingDelete(null) }
+    );
   };
 
   return (
@@ -372,9 +297,46 @@ export default function RejectedLeads() {
               View leads that failed distribution to advertisers
             </p>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            {selectedIds.size > 0 && canDeleteLeads && (
-              <AlertDialog>
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2${isFetching ? " animate-spin" : ""}`} />
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
+
+        <Card className="p-4">
+          <RejectedLeadsFilterBar
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDateChange={(d) => { setShowAllDates(false); setFromDate(d); }}
+            onToDateChange={(d) => { setShowAllDates(false); setToDate(d); }}
+            onShowAllDates={() => setShowAllDates(true)}
+            advertiserFilter={advertiserFilter}
+            onAdvertiserFilterChange={setAdvertiserFilter}
+            countryFilter={countryFilter}
+            onCountryFilterChange={setCountryFilter}
+            affiliateFilter={affiliateFilter}
+            onAffiliateFilterChange={setAffiliateFilter}
+            freeSearch={search}
+            onFreeSearchChange={setSearch}
+            advertisers={advertisers}
+            affiliates={affiliates}
+            countries={countries}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            totalItems={sortedLeads.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          >
+            <LeadColumnSelector
+              columns={columns}
+              onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              isSuperAdmin={isSuperAdmin}
+            />
+            {canDeleteLeads && selectedIds.size > 0 && (
+              <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -401,39 +363,20 @@ export default function RejectedLeads() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            <LeadColumnSelector
-              columns={columns}
-              onToggle={handleToggleColumn}
-              onReorder={handleReorderColumns}
-              isSuperAdmin={isSuperAdmin}
-            />
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm">{filteredLeads.length} rejected leads</span>
+          </RejectedLeadsFilterBar>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3 pt-3 border-t">
+              <span>
+                {selectedIds.size} lead{selectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Clear selection
+              </Button>
             </div>
-          </div>
-        </div>
-
-        <Card className="p-4">
-          <DateFilterBar
-            fromDate={fromDate}
-            toDate={toDate}
-            onFromDateChange={setFromDate}
-            onToDateChange={setToDate}
-            onShowAllChange={setShowAllDates}
-          />
+          )}
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-destructive" />
-              Failed Distributions
-            </CardTitle>
-            <CardDescription>
-              Leads rejected by advertisers with error details
-            </CardDescription>
-          </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-4">
@@ -445,82 +388,61 @@ export default function RejectedLeads() {
               <p className="text-center text-muted-foreground py-8">
                 Failed to load rejected leads. Please try again.
               </p>
-            ) : filteredLeads.length === 0 ? (
-              <div className="text-center py-12">
-                <XCircle className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground">No rejected leads found</p>
-                <p className="text-sm text-muted-foreground/70 mt-1">
-                  All leads have been successfully distributed
-                </p>
-              </div>
+            ) : sortedLeads.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No rejected leads found.
+              </p>
             ) : (
-              <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {canDeleteLeads && (
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={someSelected ? "indeterminate" : allSelected}
-                            onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                          />
-                        </TableHead>
-                      )}
-                      {visibleColumns.map(col => (
-                        <TableHead key={col.id}>{col.label}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedLeads.map((rejection) => (
-                      <TableRow
-                        key={rejection.id}
-                        className={selectedIds.has(rejection.id) ? "bg-muted/50" : ""}
-                      >
-                        {canDeleteLeads && (
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedIds.has(rejection.id)}
-                              onCheckedChange={(checked) => handleSelectChange(rejection.id, !!checked)}
-                            />
-                          </TableCell>
-                        )}
-                        {visibleColumns.map(col => (
-                          <TableCell key={col.id}>
-                            {renderCellValue(rejection, col.id)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <RejectedLeadsTable
+                rejections={paginatedLeads}
+                columns={visibleColumns}
+                selectedIds={selectedIds}
+                onSelectChange={handleSelectChange}
+                onSelectAll={handleSelectAll}
+                onDelete={setPendingDelete}
+                canDeleteLeads={canDeleteLeads}
+                sortConfig={sortConfig}
+                onSort={handleSort}
+              />
+            )}
+          </CardContent>
+          {sortedLeads.length > 0 && (
+            <CardFooter className="pt-0">
               <TablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 pageSize={pageSize}
                 pageSizeOptions={PAGE_SIZE_OPTIONS}
-                totalItems={filteredLeads.length}
+                totalItems={sortedLeads.length}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-                extra={
-                  <div className="relative w-full sm:w-64 ml-0 sm:ml-2">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search name, email, phone, or lead ID..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-8 h-8"
-                    />
-                  </div>
-                }
+                itemLabel="rejected leads"
               />
-              </>
-            )}
-          </CardContent>
+            </CardFooter>
+          )}
         </Card>
       </div>
+
+      {/* Single-row delete confirmation */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Rejected Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this rejected lead? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSingleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
