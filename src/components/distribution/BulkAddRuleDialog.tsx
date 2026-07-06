@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { countryData } from "@/components/advertisers/countryData";
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 import { useBulkCreateDistributionRules } from "@/hooks/useAffiliateDistributionRules";
 import { Search, X } from "lucide-react";
 
@@ -58,6 +59,7 @@ export function BulkAddRuleDialog({
   const [advertiserSearch, setAdvertiserSearch] = useState("");
 
   const bulkCreate = useBulkCreateDistributionRules();
+  const { isRestricted } = useRestrictedCountries();
 
   // Filter active advertisers
   const activeAdvertisers = useMemo(
@@ -76,15 +78,16 @@ export function BulkAddRuleDialog({
     return activeAffiliates.filter((a) => a.name.toLowerCase().includes(search));
   }, [affiliateSearch, activeAffiliates]);
 
-  // Filter countries by search
+  // Filter countries by search, excluding restricted countries entirely
   const filteredCountries = useMemo(() => {
     const search = countrySearch.toLowerCase();
     return Object.entries(countryData).filter(
       ([code, country]) =>
-        code.toLowerCase().includes(search) ||
-        country.name.toLowerCase().includes(search)
+        !isRestricted(code) &&
+        (code.toLowerCase().includes(search) ||
+          country.name.toLowerCase().includes(search))
     );
-  }, [countrySearch]);
+  }, [countrySearch, isRestricted]);
 
   // Filter advertisers by search
   const filteredAdvertisers = useMemo(() => {

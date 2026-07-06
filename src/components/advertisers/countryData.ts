@@ -1000,7 +1000,8 @@ function generateTestDataFromCountry(country: CountryInfo | { name: string; code
   // Generate unique email (strip accents to ensure valid email)
   const cleanFirstName = removeDiacritics(firstName.toLowerCase());
   const cleanLastName = removeDiacritics(lastName.toLowerCase());
-  const email = `${cleanFirstName}.${cleanLastName}.${timestamp}@${emailDomain}`;
+  // "test." prefix marks this clearly as test data to whoever receives it on the advertiser's side
+  const email = `test.${cleanFirstName}.${cleanLastName}.${timestamp}@${emailDomain}`;
   
   // Generate a REAL IP address for the country (for proper geolocation)
   // Use country-specific IP ranges if available, otherwise fall back to a generic one

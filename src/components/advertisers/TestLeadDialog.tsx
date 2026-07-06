@@ -26,6 +26,23 @@ const CUSTOM_FIELD_LABELS: Record<string, [string, string, string]> = {
   capitaltrading: ["Source ID", "How Much Invested", "Outline Your Case"],
 };
 
+// No country pre-selected — start with no generated data at all, rather than
+// falling back to generateTestData()'s generic-US dataset, so the admin has to
+// deliberately pick a country before any lead data (or a send) is possible.
+function blankTestData() {
+  return {
+    firstname: "",
+    lastname: "",
+    email: "",
+    mobile: "",
+    country_code: "",
+    country: "",
+    ip_address: "",
+    offer_name: "Test Lead",
+    custom1: "",
+  };
+}
+
 interface TestResult {
   success: boolean;
   message?: string;
@@ -37,9 +54,9 @@ interface TestResult {
 export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserName, advertiserType }: TestLeadDialogProps) {
   const customFieldLabels = (advertiserType && CUSTOM_FIELD_LABELS[advertiserType]) || ["custom1", "custom2", "custom3"];
   const [mode, setMode] = useState<"auto" | "manual">("auto");
-  const [selectedCountry, setSelectedCountry] = useState("US");
+  const [selectedCountry, setSelectedCountry] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedData, setGeneratedData] = useState(() => generateTestData("US"));
+  const [generatedData, setGeneratedData] = useState(() => blankTestData());
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   // Additional fields
@@ -54,13 +71,15 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   };
 
   const regenerateData = () => {
+    if (!selectedCountry) return;
     setGeneratedData(generateTestData(selectedCountry));
   };
 
   const resetDialog = () => {
     setTestResult(null);
     setMode("auto");
-    setGeneratedData(generateTestData(selectedCountry));
+    setSelectedCountry("");
+    setGeneratedData(blankTestData());
   };
 
   const handleClose = (open: boolean) => {
@@ -183,10 +202,14 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   const advertiserCountries: string[] | null = distSettings?.countries ?? null;
 
   const currentCode = generatedData.country_code?.toUpperCase();
+  const noCountrySelected = !currentCode;
   const isCountryBlocked =
-    isRestricted(currentCode) ||
-    (advertiserCountries && advertiserCountries.length > 0 && !advertiserCountries.includes(currentCode));
-  const countryBlockReason = isRestricted(currentCode)
+    !noCountrySelected &&
+    (isRestricted(currentCode) ||
+      (advertiserCountries && advertiserCountries.length > 0 && !advertiserCountries.includes(currentCode)));
+  const countryBlockReason = noCountrySelected
+    ? "Select a country to generate test data"
+    : isRestricted(currentCode)
     ? `${currentCode} is globally restricted`
     : isCountryBlocked
     ? `${currentCode} is not in this advertiser's allowed countries`
@@ -317,7 +340,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                     <Label>Select Country/Geo</Label>
                     <Select value={selectedCountry} onValueChange={handleCountryChange}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select a country..." />
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px] z-[100] bg-popover">
                         {sortedCountries.map(([code, data]) => (
@@ -474,11 +497,11 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            {/* Country blocked warning — shown in both modes */}
-            {isCountryBlocked && countryBlockReason && (
+            {/* Country blocked / not-yet-selected warning — shown in both modes */}
+            {(isCountryBlocked || noCountrySelected) && countryBlockReason && (
               <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 <XCircle className="h-4 w-4 shrink-0" />
-                {countryBlockReason}. Change the country to proceed.
+                {noCountrySelected ? countryBlockReason : `${countryBlockReason}. Change the country to proceed.`}
               </div>
             )}
 
@@ -532,7 +555,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSendTestLead} disabled={isLoading || !!isCountryBlocked}>
+              <Button onClick={handleSendTestLead} disabled={isLoading || !!isCountryBlocked || noCountrySelected}>
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

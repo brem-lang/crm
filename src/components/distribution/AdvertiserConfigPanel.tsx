@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus, Check, ClipboardCheck } from "lucide-react";
 import { ScheduleHeatmap, type HeatmapConfig } from "./ScheduleHeatmap";
 import { countryData } from "@/components/advertisers/countryData";
+import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
 import {
   isHeatmapSchedule,
   legacyScheduleToMatrix,
@@ -743,11 +744,12 @@ function CountryCapsCard({
 }) {
   const [addCode, setAddCode] = useState("");
   const [addCap, setAddCap] = useState("");
+  const { isRestricted } = useRestrictedCountries();
 
   const applicableCountries = selected.length > 0 ? selected : [];
-  const allCountryCodes = Object.keys(countryData);
+  const allCountryCodes = Object.keys(countryData).filter(c => !isRestricted(c));
   const availableToAdd = (applicableCountries.length > 0 ? applicableCountries : allCountryCodes)
-    .filter(c => !countryCaps[c]);
+    .filter(c => !countryCaps[c] && !isRestricted(c));
 
   const handleAdd = () => {
     const cap = parseInt(addCap);
