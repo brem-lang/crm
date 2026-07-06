@@ -206,6 +206,31 @@ async function createLeadHandler(
     }
   }
 
+  // Duplicate IP address check
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown";
+
+  if (clientIp !== "unknown") {
+    const { data: dupIp } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("ip_address", clientIp)
+      .maybeSingle();
+
+    if (dupIp) {
+      return json(
+        {
+          success: false,
+          error: { message: "Lead with this IP address already exists" },
+          data: { leadId: dupIp.id },
+        },
+        409
+      );
+    }
+  }
+
   // Map SAXO fields to DB columns
   const firstName = (body.firstName as string | undefined)?.trim() ?? "";
   const lastName = (body.lastName as string | undefined)?.trim() ?? "";
@@ -218,11 +243,6 @@ async function createLeadHandler(
       ? String(priorityRaw)
       : null;
   const agentComment = (body.agentComment as string | undefined)?.substring(0, 500) ?? null;
-
-  const clientIp =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown";
 
   const { data: newLead, error: insertError } = await supabase
     .from("leads")
