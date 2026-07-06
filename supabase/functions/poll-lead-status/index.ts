@@ -19,6 +19,7 @@ interface LeadDistribution {
     lastname: string;
     status: string;
     is_ftd: boolean;
+    sale_status: string | null;
   };
   advertisers: {
     id: string;
@@ -2510,7 +2511,7 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
 // Map advertiser status to our status enum
 function mapStatus(externalStatus: string | undefined): string | null {
   if (!externalStatus) return null;
-  
+
   const statusMap: Record<string, string> = {
     'new': 'new',
     'pending': 'new',
@@ -2527,9 +2528,32 @@ function mapStatus(externalStatus: string | undefined): string | null {
     'invalid': 'lost',
     'no_answer': 'contacted',
     'callback': 'contacted',
+    // Additional terminal ("lost") outcomes seen across advertiser status vocabularies
+    // (SAXO LTD / We Bull Up docs) — a lead reaching any of these is done, not just unmapped.
+    'not_interested': 'lost',
+    'wrong_number': 'lost',
+    'wrong_country': 'lost',
+    'wrong_language': 'lost',
+    'deny_registration': 'lost',
+    'called_by_others': 'lost',
+    'no_invest': 'lost',
+    'no_money': 'lost',
+    'deposit_elsewhere': 'lost',
   };
-  
-  return statusMap[externalStatus.toLowerCase()] || null;
+
+  // Normalize so "No Answer" / "no-answer" / "no_answer" all match the same key
+  const normalized = externalStatus.toLowerCase().trim().replace(/[\s-]+/g, '_');
+  return statusMap[normalized] || null;
+}
+
+// A lead is done being polled once it's hit a normalized terminal outcome
+// (converted or lost) or is already flagged FTD — applies uniformly across
+// every advertiser's differing sale_status vocabulary. Unrecognized status
+// text defaults to "keep polling" rather than being silently dropped.
+function isTerminalLead(isFtd: boolean, saleStatus: string | null | undefined): boolean {
+  if (isFtd) return true;
+  const mapped = mapStatus(saleStatus ?? undefined);
+  return mapped === 'converted' || mapped === 'lost';
 }
 
 Deno.serve(async (req) => {
@@ -2588,7 +2612,8 @@ Deno.serve(async (req) => {
         advertisers!inner (id, name, advertiser_type, api_key, status_endpoint, url, config)
       `)
       .eq('status', 'sent')
-      .not('external_lead_id', 'is', null);
+      .not('external_lead_id', 'is', null)
+      .neq('leads.status', 'rejected');
 
     // If targeting a specific email, filter by it
     if (targetEmail) {
@@ -2613,14 +2638,24 @@ Deno.serve(async (req) => {
     let totalUpdated = 0;
     let totalErrors = 0;
 
-    if (!distributions || distributions.length === 0) {
+    // Skip leads that are already done (converted/lost/FTD) — applies uniformly
+    // across every advertiser regardless of how their sale_status text is worded.
+    const pollableDistributions = ((distributions ?? []) as unknown as LeadDistribution[]).filter(
+      (dist) => !isTerminalLead(dist.leads.is_ftd, dist.leads.sale_status)
+    );
+    const skippedTerminal = (distributions?.length ?? 0) - pollableDistributions.length;
+    if (skippedTerminal > 0) {
+      console.log(`Skipped ${skippedTerminal} distribution(s) already at a terminal status`);
+    }
+
+    if (pollableDistributions.length === 0) {
       console.log('No distributions to poll');
     } else {
-      console.log(`Found ${distributions.length} distributions to poll`);
+      console.log(`Found ${pollableDistributions.length} distributions to poll`);
 
     // Group distributions by advertiser for efficient polling
     const byAdvertiser = new Map<string, LeadDistribution[]>();
-    for (const dist of distributions as unknown as LeadDistribution[]) {
+    for (const dist of pollableDistributions) {
       const key = dist.advertiser_id;
       if (!byAdvertiser.has(key)) {
         byAdvertiser.set(key, []);
@@ -2802,11 +2837,23 @@ Deno.serve(async (req) => {
     if (injError) {
       console.error('Error fetching injection leads:', injError);
     } else if (injectionLeads && injectionLeads.length > 0) {
-      console.log(`Found ${injectionLeads.length} injection leads to poll`);
+      // Skip injection leads already at a terminal status (converted/lost/FTD) —
+      // same uniform rule as the lead_distributions path above. No "rejected"
+      // leads.status filter here since injection_leads doesn't join leads and
+      // tracks its own send status, not a lead-level rejection concept.
+      const pollableInjectionLeads = injectionLeads.filter(
+        (il: any) => !isTerminalLead(il.is_ftd, il.sale_status)
+      );
+      const skippedInjTerminal = injectionLeads.length - pollableInjectionLeads.length;
+      if (skippedInjTerminal > 0) {
+        console.log(`Skipped ${skippedInjTerminal} injection lead(s) already at a terminal status`);
+      }
+
+      console.log(`Found ${pollableInjectionLeads.length} injection leads to poll`);
 
       // Group by advertiser
       const injByAdvertiser = new Map<string, typeof injectionLeads>();
-      for (const il of injectionLeads) {
+      for (const il of pollableInjectionLeads) {
         const key = il.advertiser_id;
         if (!key) continue;
         if (!injByAdvertiser.has(key)) {
