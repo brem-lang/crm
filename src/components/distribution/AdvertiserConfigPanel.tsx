@@ -192,7 +192,7 @@ export function AdvertiserConfigPanel({
       {/* Panel header — pr-10 sm:pr-14 keeps content clear of the Dialog's absolute X button */}
       <div className="pl-4 sm:pl-6 pr-10 sm:pr-14 py-3 sm:py-4 border-b flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div>
-          <p className="text-xs sm:text-sm text-muted-foreground">{advertiser.advertiser_type}</p>
+          <h2 className="text-base sm:text-lg font-semibold">{advertiser.name}</h2>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="adv-active" className="text-sm">Active</Label>
