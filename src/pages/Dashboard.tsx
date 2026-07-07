@@ -357,22 +357,32 @@ export default function Dashboard() {
         .eq('is_active', true)
         .or('daily_cap.not.is.null,hourly_cap.not.is.null');
 
-      if (advertisersWithCaps) {
+      if (advertisersWithCaps && advertisersWithCaps.length > 0) {
         const today = new Date();
         const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
         const startOfHour = new Date(new Date().setMinutes(0, 0, 0)).toISOString();
 
+        const { data: sentToday } = await supabase
+          .from('lead_distributions')
+          .select('advertiser_id, created_at')
+          .eq('status', 'sent')
+          .in('advertiser_id', advertisersWithCaps.map(a => a.id))
+          .gte('created_at', startOfDay);
+
+        const dailyCounts: Record<string, number> = {};
+        const hourlyCounts: Record<string, number> = {};
+        (sentToday || []).forEach(d => {
+          dailyCounts[d.advertiser_id] = (dailyCounts[d.advertiser_id] || 0) + 1;
+          if (d.created_at >= startOfHour) {
+            hourlyCounts[d.advertiser_id] = (hourlyCounts[d.advertiser_id] || 0) + 1;
+          }
+        });
+
         for (const adv of advertisersWithCaps) {
           // Check daily cap
           if (adv.daily_cap) {
-            const { count: dailyCount } = await supabase
-              .from('lead_distributions')
-              .select('*', { count: 'exact', head: true })
-              .eq('advertiser_id', adv.id)
-              .eq('status', 'sent')
-              .gte('created_at', startOfDay);
-
-            const dailyUsage = ((dailyCount || 0) / adv.daily_cap) * 100;
+            const dailyCount = dailyCounts[adv.id] || 0;
+            const dailyUsage = (dailyCount / adv.daily_cap) * 100;
             if (dailyUsage >= 100) {
               alerts.push({ type: 'critical', title: `${adv.name} - Daily Cap Reached`, description: `${dailyCount}/${adv.daily_cap} leads sent today (100%)` });
             } else if (dailyUsage >= 90) {
@@ -382,14 +392,8 @@ export default function Dashboard() {
 
           // Check hourly cap
           if (adv.hourly_cap) {
-            const { count: hourlyCount } = await supabase
-              .from('lead_distributions')
-              .select('*', { count: 'exact', head: true })
-              .eq('advertiser_id', adv.id)
-              .eq('status', 'sent')
-              .gte('created_at', startOfHour);
-
-            const hourlyUsage = ((hourlyCount || 0) / adv.hourly_cap) * 100;
+            const hourlyCount = hourlyCounts[adv.id] || 0;
+            const hourlyUsage = (hourlyCount / adv.hourly_cap) * 100;
             if (hourlyUsage >= 100) {
               alerts.push({ type: 'critical', title: `${adv.name} - Hourly Cap Reached`, description: `${hourlyCount}/${adv.hourly_cap} leads this hour (100%)` });
             } else if (hourlyUsage >= 90) {

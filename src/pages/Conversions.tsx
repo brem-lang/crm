@@ -200,7 +200,7 @@ export default function Conversions() {
   const queryClient = useQueryClient();
 
   const { data: advertisers } = useQuery({
-    queryKey: ['advertisers-list'],
+    queryKey: ['advertisers-list-all'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('advertisers')
@@ -212,7 +212,7 @@ export default function Conversions() {
   });
 
   const { data: affiliates } = useQuery({
-    queryKey: ['affiliates-list'],
+    queryKey: ['affiliates-list-all'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('affiliates')

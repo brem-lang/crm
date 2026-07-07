@@ -101,22 +101,25 @@ export default function Reports() {
     queryFn: async () => {
       if (showAllDates) return [];
       const daysDiff = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+
+      const { data, error } = await supabase
+        .from('leads')
+        .select('created_at')
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString());
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach(lead => {
+        const key = format(startOfDay(new Date(lead.created_at)), 'MMM d');
+        counts[key] = (counts[key] || 0) + 1;
+      });
+
       const days = [];
-      
       for (let i = 0; i < daysDiff; i++) {
         const date = startOfDay(subDays(dateRange.to, daysDiff - 1 - i));
-        const nextDate = startOfDay(subDays(dateRange.to, daysDiff - 2 - i));
-        
-        const { count } = await supabase
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', date.toISOString())
-          .lt('created_at', i === daysDiff - 1 ? dateRange.to.toISOString() : nextDate.toISOString());
-        
-        days.push({
-          date: format(date, 'MMM d'),
-          leads: count || 0,
-        });
+        const key = format(date, 'MMM d');
+        days.push({ date: key, leads: counts[key] || 0 });
       }
       return days;
     },

@@ -1,13 +1,23 @@
-After checking documentation following data seems to be missing. Please provide the information listed below to speed up the new BP creation process. Thanks!
+This is the response that we are getting. Please, clarify, which field should we use to determine statuses "status" or "sale status". And do we filter FTDs using only "is_ftd" row or should we take "ftd_date" into consideration as well?
 
-Pagination for /get-leads
+    "page": 0,
+    "limit": 500,
+    "pages": 1,
+    "count": 1,
+    "data": [
+        {
+            "id": "ea4f1f69-2e46-4747-a540-0704ac686361",
+            "lead_code": "8845905a-3768-477a-b5e8-387d20a1cf14",
+            "firstname": "John",
+            "lastname": "Doe",
+            "email": "test@example.com",
+            "country_code": "DE",
+            "mobile": "1234567890",
+            "status": "New",
+            "sale_status": "New",
+            "is_ftd": 1,
+            "ftd_date": "2026-07-07T12:51:13.568+00:00"
+        }
+    ]
 
-Rate limits
-
-Lead created/registration date in pull response
-
-Exact date filter boundary behavior
-
-Confirm conversions approach: /get-leads?hasFTD=1 is sufficient (no separate endpoint)
-
-Confirm internal FTD mapping logic (Depositor vs is_ftd=1)
+}

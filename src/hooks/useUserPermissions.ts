@@ -209,21 +209,19 @@ export function useCurrentUserPermissions() {
 
   const { data: permissions, isLoading } = useQuery({
     queryKey: ["current-user-permissions", user?.id],
+    staleTime: 60_000,
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Load direct user permissions
-      const { data: directPerms, error: directError } = await supabase
-        .from("user_permissions")
-        .select("permission")
-        .eq("user_id", user.id);
+      // Load direct user permissions + custom role assignments in parallel — independent queries
+      const [
+        { data: directPerms, error: directError },
+        { data: customRoleRows, error: customRolesError },
+      ] = await Promise.all([
+        supabase.from("user_permissions").select("permission").eq("user_id", user.id),
+        supabase.from("user_custom_roles").select("role_id, roles(slug)").eq("user_id", user.id),
+      ]);
       if (directError) throw directError;
-
-      // Load custom role assignments for this user
-      const { data: customRoleRows, error: customRolesError } = await supabase
-        .from("user_custom_roles")
-        .select("role_id, roles(slug)")
-        .eq("user_id", user.id);
       if (customRolesError) throw customRolesError;
 
       // Collect all role slugs (system roles + custom roles)
