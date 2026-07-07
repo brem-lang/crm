@@ -534,13 +534,21 @@ export default function ApiDocs() {
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">hasFTD</td><td className="py-2 pr-4">integer</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Filter by FTD status (0 or 1)</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">status</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Filter by sale status</td></tr>
                       <tr className="border-b"><td className="py-2 pr-4 font-mono">email</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Filter by email</td></tr>
-                      <tr><td className="py-2 pr-4 font-mono">lead_id</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Filter by specific lead ID</td></tr>
+                      <tr className="border-b"><td className="py-2 pr-4 font-mono">lead_id</td><td className="py-2 pr-4">string</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Filter by specific lead ID</td></tr>
+                      <tr className="border-b"><td className="py-2 pr-4 font-mono">page</td><td className="py-2 pr-4">integer</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">0-indexed page number (default 0)</td></tr>
+                      <tr><td className="py-2 pr-4 font-mono">limit</td><td className="py-2 pr-4">integer</td><td className="py-2 pr-4"><Badge variant="secondary">Optional</Badge></td><td className="py-2">Results per page (default 500, max 1000)</td></tr>
                     </tbody>
                   </table>
                 </div>
               </div>
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                <p className="text-sm"><strong>Note:</strong> Date range filters by <code>updated_at</code> — returns only leads that had status/FTD changes in that period. Rejected leads are excluded by default.</p>
+                <p className="text-sm"><strong>Note:</strong> Date range filters by <code>updated_at</code> — returns only leads that had status/FTD changes in that period. Rejected leads are excluded by default. <code>fromDate</code>/<code>toDate</code> are inclusive boundaries evaluated in the server's UTC clock: <code>fromDate</code> at 00:00:00.000 through <code>toDate</code> at 23:59:59.999.</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <p className="text-sm"><strong>Rate limit:</strong> 100 requests per minute per affiliate API key. Exceeding it returns HTTP 429 with <code>{`{ "success": false, "rejection": { "code": "RATE_LIMITED" } }`}</code>.</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <p className="text-sm"><strong>Conversions:</strong> <code>hasFTD=1</code> is the sole mechanism for pulling converted leads — there is no separate conversions endpoint.</p>
               </div>
               <Tabs defaultValue="request">
                 <TabsList>
@@ -549,15 +557,21 @@ export default function ApiDocs() {
                 </TabsList>
                 <TabsContent value="request">
                   <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                    <pre>{`GET ${BASE_URL}/get-leads?fromDate=01/01/26&toDate=01/31/26&hasFTD=1\nHeaders:\n  Api-Key: your_api_key_here`}</pre>
+                    <pre>{`GET ${BASE_URL}/get-leads?fromDate=01/01/26&toDate=01/31/26&hasFTD=1&page=0&limit=500\nHeaders:\n  Api-Key: your_api_key_here`}</pre>
                   </div>
                 </TabsContent>
                 <TabsContent value="response">
                   <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                    <pre>{`{\n  "success": true,\n  "count": 2,\n  "data": [\n    {\n      "id": "9783cddc-ea4a-4a36-b207-52360b6634fc",\n      "lead_code": "fa4b6d82-b789-4c29-b069-a3c6a8d0fa9d",\n      "firstname": "John",\n      "lastname": "Doe",\n      "email": "john.doe@example.com",\n      "country_code": "CA",\n      "status": "Depositor",\n      "is_ftd": 1,\n      "ftd_date": "2026-01-15T10:30:00Z"\n    }\n  ]\n}`}</pre>
+                    <pre>{`{\n  "success": true,\n  "total": 2,\n  "page": 0,\n  "limit": 500,\n  "pages": 1,\n  "count": 2,\n  "data": [\n    {\n      "id": "9783cddc-ea4a-4a36-b207-52360b6634fc",\n      "lead_code": "fa4b6d82-b789-4c29-b069-a3c6a8d0fa9d",\n      "firstname": "John",\n      "lastname": "Doe",\n      "email": "john.doe@example.com",\n      "country_code": "CA",\n      "status": "Depositor",\n      "is_ftd": 1,\n      "ftd_date": "2026-01-15T10:30:00Z",\n      "created_at": "2026-01-10T08:12:00Z"\n    }\n  ]\n}`}</pre>
                   </div>
                   <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                    <p className="text-sm"><strong>ℹ️ Status Field:</strong> Contains the sale status reported by the advertiser's CRM (e.g., "New", "Callback", "Depositor"). Values vary by advertiser.</p>
+                    <p className="text-sm"><strong>ℹ️ Status Field:</strong> Contains the sale status reported by the advertiser's CRM (e.g., "New", "Callback", "Depositor"). Values vary by advertiser and are independent of the <code>is_ftd</code> field — <code>sale_status</code> is display text only and should never be used as an FTD signal.</p>
+                  </div>
+                  <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                    <p className="text-sm"><strong>ℹ️ is_ftd Field:</strong> Only becomes <code>1</code> once the FTD has been manually released internally — it can lag behind the advertiser's reported <code>sale_status</code>.</p>
+                  </div>
+                  <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                    <p className="text-sm"><strong>ℹ️ created_at Field:</strong> The lead's original registration timestamp (UTC, ISO 8601).</p>
                   </div>
                 </TabsContent>
               </Tabs>

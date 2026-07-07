@@ -5,6 +5,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, api-key, x-api-key',
 };
 
+const RATE_LIMIT_RPM = 100;
+
+async function isRateLimited(supabase: any, affiliateId: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('endpoint', 'get-leads')
+    .eq('affiliate_id', affiliateId)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= RATE_LIMIT_RPM;
+}
+
+// Invalid-API-key attempts are logged with affiliate_id: null, so they never
+// count against isRateLimited() above — without this, brute-forcing API keys
+// is completely unthrottled. Bucket those by request IP instead.
+const INVALID_KEY_RATE_LIMIT_PER_IP = 20;
+async function isIpRateLimitedForInvalidKeys(supabase: any, clientIp: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase
+    .from('affiliate_api_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('endpoint', 'get-leads')
+    .is('affiliate_id', null)
+    .eq('request_ip', clientIp)
+    .gte('created_at', windowStart);
+  return (count ?? 0) >= INVALID_KEY_RATE_LIMIT_PER_IP;
+}
+
+function getClientIp(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    ?? req.headers.get('cf-connecting-ip')
+    ?? req.headers.get('x-real-ip')
+    ?? 'unknown';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -34,7 +70,7 @@ Deno.serve(async (req) => {
 
   try {
     const apiKey = req.headers.get('Api-Key') || req.headers.get('api-key') || req.headers.get('X-Api-Key');
-    
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({ success: false, message: 'Api-Key header is required' }),
@@ -46,6 +82,19 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const clientIp = getClientIp(req);
+
+    if (await isIpRateLimitedForInvalidKeys(supabase, clientIp)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Too many invalid API key attempts. Try again later.',
+          rejection: { code: 'RATE_LIMITED', message: 'Too many invalid API key attempts from this IP' }
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate API key
     const { data: affiliate, error: affiliateError } = await supabase
       .from('affiliates')
@@ -55,9 +104,32 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (affiliateError || !affiliate) {
+      try {
+        await supabase.from('affiliate_api_logs').insert({
+          affiliate_id: null,
+          endpoint: 'get-leads',
+          api_key_hint: apiKey.slice(-4),
+          request_ip: clientIp,
+          payload: null,
+          status: 'rejected',
+          reason: 'Invalid or inactive API key',
+        });
+      } catch { /* non-critical */ }
       return new Response(
         JSON.stringify({ success: false, message: 'Invalid or inactive API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting: max 100 requests per minute per affiliate
+    if (await isRateLimited(supabase, affiliate.id)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Rate limit exceeded. Maximum 100 requests per minute.',
+          rejection: { code: 'RATE_LIMITED', message: 'Too many requests. Please slow down.' }
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -97,7 +169,7 @@ Deno.serve(async (req) => {
     // Build query
     let query = supabase
       .from('leads')
-      .select('id, request_id, firstname, lastname, email, country_code, mobile, status, sale_status, is_ftd, ftd_date, ftd_released', { count: 'exact' })
+      .select('id, request_id, firstname, lastname, email, country_code, mobile, status, sale_status, is_ftd, ftd_date, ftd_released, created_at', { count: 'exact' })
       .eq('affiliate_id', affiliate.id)
       .gte('updated_at', startDate.toISOString())
       .lte('updated_at', endDate.toISOString())
@@ -150,7 +222,20 @@ Deno.serve(async (req) => {
       sale_status: lead.sale_status || 'New',
       is_ftd: lead.ftd_released ? 1 : 0,
       ftd_date: lead.ftd_released ? lead.ftd_date : null,
+      created_at: lead.created_at,
     }));
+
+    try {
+      await supabase.from('affiliate_api_logs').insert({
+        affiliate_id: affiliate.id,
+        endpoint: 'get-leads',
+        api_key_hint: apiKey.slice(-4),
+        request_ip: clientIp,
+        payload: null,
+        status: 'accepted',
+        reason: null,
+      });
+    } catch { /* non-critical */ }
 
     return new Response(
       JSON.stringify({

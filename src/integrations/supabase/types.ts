@@ -789,6 +789,7 @@ export type Database = {
         Row: {
           id: string
           affiliate_id: string | null
+          endpoint: string
           api_key_hint: string | null
           request_ip: string | null
           payload: Record<string, unknown> | null
@@ -799,6 +800,7 @@ export type Database = {
         Insert: {
           id?: string
           affiliate_id?: string | null
+          endpoint?: string
           api_key_hint?: string | null
           request_ip?: string | null
           payload?: Record<string, unknown> | null
@@ -809,6 +811,7 @@ export type Database = {
         Update: {
           id?: string
           affiliate_id?: string | null
+          endpoint?: string
           api_key_hint?: string | null
           request_ip?: string | null
           payload?: Record<string, unknown> | null

@@ -176,6 +176,7 @@ async function isRateLimited(supabase: any, affiliateId: string): Promise<boolea
   const { count } = await supabase
     .from('affiliate_api_logs')
     .select('*', { count: 'exact', head: true })
+    .eq('endpoint', 'submit-lead')
     .eq('affiliate_id', affiliateId)
     .gte('created_at', windowStart);
   return (count ?? 0) >= RATE_LIMIT_RPM;
@@ -190,6 +191,7 @@ async function isIpRateLimitedForInvalidKeys(supabase: any, clientIp: string): P
   const { count } = await supabase
     .from('affiliate_api_logs')
     .select('*', { count: 'exact', head: true })
+    .eq('endpoint', 'submit-lead')
     .is('affiliate_id', null)
     .eq('request_ip', clientIp)
     .gte('created_at', windowStart);
@@ -284,6 +286,7 @@ Deno.serve(async (req) => {
       try {
         await supabase.from('affiliate_api_logs').insert({
           affiliate_id: null,
+          endpoint: 'submit-lead',
           api_key_hint: apiKey.slice(-4),
           request_ip: clientIp,
           payload: null,
@@ -312,6 +315,7 @@ Deno.serve(async (req) => {
         try {
           await supabase.from('affiliate_api_logs').insert({
             affiliate_id: affiliate.id,
+            endpoint: 'submit-lead',
             api_key_hint: apiKey.slice(-4),
             request_ip: clientIp,
             payload: null,
@@ -661,6 +665,7 @@ Deno.serve(async (req) => {
     try {
       await supabase.from('affiliate_api_logs').insert({
         affiliate_id: affiliate.id,
+        endpoint: 'submit-lead',
         api_key_hint: apiKey.slice(-4),
         request_ip: clientIp,
         payload: body,
