@@ -456,14 +456,14 @@ export function LeadsTable({
       <Table className={cn(compactMode && "[&_td]:py-1 [&_th]:py-1")}>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-12">
-              <Checkbox 
+            <TableHead className="w-12 whitespace-nowrap">
+              <Checkbox
                 checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={(checked) => onSelectAll(!!checked)}
               />
             </TableHead>
             {visibleColumns.map((col) => (
-              <TableHead key={col.id}>
+              <TableHead key={col.id} className="whitespace-nowrap">
                 <SortableHeader
                   label={col.label}
                   columnId={col.id}
@@ -472,22 +472,22 @@ export function LeadsTable({
                 />
               </TableHead>
             ))}
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {leads.map((lead) => (
             <TableRow key={lead.id} className={selectedIds.has(lead.id) ? "bg-muted/50" : ""}>
-              <TableCell>
-                <Checkbox 
+              <TableCell className="whitespace-nowrap">
+                <Checkbox
                   checked={selectedIds.has(lead.id)}
                   onCheckedChange={(checked) => onSelectChange(lead.id, !!checked)}
                 />
               </TableCell>
               {visibleColumns.map((col) => (
-                <TableCell key={col.id}>{renderCellValue(lead, col.id)}</TableCell>
+                <TableCell key={col.id} className="whitespace-nowrap">{renderCellValue(lead, col.id)}</TableCell>
               ))}
-              <TableCell className="text-right">
+              <TableCell className="text-right whitespace-nowrap">
                 {(() => {
                   const dist = (lead as any).lead_distributions?.find((d: any) => d.status === 'sent') || (lead as any).lead_distributions?.[0];
                   const advertiserName = dist?.advertisers?.name || "Advertiser";
