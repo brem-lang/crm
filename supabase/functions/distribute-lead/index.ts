@@ -267,10 +267,11 @@ function extractAutologinUrl(responseText: string): string | null {
     }
     
     // Common patterns for autologin URLs across different CRMs
-    const url = data.autologin_url || data.autologinUrl || data.autoLoginUrl ||
+    // (ELNOPY/CRG-Cooper use the bare "autologin" key, no suffix)
+    const url = data.autologin_url || data.autologinUrl || data.autoLoginUrl || data.autologin ||
                 data.redirect_url || data.redirectUrl || data.login_url || data.loginUrl ||
-                data.data?.autologin_url || data.data?.autologinUrl || data.data?.autoLoginUrl ||
-                data.data?.redirect_url || data.data?.redirectUrl || data.data?.login_url || 
+                data.data?.autologin_url || data.data?.autologinUrl || data.data?.autoLoginUrl || data.data?.autologin ||
+                data.data?.redirect_url || data.data?.redirectUrl || data.data?.login_url ||
                 data.data?.loginUrl || data.data?.loginURL || data.url || data.data?.url || null;
     
     // Validate it looks like a URL
@@ -280,7 +281,7 @@ function extractAutologinUrl(responseText: string): string | null {
     return null;
   } catch {
     // Try regex extraction for URL patterns in non-JSON responses
-    const urlMatch = responseText.match(/"(?:autologin_?url|redirect_?url|login_?url|loginURL|url)":\s*"(https?:\/\/[^"]+)"/i);
+    const urlMatch = responseText.match(/"(?:autologin_?url|autologin|redirect_?url|login_?url|loginURL|url)":\s*"(https?:\/\/[^"]+)"/i);
     if (urlMatch) return urlMatch[1];
     return null;
   }
