@@ -166,16 +166,31 @@ export default function SettingsSection() {
     switch (section) {
       case "general":
         return (
-          <div className="space-y-2">
-            <Label>CRM Name</Label>
-            <Input
-              value={get("crm_name") ?? ""}
-              onChange={e => set("crm_name", e.target.value)}
-              className="w-full max-w-sm"
-              maxLength={30}
-              disabled={!isSuperAdmin}
-            />
-            <p className="text-xs text-muted-foreground">Appears in the sidebar and browser tab title</p>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>CRM Name</Label>
+              <Input
+                value={get("crm_name") ?? ""}
+                onChange={e => set("crm_name", e.target.value)}
+                className="w-full max-w-sm"
+                maxLength={30}
+                disabled={!isSuperAdmin}
+              />
+              <p className="text-xs text-muted-foreground">Appears in the sidebar and browser tab title</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Global Timezone</Label>
+              <Select value={get("timezone") ?? "UTC"} onValueChange={v => set("timezone", v)} disabled={!isSuperAdmin}>
+                <SelectTrigger className="w-full max-w-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">All lead timestamps, reports, and the sidebar clock will use this timezone</p>
+            </div>
           </div>
         );
 
@@ -210,19 +225,6 @@ export default function SettingsSection() {
                 </Select>
                 <p className="text-xs text-muted-foreground">How dates are displayed throughout the CRM</p>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Global Timezone</Label>
-              <Select value={get("timezone") ?? "UTC"} onValueChange={v => set("timezone", v)} disabled={!isSuperAdmin}>
-                <SelectTrigger className="w-full max-w-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIMEZONES.map(tz => (
-                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">All lead timestamps and reports will use this timezone</p>
             </div>
 
             <div className="space-y-4 pt-2 border-t">

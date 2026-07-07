@@ -1,1 +1,2 @@
-in the leads table i want the data to be in one line not two line
+in the setting page under general setting we should add a timezone, where we can configure
+the time in the sidebar
