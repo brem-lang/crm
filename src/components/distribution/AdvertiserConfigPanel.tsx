@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus, Check, ClipboardCheck } from "lucide-react";
+import { Save, Clock, Globe, Sliders, Zap, Bell, Copy, Trash2, Plus, Check, ClipboardCheck, X } from "lucide-react";
 import { ScheduleHeatmap, type HeatmapConfig } from "./ScheduleHeatmap";
 import { countryData } from "@/components/advertisers/countryData";
 import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
@@ -599,7 +599,37 @@ function CountriesCard({
             onChange={e => setSearch(e.target.value)}
             className="h-8 text-sm"
           />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0"
+            disabled={selected.length === 0}
+            onClick={() => onChange([])}
+          >
+            Clear all
+          </Button>
         </div>
+        {selected.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {selected.map(code => (
+              <Badge
+                key={code}
+                variant="secondary"
+                className="h-6 px-1.5 text-xs font-mono flex items-center gap-1"
+              >
+                {code}
+                <button
+                  type="button"
+                  className="cursor-pointer hover:text-destructive"
+                  onClick={() => toggle(code)}
+                  aria-label={`Remove ${code}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
         <ScrollArea className="h-48 rounded border">
           <div className="grid grid-cols-2 gap-1 p-2">
             {filtered.map(([code, country]) => (
