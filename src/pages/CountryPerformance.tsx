@@ -25,6 +25,7 @@ type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" 
 interface CountryPerformanceData {
   country_code: string;
   leads: number;
+  rejected: number;
   conversions: number;
   pending_conversions: number;
   cr: number;
@@ -115,7 +116,7 @@ export default function CountryPerformance() {
       // Get all leads within date range
       let leadsQ = supabase
         .from('leads')
-        .select('country_code, is_ftd, ftd_released');
+        .select('country_code, status, is_ftd, ftd_released, lead_distributions(status)');
       if (!showAllDates) {
         leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
       }
@@ -127,21 +128,29 @@ export default function CountryPerformance() {
       // Group by country
       const countryMap: Record<string, CountryPerformanceData> = {};
 
-      leads.forEach((lead) => {
+      leads.forEach((lead: any) => {
         const country = lead.country_code || 'Unknown';
-        
+
         if (!countryMap[country]) {
           countryMap[country] = {
             country_code: country,
             leads: 0,
+            rejected: 0,
             conversions: 0,
             pending_conversions: 0,
             cr: 0,
           };
         }
 
-        countryMap[country].leads++;
-        
+        const wentToAdvertiser = lead.lead_distributions?.some((d: any) => d.status === 'sent');
+        if (wentToAdvertiser) {
+          countryMap[country].leads++;
+        }
+
+        if (lead.status === 'rejected') {
+          countryMap[country].rejected++;
+        }
+
         if (lead.is_ftd) {
           if (lead.ftd_released) {
             countryMap[country].conversions++;
@@ -279,10 +288,11 @@ export default function CountryPerformance() {
   const totals = filteredData.reduce(
     (acc, row) => ({
       leads: acc.leads + row.leads,
+      rejected: acc.rejected + row.rejected,
       conversions: acc.conversions + row.conversions,
       pending_conversions: acc.pending_conversions + row.pending_conversions,
     }),
-    { leads: 0, conversions: 0, pending_conversions: 0 }
+    { leads: 0, rejected: 0, conversions: 0, pending_conversions: 0 }
   );
 
   const totalCR = totals.leads > 0 ? (totals.conversions / totals.leads) * 100 : 0;
@@ -484,6 +494,7 @@ export default function CountryPerformance() {
                   <TableRow>
                     <TableHead>Country</TableHead>
                     <TableHead className="text-right">Leads</TableHead>
+                    <TableHead className="text-right">Rejected</TableHead>
                     <TableHead className="text-right">Conversions</TableHead>
                     <TableHead className="text-right">CR</TableHead>
                     <TableHead className="text-right">Pending Conv.</TableHead>
@@ -494,13 +505,14 @@ export default function CountryPerformance() {
                   {paginatedData && paginatedData.length > 0 ? (
                     <>
                       {paginatedData.map((row) => (
-                        <TableRow 
-                          key={row.country_code} 
+                        <TableRow
+                          key={row.country_code}
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedCountryForBreakdown(row.country_code)}
                         >
                           <TableCell className="font-medium">{row.country_code}</TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
+                          <TableCell className="text-right">{row.rejected}</TableCell>
                           <TableCell className="text-right">{row.conversions}</TableCell>
                           <TableCell className="text-right">{row.cr.toFixed(2)}%</TableCell>
                           <TableCell className="text-right">{row.pending_conversions}</TableCell>
@@ -513,6 +525,7 @@ export default function CountryPerformance() {
                       <TableRow className="bg-muted/50 font-semibold">
                         <TableCell>Total:</TableCell>
                         <TableCell className="text-right">{totals.leads}</TableCell>
+                        <TableCell className="text-right">{totals.rejected}</TableCell>
                         <TableCell className="text-right">{totals.conversions}</TableCell>
                         <TableCell className="text-right">{totalCR.toFixed(2)}%</TableCell>
                         <TableCell className="text-right">{totals.pending_conversions}</TableCell>
@@ -521,7 +534,7 @@ export default function CountryPerformance() {
                     </>
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No data available for the selected period
                       </TableCell>
                     </TableRow>
