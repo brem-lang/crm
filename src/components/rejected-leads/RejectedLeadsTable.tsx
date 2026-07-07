@@ -197,33 +197,33 @@ export function RejectedLeadsTable({
       <Table className={cn(compactMode && "[&_td]:py-1 [&_th]:py-1")}>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-12">
+            <TableHead className="w-12 whitespace-nowrap">
               <Checkbox
                 checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={(checked) => onSelectAll(!!checked)}
               />
             </TableHead>
             {visibleColumns.map((col) => (
-              <TableHead key={col.id}>
+              <TableHead key={col.id} className="whitespace-nowrap">
                 <SortableHeader label={col.label} columnId={col.id} sortConfig={sortConfig} onSort={onSort} />
               </TableHead>
             ))}
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rejections.map((rejection) => (
             <TableRow key={rejection.id} className={selectedIds.has(rejection.id) ? "bg-muted/50" : ""}>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Checkbox
                   checked={selectedIds.has(rejection.id)}
                   onCheckedChange={(checked) => onSelectChange(rejection.id, !!checked)}
                 />
               </TableCell>
               {visibleColumns.map((col) => (
-                <TableCell key={col.id}>{renderCellValue(rejection, col.id)}</TableCell>
+                <TableCell key={col.id} className="whitespace-nowrap">{renderCellValue(rejection, col.id)}</TableCell>
               ))}
-              <TableCell className="text-right">
+              <TableCell className="text-right whitespace-nowrap">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">

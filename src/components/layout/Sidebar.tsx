@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { getTimezoneLabel } from "@/lib/timezones";
 import {
   LayoutDashboard,
   Users,
@@ -152,7 +153,8 @@ export function Sidebar() {
   const location = useLocation();
   const { signOut, roles, customRoleNames, user, username, isChatSupport } = useAuth();
   const { isCollapsed, toggleCollapsed } = useSidebarState();
-  const { formatDate, crmName } = useCRMSettings();
+  const { formatDate, crmName, timezone } = useCRMSettings();
+  const timezoneLabel = getTimezoneLabel(timezone);
   const crmInitials = crmName
     .split(" ")
     .map((w) => w[0])
@@ -229,7 +231,8 @@ export function Sidebar() {
         </div>
         {!isCollapsed && (
           <div className="mt-2 text-xs text-muted-foreground font-mono">
-            {formatDate(currentTime)}
+            <div>{formatDate(currentTime)}</div>
+            <div className="truncate" title={timezoneLabel}>{timezoneLabel}</div>
           </div>
         )}
       </div>

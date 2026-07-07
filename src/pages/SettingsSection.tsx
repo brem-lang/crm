@@ -19,26 +19,7 @@ import {
 } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { getCountryList } from "@/components/advertisers/countryData";
-
-const TIMEZONES = [
-  { value: "UTC", label: "UTC (Coordinated Universal Time)" },
-  { value: "Europe/London", label: "London (GMT/BST)" },
-  { value: "Europe/Paris", label: "Paris (CET/CEST)" },
-  { value: "Europe/Berlin", label: "Berlin (CET/CEST)" },
-  { value: "Europe/Moscow", label: "Moscow (MSK)" },
-  { value: "Asia/Dubai", label: "Dubai (GST)" },
-  { value: "Asia/Kolkata", label: "India (IST)" },
-  { value: "Asia/Singapore", label: "Singapore (SGT)" },
-  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
-  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
-  { value: "Australia/Sydney", label: "Sydney (AEST/AEDT)" },
-  { value: "Pacific/Auckland", label: "Auckland (NZST/NZDT)" },
-  { value: "America/New_York", label: "New York (EST/EDT)" },
-  { value: "America/Chicago", label: "Chicago (CST/CDT)" },
-  { value: "America/Denver", label: "Denver (MST/MDT)" },
-  { value: "America/Los_Angeles", label: "Los Angeles (PST/PDT)" },
-  { value: "America/Sao_Paulo", label: "São Paulo (BRT)" },
-];
+import { TIMEZONES } from "@/lib/timezones";
 
 const SECTION_META: Record<string, { title: string; description: string; icon: React.ElementType; iconBg: string; adminOnly?: boolean }> = {
   general:      { title: "General Settings",    description: "Platform name, timezone, and basic configuration",       icon: Tag,           iconBg: "bg-blue-500"   },

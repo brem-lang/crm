@@ -25,6 +25,7 @@ type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" 
 interface CountryPerformanceData {
   country_code: string;
   leads: number;
+  accepted: number;
   rejected: number;
   conversions: number;
   pending_conversions: number;
@@ -135,6 +136,7 @@ export default function CountryPerformance() {
           countryMap[country] = {
             country_code: country,
             leads: 0,
+            accepted: 0,
             rejected: 0,
             conversions: 0,
             pending_conversions: 0,
@@ -144,7 +146,7 @@ export default function CountryPerformance() {
 
         const wentToAdvertiser = lead.lead_distributions?.some((d: any) => d.status === 'sent');
         if (wentToAdvertiser) {
-          countryMap[country].leads++;
+          countryMap[country].accepted++;
         }
 
         if (lead.status === 'rejected') {
@@ -160,10 +162,11 @@ export default function CountryPerformance() {
         }
       });
 
-      // Calculate CR and convert to array
+      // Leads = accepted + rejected; CR is based on accepted (advertiser-sent) leads
       const results = Object.values(countryMap).map(country => ({
         ...country,
-        cr: country.leads > 0 ? (country.conversions / country.leads) * 100 : 0,
+        leads: country.accepted + country.rejected,
+        cr: country.accepted > 0 ? (country.conversions / country.accepted) * 100 : 0,
       }));
 
       // Sort by leads descending
@@ -288,14 +291,14 @@ export default function CountryPerformance() {
   const totals = filteredData.reduce(
     (acc, row) => ({
       leads: acc.leads + row.leads,
-      rejected: acc.rejected + row.rejected,
+      accepted: acc.accepted + row.accepted,
       conversions: acc.conversions + row.conversions,
       pending_conversions: acc.pending_conversions + row.pending_conversions,
     }),
-    { leads: 0, rejected: 0, conversions: 0, pending_conversions: 0 }
+    { leads: 0, accepted: 0, conversions: 0, pending_conversions: 0 }
   );
 
-  const totalCR = totals.leads > 0 ? (totals.conversions / totals.leads) * 100 : 0;
+  const totalCR = totals.accepted > 0 ? (totals.conversions / totals.accepted) * 100 : 0;
 
   const toggleCountry = (country: string) => {
     const newSelected = new Set(selectedCountries);
@@ -494,7 +497,7 @@ export default function CountryPerformance() {
                   <TableRow>
                     <TableHead>Country</TableHead>
                     <TableHead className="text-right">Leads</TableHead>
-                    <TableHead className="text-right">Rejected</TableHead>
+                    <TableHead className="text-right">Accepted</TableHead>
                     <TableHead className="text-right">Conversions</TableHead>
                     <TableHead className="text-right">CR</TableHead>
                     <TableHead className="text-right">Pending Conv.</TableHead>
@@ -512,7 +515,7 @@ export default function CountryPerformance() {
                         >
                           <TableCell className="font-medium">{row.country_code}</TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
-                          <TableCell className="text-right">{row.rejected}</TableCell>
+                          <TableCell className="text-right">{row.accepted}</TableCell>
                           <TableCell className="text-right">{row.conversions}</TableCell>
                           <TableCell className="text-right">{row.cr.toFixed(2)}%</TableCell>
                           <TableCell className="text-right">{row.pending_conversions}</TableCell>
@@ -525,7 +528,7 @@ export default function CountryPerformance() {
                       <TableRow className="bg-muted/50 font-semibold">
                         <TableCell>Total:</TableCell>
                         <TableCell className="text-right">{totals.leads}</TableCell>
-                        <TableCell className="text-right">{totals.rejected}</TableCell>
+                        <TableCell className="text-right">{totals.accepted}</TableCell>
                         <TableCell className="text-right">{totals.conversions}</TableCell>
                         <TableCell className="text-right">{totalCR.toFixed(2)}%</TableCell>
                         <TableCell className="text-right">{totals.pending_conversions}</TableCell>
