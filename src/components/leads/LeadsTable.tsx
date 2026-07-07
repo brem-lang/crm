@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { cn, shortId } from "@/lib/utils";
+import { cn, shortId, parseRequestPayload } from "@/lib/utils";
 import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
@@ -569,7 +569,13 @@ export function LeadsTable({
                   variant="ghost" size="icon"
                   className="absolute top-2 right-2 h-8 w-8 z-10"
                   onClick={() => {
-                    const fullRequest = { url: dist?.request_url, headers: dist?.request_headers, payload: dist?.request_payload ? (() => { try { return JSON.parse(dist.request_payload); } catch { return dist.request_payload; } })() : null };
+                    const parsedPayload = dist?.request_payload ? parseRequestPayload(dist.request_payload) : null;
+                    const payload = parsedPayload
+                      ? parsedPayload.kind === "form"
+                        ? Object.fromEntries(parsedPayload.value)
+                        : parsedPayload.value
+                      : null;
+                    const fullRequest = { url: dist?.request_url, headers: dist?.request_headers, payload };
                     navigator.clipboard.writeText(JSON.stringify(fullRequest, null, 2));
                     toast.success("Full request copied to clipboard");
                   }}
@@ -594,7 +600,25 @@ export function LeadsTable({
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground font-medium mb-1">Request Payload</p>
-                        <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist.request_payload ? (() => { try { return JSON.stringify(JSON.parse(dist.request_payload), null, 2); } catch { return dist.request_payload; } })() : "Not recorded"}</pre>
+                        {!dist.request_payload ? (
+                          <p className="text-xs text-muted-foreground bg-background p-2 rounded">Not recorded</p>
+                        ) : (() => {
+                          const parsed = parseRequestPayload(dist.request_payload);
+                          if (parsed.kind === "form") {
+                            return (
+                              <div className="bg-background rounded border divide-y">
+                                {parsed.value.map(([key, value], i) => (
+                                  <div key={i} className="flex items-start gap-2 px-2 py-1.5 text-xs">
+                                    <span className="font-mono font-medium text-muted-foreground shrink-0">{key}</span>
+                                    <span className="font-mono break-all">{value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          const text = parsed.kind === "json" ? JSON.stringify(parsed.value, null, 2) : parsed.value;
+                          return <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{text}</pre>;
+                        })()}
                       </div>
                     </div>
                   )}
