@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -46,6 +47,8 @@ export function RejectedLeadsTable({
   onSort,
 }: RejectedLeadsTableProps) {
   const { formatDate, compactMode } = useCRMSettings();
+  const [requestDialogId, setRequestDialogId] = useState<string | null>(null);
+  const [responseDialogId, setResponseDialogId] = useState<string | null>(null);
   const visibleColumns = columns.filter((col) => col.visible);
   const allSelected = rejections.length > 0 && rejections.every((r) => selectedIds.has(r.id));
   const someSelected = rejections.some((r) => selectedIds.has(r.id)) && !allSelected;
@@ -257,6 +260,14 @@ export function RejectedLeadsTable({
                         </ScrollArea>
                       </DialogContent>
                     </Dialog>
+                    <DropdownMenuItem onClick={() => setRequestDialogId(rejection.id)}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Request
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setResponseDialogId(rejection.id)}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Response
+                    </DropdownMenuItem>
                     {canDeleteLeads && (
                       <DropdownMenuItem onClick={() => onDelete(rejection)} className="text-red-600">
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -270,6 +281,110 @@ export function RejectedLeadsTable({
           ))}
         </TableBody>
       </Table>
+
+      {/* Full Request Details Dialog */}
+      {(() => {
+        const rejection = rejections.find(r => r.id === requestDialogId);
+        const dist = rejection?.distribution;
+        const advertiserName = rejection?.advertisers?.name || "Advertiser";
+        return (
+          <Dialog open={!!requestDialogId} onOpenChange={(open) => !open && setRequestDialogId(null)}>
+            <DialogContent className="max-w-2xl max-h-[90vh]">
+              <DialogHeader>
+                <DialogTitle>Full Request Details</DialogTitle>
+                <DialogDescription>Complete request sent to {advertiserName}</DialogDescription>
+              </DialogHeader>
+              <div className="relative">
+                <Button
+                  variant="ghost" size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 z-10"
+                  onClick={() => {
+                    const fullRequest = { url: dist?.request_url, headers: dist?.request_headers, payload: dist?.request_payload ? (() => { try { return JSON.parse(dist.request_payload); } catch { return dist.request_payload; } })() : null };
+                    navigator.clipboard.writeText(JSON.stringify(fullRequest, null, 2));
+                    toast.success("Full request copied to clipboard");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <ScrollArea className="max-h-[60vh] border rounded-lg bg-muted/50">
+                  {!dist ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center py-8">
+                      <p className="font-medium">No distribution record found</p>
+                      <p className="text-xs mt-1">This lead has no recorded request data.</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-4 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-1">Target URL</p>
+                        <code className="text-xs bg-background p-2 rounded block break-all">{dist.request_url || "Not recorded"}</code>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-1">Headers</p>
+                        <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist.request_headers ? JSON.stringify(dist.request_headers, null, 2) : "Not recorded"}</pre>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-1">Request Payload</p>
+                        <pre className="text-xs bg-background p-2 rounded whitespace-pre-wrap break-all">{dist.request_payload ? (() => { try { return JSON.stringify(JSON.parse(dist.request_payload), null, 2); } catch { return dist.request_payload; } })() : "Not recorded"}</pre>
+                      </div>
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* Advertiser Response Dialog */}
+      {(() => {
+        const rejection = rejections.find(r => r.id === responseDialogId);
+        const dist = rejection?.distribution;
+        const advertiserName = rejection?.advertisers?.name || "Advertiser";
+
+        const buildResponseContent = () => {
+          if (!dist?.response) return "No response recorded";
+          try {
+            return JSON.stringify(JSON.parse(dist.response), null, 2);
+          } catch {
+            return dist.response;
+          }
+        };
+
+        return (
+          <Dialog open={!!responseDialogId} onOpenChange={(open) => !open && setResponseDialogId(null)}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Advertiser Response</DialogTitle>
+                <DialogDescription>Response from {advertiserName}</DialogDescription>
+              </DialogHeader>
+              <div className="relative">
+                <Button
+                  variant="ghost" size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 z-10"
+                  onClick={() => {
+                    navigator.clipboard.writeText(buildResponseContent());
+                    toast.success("Response copied to clipboard");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <ScrollArea className="max-h-[400px] border rounded-lg bg-muted/50">
+                  {!dist ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center py-8">
+                      <p className="font-medium">No distribution record found</p>
+                      <p className="text-xs mt-1">This lead has no recorded response data.</p>
+                    </div>
+                  ) : (
+                    <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+                      {buildResponseContent()}
+                    </pre>
+                  )}
+                </ScrollArea>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

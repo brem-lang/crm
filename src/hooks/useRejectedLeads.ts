@@ -48,6 +48,9 @@ export function useRejectedLeads() {
             id,
             advertiser_id,
             status,
+            request_url,
+            request_headers,
+            request_payload,
             response,
             created_at,
             advertisers(name)
@@ -70,7 +73,17 @@ export function useRejectedLeads() {
             user_agent, platform, browser, comment,
             custom1, custom2, custom3, custom4, custom5,
             live_lead_status, live_lead_score,
-            request_id, created_at, distributed_at, affiliates(name)
+            request_id, created_at, distributed_at, affiliates(name),
+            lead_distributions(
+              id,
+              advertiser_id,
+              status,
+              request_url,
+              request_headers,
+              request_payload,
+              response,
+              created_at
+            )
           ),
           advertisers(name)
         `)
@@ -130,6 +143,7 @@ export function useRejectedLeads() {
                 affiliates: lead.affiliates,
               },
               advertisers: dist.advertisers || { name: 'Unknown' },
+              distribution: dist,
               source: 'status' as const,
             });
           });
@@ -177,13 +191,17 @@ export function useRejectedLeads() {
               affiliates: lead.affiliates,
             },
             advertisers: { name: 'None Available' },
+            distribution: null,
             source: 'status' as const,
           });
         }
       });
 
-      const tableRejected = (rejectedLeadsTable || []).map(item => ({
+      const tableRejected = (rejectedLeadsTable || []).map((item: any) => ({
         ...item,
+        distribution: item.leads?.lead_distributions?.find(
+          (d: any) => d.advertiser_id === item.advertiser_id
+        ) ?? null,
         source: 'table' as const,
       }));
 
