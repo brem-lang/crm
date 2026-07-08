@@ -87,7 +87,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "city", label: "City", visible: false },
   { id: "ip_address",    label: "IP Address", visible: false },
   { id: "locale",        label: "Locale",     visible: false },
-  { id: "status", label: "Status", visible: true },
+  { id: "status", label: "Status", visible: false },
   { id: "sale_status", label: "Sale Status", visible: true },
   { id: "advertiser", label: "Advertiser", visible: true },
   { id: "advertiser_id", label: "Advertiser ID", visible: false },
