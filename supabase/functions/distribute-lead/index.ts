@@ -2398,9 +2398,19 @@ Deno.serve(async (req) => {
             }
           }
           
-          // If rejected, record this email+advertiser combination to prevent future re-sends
+          // If rejected, record this email+advertiser combination to prevent future re-sends,
+          // and save the lead as rejected so it's visible in Rejected Leads like any other
+          // rejection instead of being silently discarded.
           if (!success) {
             await recordEmailRejection(supabase, test_lead_data.email, typedAdvertiser.id, response);
+            createdLeadId = await saveRejectedTestLead();
+            if (createdLeadId) {
+              await supabase.from('rejected_leads').insert({
+                lead_id: createdLeadId,
+                advertiser_id: typedAdvertiser.id,
+                reason: response.substring(0, 500),
+              });
+            }
           }
           
           // Log the test attempt with request metadata
@@ -2448,10 +2458,19 @@ Deno.serve(async (req) => {
           );
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          
-          // Record rejection on error as well
+
+          // Record rejection on error as well, and save the lead as rejected (see the
+          // !success branch above for why).
           await recordEmailRejection(supabase, test_lead_data.email, typedAdvertiser.id, errorMessage);
-          
+          const rejectedLeadId = await saveRejectedTestLead();
+          if (rejectedLeadId) {
+            await supabase.from('rejected_leads').insert({
+              lead_id: rejectedLeadId,
+              advertiser_id: typedAdvertiser.id,
+              reason: errorMessage.substring(0, 500),
+            });
+          }
+
           // Log the failed test attempt
           await supabase.from('test_lead_logs').insert({
             advertiser_id: typedAdvertiser.id,
@@ -2460,7 +2479,7 @@ Deno.serve(async (req) => {
             response: errorMessage,
             created_by: user_id || null,
           });
-          
+
           return new Response(
             JSON.stringify({
               success: false,
@@ -2468,6 +2487,7 @@ Deno.serve(async (req) => {
               test_mode: true,
               advertiser_name: typedAdvertiser.name,
               error: errorMessage,
+              lead_id: rejectedLeadId,
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
