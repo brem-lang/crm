@@ -2424,6 +2424,20 @@ Deno.serve(async (req) => {
                 advertiser_id: typedAdvertiser.id,
                 reason: response.substring(0, 500),
               });
+              // Also record the failed attempt in lead_distributions, same as a real
+              // (non-test) rejection, so Rejected Leads can show the full request
+              // (url/headers/payload) alongside the response — not just the reason text.
+              await supabase.from('lead_distributions').insert({
+                lead_id: createdLeadId,
+                advertiser_id: typedAdvertiser.id,
+                affiliate_id: test_lead_data.affiliate_id || null,
+                status: 'failed',
+                response: response.substring(0, 1000),
+                sent_at: new Date().toISOString(),
+                request_url: requestMetadata?.url || null,
+                request_headers: requestMetadata?.headers || null,
+                request_payload: requestMetadata?.payload || null,
+              });
             }
           }
           
@@ -2482,6 +2496,16 @@ Deno.serve(async (req) => {
               lead_id: rejectedLeadId,
               advertiser_id: typedAdvertiser.id,
               reason: errorMessage.substring(0, 500),
+            });
+            // requestMetadata isn't available here — the adapter threw before returning
+            // it — but still record the attempt so it shows up next to real rejections.
+            await supabase.from('lead_distributions').insert({
+              lead_id: rejectedLeadId,
+              advertiser_id: typedAdvertiser.id,
+              affiliate_id: test_lead_data.affiliate_id || null,
+              status: 'failed',
+              response: errorMessage.substring(0, 1000),
+              sent_at: new Date().toISOString(),
             });
           }
 
