@@ -2257,8 +2257,22 @@ Deno.serve(async (req) => {
           .single();
 
         if (advError || !advertiser) {
+          const rejectedLeadId = await saveRejectedTestLead();
+          if (rejectedLeadId) {
+            try {
+              await supabase.from('rejected_leads').insert({
+                lead_id: rejectedLeadId,
+                advertiser_id,
+                reason: 'Advertiser not found or inactive',
+              });
+            } catch {
+              // advertiser_id may not reference a real row (deleted, not just
+              // inactive) — the FK would reject the insert; the lead is still
+              // saved as rejected either way.
+            }
+          }
           return new Response(
-            JSON.stringify({ success: false, message: 'Advertiser not found or inactive' }),
+            JSON.stringify({ success: false, message: 'Advertiser not found or inactive', lead_id: rejectedLeadId }),
             { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
