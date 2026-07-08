@@ -561,13 +561,18 @@ function CountriesCard({
 }) {
   const [search, setSearch] = useState("");
   const allEntries = Object.entries(countryData);
-  const filtered = search
-    ? allEntries.filter(
-        ([code, c]) =>
-          code.toLowerCase().includes(search.toLowerCase()) ||
-          c.name.toLowerCase().includes(search.toLowerCase())
-      )
-    : allEntries;
+  // Exactly 2 characters is unambiguously a country code (all codes are 2
+  // letters) — match the code only, so "es" means Spain and not also
+  // Eswatini/Estonia just because their names start with "Es". Anything
+  // longer is a name search (no code is longer than 2 letters anyway).
+  const filtered = (() => {
+    if (!search) return allEntries;
+    const q = search.toLowerCase();
+    if (q.length === 2) return allEntries.filter(([code]) => code.toLowerCase() === q);
+    return allEntries.filter(
+      ([code, c]) => code.toLowerCase().startsWith(q) || c.name.toLowerCase().startsWith(q)
+    );
+  })();
 
   const toggle = (code: string) => {
     onChange(selected.includes(code) ? selected.filter(c => c !== code) : [...selected, code]);
@@ -681,8 +686,10 @@ function AffiliatesCard({
   };
 
   const otherAdvertisers = allAdvertisers.filter(a => a.id !== currentAdvertiserId && a.is_active);
+  // startsWith, not includes — avoids noisy mid-name matches, same reasoning
+  // as the country search above.
   const filtered = search
-    ? affiliates.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+    ? affiliates.filter(a => a.name.toLowerCase().startsWith(search.toLowerCase()))
     : affiliates;
 
   return (
