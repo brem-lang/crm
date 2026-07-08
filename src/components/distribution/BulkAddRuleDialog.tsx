@@ -81,11 +81,14 @@ export function BulkAddRuleDialog({
   // Filter countries by search, excluding restricted countries entirely
   const filteredCountries = useMemo(() => {
     const search = countrySearch.toLowerCase();
+    // startsWith, not includes — a 2-letter code search like "es" (Spain) should
+    // not also match every country whose full name happens to contain "es"
+    // somewhere in the middle (United States, Lesotho, Indonesia, Palestine...).
     return Object.entries(countryData).filter(
       ([code, country]) =>
         !isRestricted(code) &&
-        (code.toLowerCase().includes(search) ||
-          country.name.toLowerCase().includes(search))
+        (code.toLowerCase().startsWith(search) ||
+          country.name.toLowerCase().startsWith(search))
     );
   }, [countrySearch, isRestricted]);
 
