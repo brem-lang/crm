@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { Loader2, Send, RefreshCw, CheckCircle2, XCircle, Copy, Wand2, PenLine } from "lucide-react";
 import { countryData, generateTestData } from "./countryData";
 import { useRestrictedCountries } from "@/hooks/useRestrictedCountries";
-import { useQuery } from "@tanstack/react-query";
 
 interface TestLeadDialogProps {
   open: boolean;
@@ -185,45 +184,20 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
 
   const { isRestricted } = useRestrictedCountries();
 
-  // Fetch this advertiser's distribution settings to get its allowed countries
-  const { data: distSettings } = useQuery({
-    queryKey: ['advertiser-dist-settings', advertiserId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('advertiser_distribution_settings')
-        .select('countries')
-        .eq('advertiser_id', advertiserId)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!advertiserId,
-  });
-
-  const advertiserCountries: string[] | null = distSettings?.countries ?? null;
-
   const currentCode = generatedData.country_code?.toUpperCase();
   const noCountrySelected = !currentCode;
-  const isCountryBlocked =
-    !noCountrySelected &&
-    (isRestricted(currentCode) ||
-      (advertiserCountries && advertiserCountries.length > 0 && !advertiserCountries.includes(currentCode)));
+  const isCountryBlocked = !noCountrySelected && isRestricted(currentCode);
   const countryBlockReason = noCountrySelected
     ? "Select a country to generate test data"
-    : isRestricted(currentCode)
-    ? `${currentCode} is globally restricted`
     : isCountryBlocked
-    ? `${currentCode} is not in this advertiser's allowed countries`
+    ? `${currentCode} is globally restricted`
     : null;
 
-  // Filter: exclude globally restricted + keep only advertiser-allowed countries (if set)
+  // Filter: exclude only globally restricted countries — a test tool should be
+  // able to exercise any country the advertiser's adapter might receive, not
+  // just the ones currently allowed in its distribution settings.
   const sortedCountries = Object.entries(countryData)
-    .filter(([code]) => {
-      if (isRestricted(code)) return false;
-      if (advertiserCountries && advertiserCountries.length > 0) {
-        return advertiserCountries.includes(code);
-      }
-      return true;
-    })
+    .filter(([code]) => !isRestricted(code))
     .sort(([, a], [, b]) => a.name.localeCompare(b.name));
 
   return (
@@ -330,11 +304,6 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
 
             {mode === "auto" ? (
               <>
-                {advertiserCountries && advertiserCountries.length > 0 && (
-                  <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
-                    Showing only countries allowed by this advertiser's distribution settings ({advertiserCountries.length} countries).
-                  </p>
-                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Select Country/Geo</Label>
