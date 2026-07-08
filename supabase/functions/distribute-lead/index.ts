@@ -2265,9 +2265,9 @@ Deno.serve(async (req) => {
                 advertiser_id,
                 reason: 'Advertiser not found or inactive',
               });
-              // No request was ever attempted — the advertiser lookup itself failed —
-              // so there's no real URL/payload to show, just a descriptive response
-              // recorded the same way as a real distribution failure would be.
+              // No request was ever sent to the advertiser (the lookup itself failed,
+              // so there's no adapter-specific payload shape to build) — record the
+              // raw test input as the payload so there's still something to inspect.
               await supabase.from('lead_distributions').insert({
                 lead_id: rejectedLeadId,
                 advertiser_id,
@@ -2275,6 +2275,7 @@ Deno.serve(async (req) => {
                 status: 'failed',
                 response: 'Advertiser not found or inactive',
                 sent_at: new Date().toISOString(),
+                request_payload: JSON.stringify(test_lead_data),
               });
             } catch {
               // advertiser_id may not reference a real row (deleted, not just
@@ -2303,8 +2304,8 @@ Deno.serve(async (req) => {
               reason: 'Advertiser is outside working hours',
             });
             // No request was attempted (blocked before contacting the advertiser) —
-            // record a descriptive response so this shows up consistently with
-            // every other rejection path in Rejected Leads.
+            // record the raw test input as the payload, same reasoning as the
+            // inactive-advertiser case above.
             await supabase.from('lead_distributions').insert({
               lead_id: rejectedLeadId,
               advertiser_id,
@@ -2312,6 +2313,7 @@ Deno.serve(async (req) => {
               status: 'failed',
               response: 'Advertiser is outside working hours',
               sent_at: new Date().toISOString(),
+              request_payload: JSON.stringify(test_lead_data),
             });
           }
           return new Response(
@@ -2520,7 +2522,7 @@ Deno.serve(async (req) => {
               reason: errorMessage.substring(0, 500),
             });
             // requestMetadata isn't available here — the adapter threw before returning
-            // it — but still record the attempt so it shows up next to real rejections.
+            // it — fall back to the raw test input so there's still a payload to inspect.
             await supabase.from('lead_distributions').insert({
               lead_id: rejectedLeadId,
               advertiser_id: typedAdvertiser.id,
@@ -2528,6 +2530,7 @@ Deno.serve(async (req) => {
               status: 'failed',
               response: errorMessage.substring(0, 1000),
               sent_at: new Date().toISOString(),
+              request_payload: JSON.stringify(test_lead_data),
             });
           }
 
