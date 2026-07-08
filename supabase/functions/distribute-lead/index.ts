@@ -2302,6 +2302,17 @@ Deno.serve(async (req) => {
               advertiser_id,
               reason: 'Advertiser is outside working hours',
             });
+            // No request was attempted (blocked before contacting the advertiser) —
+            // record a descriptive response so this shows up consistently with
+            // every other rejection path in Rejected Leads.
+            await supabase.from('lead_distributions').insert({
+              lead_id: rejectedLeadId,
+              advertiser_id,
+              affiliate_id: test_lead_data.affiliate_id || null,
+              status: 'failed',
+              response: 'Advertiser is outside working hours',
+              sent_at: new Date().toISOString(),
+            });
           }
           return new Response(
             JSON.stringify({
