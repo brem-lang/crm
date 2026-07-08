@@ -45,7 +45,11 @@
       "Bash(xxd:*)",
       "Bash(ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbGYtaG9zdGVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNTYwMDAsImV4cCI6MTkyNzkyMjQwMH0.An-Bi2dl7klEgFbxauShnjоVJedhotV_Dw_jtsgGwKc\":*)",
       "Bash(/tmp/decode_jwt.py:*)",
-      "Read(//home/crmalphatradecrm/public_html/**)"
+      "Read(//home/crmalphatradecrm/public_html/**)",
+      "Bash(git --version)",
+      "Bash(command -v gh)",
+      "Read(//root/.ssh/**)",
+      "Bash(git config *)"
     ],
     "additionalDirectories": [
       "/tmp"
