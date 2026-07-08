@@ -1367,7 +1367,17 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       const response = await fetch(endpoint, { method: 'POST', headers, body: payloadStr });
       responseText = await response.text();
       console.log('Capital Trading raw response:', response.status, responseText);
-      isSuccess = response.ok; // API returns no body on success — 2xx = accepted
+      isSuccess = response.ok;
+      // API returns HTTP 200 even for rejected leads (e.g. invalid phone, duplicate
+      // account) — the body's `error` field is the real signal, not the status code.
+      try {
+        const json = JSON.parse(responseText);
+        if (json.error) {
+          isSuccess = false;
+        }
+      } catch {
+        // Not JSON — fall back to the status code check above.
+      }
     } catch (err) {
       console.error('Capital Trading fetch error:', err);
       responseText = String(err);
