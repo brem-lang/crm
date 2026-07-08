@@ -81,15 +81,15 @@ export function BulkAddRuleDialog({
   // Filter countries by search, excluding restricted countries entirely
   const filteredCountries = useMemo(() => {
     const search = countrySearch.toLowerCase();
-    // startsWith, not includes — a 2-letter code search like "es" (Spain) should
-    // not also match every country whose full name happens to contain "es"
-    // somewhere in the middle (United States, Lesotho, Indonesia, Palestine...).
-    return Object.entries(countryData).filter(
-      ([code, country]) =>
-        !isRestricted(code) &&
-        (code.toLowerCase().startsWith(search) ||
-          country.name.toLowerCase().startsWith(search))
-    );
+    // Exactly 2 characters is unambiguously a country code (all codes are 2
+    // letters) — match the code only, so "es" means Spain and not also
+    // Eswatini/Estonia just because their names start with "Es". Anything
+    // longer is a name search (no code is longer than 2 letters anyway).
+    return Object.entries(countryData).filter(([code, country]) => {
+      if (isRestricted(code)) return false;
+      if (search.length === 2) return code.toLowerCase() === search;
+      return code.toLowerCase().startsWith(search) || country.name.toLowerCase().startsWith(search);
+    });
   }, [countrySearch, isRestricted]);
 
   // Filter advertisers by search
