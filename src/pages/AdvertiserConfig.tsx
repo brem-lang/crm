@@ -106,6 +106,29 @@ function useThroughput() {
   });
 }
 
+// Recent failures for one advertiser — fetched on demand (only when its
+// "Failing" badge is clicked), not bundled into useThroughput() above which
+// stays lean since it already drives every card on the page.
+function useAdvertiserFailures(advertiserId: string | null) {
+  return useQuery({
+    queryKey: ["adv-failures", advertiserId],
+    queryFn: async () => {
+      const dayAgo = subHours(new Date(), 24).toISOString();
+      const { data, error } = await supabase
+        .from("lead_distributions")
+        .select("id, created_at, response, request_url")
+        .eq("advertiser_id", advertiserId as string)
+        .eq("status", "failed")
+        .gte("created_at", dayAgo)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!advertiserId,
+  });
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 type StatusTone = "ok" | "danger" | "idle" | "muted";
@@ -177,6 +200,7 @@ function KpiTile({
 
 export default function AdvertiserConfig() {
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string | null>(null);
+  const [issuesAdvertiserId, setIssuesAdvertiserId] = useState<string | null>(null);
   const [linterOpen, setLinterOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -222,6 +246,8 @@ export default function AdvertiserConfig() {
   }, [advertisers, settings, throughput]);
 
   const selectedAdvertiser = (advertisers || []).find((a) => a.id === selectedAdvertiserId) ?? null;
+  const issuesAdvertiser = (advertisers || []).find((a) => a.id === issuesAdvertiserId) ?? null;
+  const { data: advertiserFailures, isLoading: loadingFailures } = useAdvertiserFailures(issuesAdvertiserId);
   const selectedSetting = (settings || []).find((s) => s.advertiser_id === selectedAdvertiserId) ?? null;
 
   // ── handlers ─────────────────────────────────────────────────────────────
@@ -381,11 +407,19 @@ export default function AdvertiserConfig() {
               const pct = cap ? Math.min(100, (sent24 / cap) * 100) : 0;
               const status = statusFor(a, stats);
               return (
-                <button
+                <div
                   key={a.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleCardClick(a.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleCardClick(a.id);
+                    }
+                  }}
                   className={cn(
-                    "group relative overflow-hidden rounded-lg border bg-card p-4 text-left shadow-sm transition-all",
+                    "group relative overflow-hidden rounded-lg border bg-card p-4 text-left shadow-sm transition-all cursor-pointer",
                     "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
                     "focus:outline-none focus:ring-2 focus:ring-primary/40"
                   )}
@@ -397,10 +431,32 @@ export default function AdvertiserConfig() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/40 shrink-0">
                       <Building2 className="h-5 w-5" />
                     </div>
-                    <Badge variant="outline" className={cn("gap-1 text-[10px] shrink-0", TONE_BADGE[status.tone])}>
-                      <CircleDot className="h-2.5 w-2.5" />
-                      {status.label}
-                    </Badge>
+                    {status.tone === "danger" ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIssuesAdvertiserId(a.id);
+                        }}
+                        title="Click to see recent failures"
+                        className="shrink-0"
+                      >
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "gap-1 text-[10px] shrink-0 cursor-pointer ring-1 ring-red-500/40 hover:ring-red-500/70",
+                            TONE_BADGE[status.tone]
+                          )}
+                        >
+                          <CircleDot className="h-2.5 w-2.5" />
+                          {status.label}
+                        </Badge>
+                      </button>
+                    ) : (
+                      <Badge variant="outline" className={cn("gap-1 text-[10px] shrink-0", TONE_BADGE[status.tone])}>
+                        <CircleDot className="h-2.5 w-2.5" />
+                        {status.label}
+                      </Badge>
+                    )}
                   </div>
 
                   <h3 className="mt-3 truncate text-sm font-semibold">{a.name}</h3>
@@ -425,7 +481,7 @@ export default function AdvertiserConfig() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -524,6 +580,49 @@ export default function AdvertiserConfig() {
               />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Recent failures dialog */}
+      <Dialog
+        open={!!issuesAdvertiserId}
+        onOpenChange={(o) => { if (!o) setIssuesAdvertiserId(null); }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <h2 className="text-sm font-semibold">
+              {issuesAdvertiser?.name} — {advertiserFailures?.length ?? 0} failure
+              {advertiserFailures?.length === 1 ? "" : "s"} in the last 24h
+            </h2>
+          </div>
+          <div className="flex-1 overflow-y-auto -mx-1 px-1">
+            {loadingFailures ? (
+              <div className="space-y-2 py-2">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : !advertiserFailures || advertiserFailures.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No failures in the last 24h — this may have just rolled out of the window.
+              </p>
+            ) : (
+              <div className="space-y-2 py-1">
+                {advertiserFailures.map((f) => (
+                  <div key={f.id} className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
+                    <div className="text-muted-foreground">{new Date(f.created_at).toLocaleString()}</div>
+                    {f.request_url && (
+                      <div className="font-mono text-muted-foreground break-all">{f.request_url}</div>
+                    )}
+                    <div className="font-mono break-all whitespace-pre-wrap">
+                      {f.response || "No response recorded"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>
