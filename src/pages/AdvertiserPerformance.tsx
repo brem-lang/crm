@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarIcon, X } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { countryData } from "@/components/advertisers/countryData";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "all" | "custom";
 
@@ -43,6 +45,7 @@ export default function AdvertiserPerformance() {
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfMonth(getNow()));
   const [advertiserSearch, setAdvertiserSearch] = useState("");
+  const [breakdownAdvertiser, setBreakdownAdvertiser] = useState<{ id: string; name: string } | null>(null);
 
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -148,6 +151,44 @@ export default function AdvertiserPerformance() {
           };
         })
         .filter(Boolean) as AdvertiserPerformanceData[];
+    },
+  });
+
+  const { data: breakdown, isLoading: isBreakdownLoading } = useQuery({
+    queryKey: ['advertiser-country-breakdown', breakdownAdvertiser?.id, showAllDates, fromDate, toDate],
+    enabled: !!breakdownAdvertiser,
+    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      let distsQuery = supabase
+        .from('lead_distributions')
+        .select('lead_id, leads(country_code, is_ftd, ftd_released)')
+        .eq('advertiser_id', breakdownAdvertiser!.id)
+        .eq('status', 'sent');
+      if (!showAllDates) {
+        distsQuery = distsQuery.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
+      }
+      const { data } = await distsQuery;
+      if (!data?.length) return [];
+
+      const stats: Record<string, { leads: number; conversions: number; pending: number }> = {};
+      for (const d of data) {
+        const lead = d.leads as { country_code: string; is_ftd: boolean; ftd_released: boolean } | null;
+        const code = lead?.country_code || 'Unknown';
+        if (!stats[code]) stats[code] = { leads: 0, conversions: 0, pending: 0 };
+        stats[code].leads++;
+        if (lead?.is_ftd && lead.ftd_released) stats[code].conversions++;
+        if (lead?.is_ftd && !lead.ftd_released) stats[code].pending++;
+      }
+
+      return Object.entries(stats)
+        .map(([country_code, s]) => ({
+          country_code,
+          leads: s.leads,
+          conversions: s.conversions,
+          pending: s.pending,
+          cr: s.leads > 0 ? (s.conversions / s.leads) * 100 : 0,
+        }))
+        .sort((a, b) => b.leads - a.leads);
     },
   });
 
@@ -299,7 +340,14 @@ export default function AdvertiserPerformance() {
                     <>
                       {performanceData.map((row) => (
                         <TableRow key={row.advertiser_id}>
-                          <TableCell className="font-medium">{row.advertiser_name}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              className="hover:underline text-left"
+                              onClick={() => setBreakdownAdvertiser({ id: row.advertiser_id, name: row.advertiser_name })}
+                            >
+                              {row.advertiser_name}
+                            </button>
+                          </TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
                           <TableCell className="text-right">{row.conversions}</TableCell>
                           <TableCell className="text-right">{row.cr.toFixed(2)}%</TableCell>
@@ -328,6 +376,51 @@ export default function AdvertiserPerformance() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!breakdownAdvertiser} onOpenChange={(o) => !o && setBreakdownAdvertiser(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{breakdownAdvertiser?.name} — By Country</DialogTitle>
+          </DialogHeader>
+          {isBreakdownLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !breakdown?.length ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No leads in this date range.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Country</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Conversions</TableHead>
+                  <TableHead className="text-right">Pending</TableHead>
+                  <TableHead className="text-right">CR</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {breakdown.map((row) => (
+                  <TableRow key={row.country_code}>
+                    <TableCell>
+                      {row.country_code}
+                      <span className="text-muted-foreground text-xs ml-1">
+                        {countryData[row.country_code]?.name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">{row.leads}</TableCell>
+                    <TableCell className="text-right">{row.conversions}</TableCell>
+                    <TableCell className="text-right">{row.pending}</TableCell>
+                    <TableCell className="text-right">{row.cr.toFixed(2)}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
