@@ -13,6 +13,7 @@ export interface AffiliateDistributionRule {
   hourly_cap: number | null;
   is_active: boolean;
   priority_type: 'primary' | 'fallback';
+  priority: number;
   start_time: string | null;
   end_time: string | null;
   weekly_schedule: WeeklySchedule | null;
@@ -102,6 +103,7 @@ export function useCreateDistributionRule() {
       hourly_cap?: number | null;
       is_active?: boolean;
       priority_type?: 'primary' | 'fallback';
+      priority?: number;
       start_time?: string | null;
       end_time?: string | null;
       weekly_schedule?: WeeklySchedule | null;
@@ -145,6 +147,7 @@ export function useUpdateDistributionRule() {
       hourly_cap?: number | null;
       is_active?: boolean;
       priority_type?: 'primary' | 'fallback';
+      priority?: number;
       start_time?: string | null;
       end_time?: string | null;
       weekly_schedule?: WeeklySchedule | null;
@@ -213,6 +216,36 @@ export function useBulkDeleteDistributionRules() {
     },
     onError: (error: any) => {
       toast.error("Failed to delete rules: " + error.message);
+    },
+  });
+}
+
+export interface BulkRuleUpdates {
+  is_active?: boolean;
+  priority_type?: 'primary' | 'fallback';
+  priority?: number;
+  weight?: number;
+}
+
+export function useBulkUpdateDistributionRules() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, updates }: { ids: string[]; updates: BulkRuleUpdates }) => {
+      const { error } = await supabase
+        .from("affiliate_distribution_rules")
+        .update(updates as any)
+        .in("id", ids);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, { ids }) => {
+      queryClient.invalidateQueries({ queryKey: ["affiliate-distribution-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["all-distribution-rules"] });
+      toast.success(`${ids.length} rule${ids.length !== 1 ? "s" : ""} updated`);
+    },
+    onError: (error: any) => {
+      toast.error("Failed to update rules: " + error.message);
     },
   });
 }

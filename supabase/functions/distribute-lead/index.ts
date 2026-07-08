@@ -221,27 +221,6 @@ function isWithinWorkingHours(
   return true;
 }
 
-// Returns the name of the first inactive distribution rule whose conditions match this
-// affiliate/country, or null if none match. Inactive rules act as a rejection gate —
-// only leads matching their scope are blocked; everything else routes normally.
-// deno-lint-ignore no-explicit-any
-async function getStoppedRuleReason(
-  supabase: any,
-  { affiliateId, countryCode }: { affiliateId?: string | null; countryCode?: string | null },
-): Promise<string | null> {
-  const { data: rules } = await supabase
-    .from('distribution_rules')
-    .select('name, conditions')
-    .eq('is_active', false);
-  for (const rule of rules ?? []) {
-    const c = rule.conditions ?? {};
-    const affiliateMatches = !c.affiliate_ids?.length || (!!affiliateId && c.affiliate_ids.includes(affiliateId));
-    const countryMatches = !c.country_codes?.length || (!!countryCode && c.country_codes.some((cc: string) => cc.toUpperCase() === countryCode.toUpperCase()));
-    if (affiliateMatches && countryMatches) return rule.name;
-  }
-  return null;
-}
-
 // Helper to extract autologin URL from advertiser response
 function extractAutologinUrl(responseText: string): string | null {
   try {
@@ -1446,6 +1425,7 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 interface EligibleAdvertiser extends Advertiser {
   weight: number;
   priority_type: 'primary' | 'fallback';
+  priority: number;
 }
 
 interface EligibleAdvertisersResult {
@@ -1564,6 +1544,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
           ...mockAdvertiser as Advertiser,
           weight: 100,
           priority_type: 'primary',
+          priority: 100,
         };
         result.primary.push(eligibleMock);
         console.log(`Test mode: Mock Advertiser found and added as primary`);
@@ -1668,6 +1649,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
 
         const weight = rule.weight || 100;
         const priorityType = rule.priority_type || 'primary';
+        const priority = rule.priority ?? 100;
 
         // Check daily cap from rule or advertiser default
         const dailyLimit = rule.daily_cap || adv.daily_cap || 100;
@@ -1687,7 +1669,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
           }
         }
 
-        const eligibleAdv: EligibleAdvertiser = { ...adv, weight, priority_type: priorityType };
+        const eligibleAdv: EligibleAdvertiser = { ...adv, weight, priority_type: priorityType, priority };
         
         if (priorityType === 'fallback') {
           result.fallback.push(eligibleAdv);
@@ -1823,7 +1805,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
       continue;
     }
 
-    result.primary.push({ ...adv, weight, priority_type: 'primary' });
+    result.primary.push({ ...adv, weight, priority_type: 'primary', priority: 100 });
   }
 
   console.log(`Eligible advertisers: ${result.primary.map(a => `${a.name}(w:${a.weight})`).join(', ')}`);
@@ -1854,11 +1836,37 @@ function selectWeightedAdvertiser(advertisers: EligibleAdvertiser[]): EligibleAd
   return advertisers[advertisers.length - 1];
 }
 
+// Groups advertisers by priority (ascending, 0 first) and only applies the weighted-random
+// pick + failover ordering *within* a priority group. Same priority on every row (the
+// default) reduces to exactly the old pure weighted-random behavior across the whole list.
+function orderByPriorityThenWeight(advertisers: EligibleAdvertiser[]): EligibleAdvertiser[] {
+  if (advertisers.length <= 1) return advertisers;
+
+  const groups = new Map<number, EligibleAdvertiser[]>();
+  for (const adv of advertisers) {
+    const p = adv.priority ?? 100;
+    if (!groups.has(p)) groups.set(p, []);
+    groups.get(p)!.push(adv);
+  }
+
+  const result: EligibleAdvertiser[] = [];
+  for (const p of Array.from(groups.keys()).sort((a, b) => a - b)) {
+    const group = groups.get(p)!;
+    if (group.length === 1) {
+      result.push(group[0]);
+    } else {
+      const selected = selectWeightedAdvertiser(group);
+      result.push(...orderForFailover(group, selected.id));
+    }
+  }
+  return result;
+}
+
 // Reorder advertisers for failover: selected first, then others by weight
 function orderForFailover(advertisers: EligibleAdvertiser[], selectedId: string): EligibleAdvertiser[] {
   const selected = advertisers.find(a => a.id === selectedId);
   const others = advertisers.filter(a => a.id !== selectedId).sort((a, b) => b.weight - a.weight);
-  
+
   if (selected) {
     return [selected, ...others];
   }
@@ -2208,23 +2216,6 @@ Deno.serve(async (req) => {
         return rejectedLead?.id ?? null;
       };
 
-      // Distribution rule stop check — an inactive rule scoped to this affiliate/country rejects the lead outright
-      const stoppedRuleName = await getStoppedRuleReason(supabase, {
-        affiliateId: test_lead_data.affiliate_id,
-        countryCode: test_lead_data.country_code,
-      });
-      if (stoppedRuleName) {
-        const rejectedLeadId = await saveRejectedTestLead();
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Distribution rule is stopped. All leads rejected.',
-            lead_id: rejectedLeadId,
-          }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
       // Duplicate IP address check — applies before any advertiser is contacted,
       // so a duplicate test lead never wastes a real outbound call to the advertiser.
       if (test_lead_data.ip_address) {
@@ -2510,9 +2501,8 @@ Deno.serve(async (req) => {
       let lastRejectionAdvertiser = '';
       
       if (primary.length > 0) {
-        const selectedPrimary = selectWeightedAdvertiser(primary);
-        const orderedPrimary = orderForFailover(primary, selectedPrimary.id);
-        
+        const orderedPrimary = orderByPriorityThenWeight(primary);
+
         for (const advertiser of orderedPrimary) {
           const adapter = advertiserAdapters[advertiser.advertiser_type] || advertiserAdapters.custom;
           
@@ -2621,9 +2611,8 @@ Deno.serve(async (req) => {
       
       // Try FALLBACK advertisers if primary all failed
       if (fallback.length > 0) {
-        const selectedFallback = selectWeightedAdvertiser(fallback);
-        const orderedFallback = orderForFailover(fallback, selectedFallback.id);
-        
+        const orderedFallback = orderByPriorityThenWeight(fallback);
+
         for (const advertiser of orderedFallback) {
           const adapter = advertiserAdapters[advertiser.advertiser_type] || advertiserAdapters.custom;
           
@@ -2839,10 +2828,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // STEP 1: Try PRIMARY advertisers first (using weighted selection)
+    // STEP 1: Try PRIMARY advertisers first (ordered by priority, then weighted selection within a tie)
     if (primary.length > 0) {
-      const selectedPrimary = selectWeightedAdvertiser(primary);
-      const orderedPrimary = orderForFailover(primary, selectedPrimary.id);
+      const orderedPrimary = orderByPriorityThenWeight(primary);
 
       for (const advertiser of orderedPrimary) {
         const result = await distributeLead(supabase, typedLead, advertiser);
@@ -2865,10 +2853,9 @@ Deno.serve(async (req) => {
       console.log('All primary advertisers failed, trying fallback...');
     }
 
-    // STEP 2: If all PRIMARY failed, try FALLBACK advertisers
+    // STEP 2: If all PRIMARY failed, try FALLBACK advertisers (same priority-then-weight ordering)
     if (fallback.length > 0) {
-      const selectedFallback = selectWeightedAdvertiser(fallback);
-      const orderedFallback = orderForFailover(fallback, selectedFallback.id);
+      const orderedFallback = orderByPriorityThenWeight(fallback);
 
       for (const advertiser of orderedFallback) {
         const result = await distributeLead(supabase, typedLead, advertiser);
