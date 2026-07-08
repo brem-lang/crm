@@ -2265,6 +2265,17 @@ Deno.serve(async (req) => {
                 advertiser_id,
                 reason: 'Advertiser not found or inactive',
               });
+              // No request was ever attempted — the advertiser lookup itself failed —
+              // so there's no real URL/payload to show, just a descriptive response
+              // recorded the same way as a real distribution failure would be.
+              await supabase.from('lead_distributions').insert({
+                lead_id: rejectedLeadId,
+                advertiser_id,
+                affiliate_id: test_lead_data.affiliate_id || null,
+                status: 'failed',
+                response: 'Advertiser not found or inactive',
+                sent_at: new Date().toISOString(),
+              });
             } catch {
               // advertiser_id may not reference a real row (deleted, not just
               // inactive) — the FK would reject the insert; the lead is still
