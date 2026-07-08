@@ -38,8 +38,6 @@ interface LeadsFilterBarProps {
   onAffiliateFilterChange: (value: string) => void;
   freeSearch: string;
   onFreeSearchChange: (value: string) => void;
-  statusFilter: string;
-  onStatusFilterChange: (value: string) => void;
   saleStatusFilter: string[];
   onSaleStatusFilterChange: (value: string[]) => void;
   liveLeadStatusFilter?: string;
@@ -84,8 +82,6 @@ export function LeadsFilterBar({
   onAffiliateFilterChange,
   freeSearch,
   onFreeSearchChange,
-  statusFilter,
-  onStatusFilterChange,
   saleStatusFilter,
   onSaleStatusFilterChange,
   liveLeadStatusFilter = "all",
@@ -299,21 +295,6 @@ export function LeadsFilterBar({
           className="w-full sm:w-[160px]"
         />
 
-        <SearchableSelect
-          value={statusFilter}
-          onValueChange={onStatusFilterChange}
-          options={[
-            { value: "new", label: "New" },
-            { value: "contacted", label: "Contacted" },
-            { value: "qualified", label: "Qualified" },
-            { value: "converted", label: "Converted" },
-            { value: "lost", label: "Lost" },
-          ]}
-          placeholder="All Status"
-          searchPlaceholder="Search status..."
-          emptyMessage="No statuses found"
-          className="w-full sm:w-[130px]"
-        />
 
         <MultiSelect
           options={saleStatusOptions}

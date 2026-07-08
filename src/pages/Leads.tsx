@@ -183,7 +183,6 @@ export default function Leads() {
     direction: "desc",
   });
 
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [saleStatusFilter, setSaleStatusFilter] = useState<string[]>([]);
   const [liveLeadStatusFilter, setLiveLeadStatusFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -344,10 +343,6 @@ export default function Leads() {
   const filteredLeads = useMemo(() => {
     return (
       leads?.filter((lead) => {
-        // Internal status filter (sent to affiliates)
-        const matchesStatus =
-          statusFilter === "all" || lead.status === statusFilter;
-
         // Sale status filter (from advertiser CRM) - multi-select
         const matchesSaleStatus =
           saleStatusFilter.length === 0 ||
@@ -413,7 +408,6 @@ export default function Leads() {
         }
 
         return (
-          matchesStatus &&
           matchesSaleStatus &&
           matchesDate &&
           matchesAdvertiser &&
@@ -426,7 +420,6 @@ export default function Leads() {
     );
   }, [
     leads,
-    statusFilter,
     saleStatusFilter,
     showAllDates,
     fromDate,
@@ -511,7 +504,6 @@ export default function Leads() {
   useEffect(() => {
     setCurrentPage(1);
   }, [
-    statusFilter,
     saleStatusFilter,
     liveLeadStatusFilter,
     showAllDates,
@@ -743,8 +735,6 @@ export default function Leads() {
             affiliates={affiliates}
             countries={countries}
             saleStatuses={saleStatuses}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
             saleStatusFilter={saleStatusFilter}
             onSaleStatusFilterChange={setSaleStatusFilter}
             liveLeadStatusFilter={liveLeadStatusFilter}
