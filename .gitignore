@@ -57,3 +57,6 @@ create-super-admin.sh
 
 # Docker
 get-docker.sh
+.env.production
+Dockerfile
+nginx.conf
