@@ -24,12 +24,14 @@ type DatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" 
 
 interface CountryPerformanceData {
   country_code: string;
+  clicks: number;
   leads: number;
   accepted: number;
   rejected: number;
   conversions: number;
   pending_conversions: number;
   cr: number;
+  c2l: number;
 }
 
 interface BreakdownData {
@@ -117,7 +119,7 @@ export default function CountryPerformance() {
       // Get all leads within date range
       let leadsQ = supabase
         .from('leads')
-        .select('country_code, status, is_ftd, ftd_released, lead_distributions(status)');
+        .select('country_code, status, is_ftd, ftd_released, click_id, lead_distributions(status)');
       if (!showAllDates) {
         leadsQ = leadsQ.gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString());
       }
@@ -135,13 +137,19 @@ export default function CountryPerformance() {
         if (!countryMap[country]) {
           countryMap[country] = {
             country_code: country,
+            clicks: 0,
             leads: 0,
             accepted: 0,
             rejected: 0,
             conversions: 0,
             pending_conversions: 0,
             cr: 0,
+            c2l: 0,
           };
+        }
+
+        if (lead.click_id) {
+          countryMap[country].clicks++;
         }
 
         const wentToAdvertiser = lead.lead_distributions?.some((d: any) => d.status === 'sent');
@@ -162,11 +170,16 @@ export default function CountryPerformance() {
         }
       });
 
-      // Leads = accepted + rejected; CR is based on accepted (advertiser-sent) leads
+      // Leads = accepted + rejected; CR is based on accepted (advertiser-sent) leads.
+      // C2L = % of leads that carry click-tracking data (this CRM has no separate
+      // click log, so "clicks" here means leads with a click_id, not raw ad clicks).
       const results = Object.values(countryMap).map(country => ({
         ...country,
         leads: country.accepted + country.rejected,
         cr: country.accepted > 0 ? (country.conversions / country.accepted) * 100 : 0,
+        c2l: (country.accepted + country.rejected) > 0
+          ? (country.clicks / (country.accepted + country.rejected)) * 100
+          : 0,
       }));
 
       // Sort by leads descending
@@ -290,15 +303,18 @@ export default function CountryPerformance() {
 
   const totals = filteredData.reduce(
     (acc, row) => ({
+      clicks: acc.clicks + row.clicks,
       leads: acc.leads + row.leads,
       accepted: acc.accepted + row.accepted,
+      rejected: acc.rejected + row.rejected,
       conversions: acc.conversions + row.conversions,
       pending_conversions: acc.pending_conversions + row.pending_conversions,
     }),
-    { leads: 0, accepted: 0, conversions: 0, pending_conversions: 0 }
+    { clicks: 0, leads: 0, accepted: 0, rejected: 0, conversions: 0, pending_conversions: 0 }
   );
 
   const totalCR = totals.accepted > 0 ? (totals.conversions / totals.accepted) * 100 : 0;
+  const totalC2L = totals.leads > 0 ? (totals.clicks / totals.leads) * 100 : 0;
 
   const toggleCountry = (country: string) => {
     const newSelected = new Set(selectedCountries);
@@ -496,11 +512,11 @@ export default function CountryPerformance() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Country</TableHead>
+                    <TableHead className="text-right">Clicks</TableHead>
+                    <TableHead className="text-right">C2L</TableHead>
                     <TableHead className="text-right">Leads</TableHead>
-                    <TableHead className="text-right">Accepted</TableHead>
-                    <TableHead className="text-right">Conversions</TableHead>
+                    <TableHead className="text-right">Failed Leads</TableHead>
                     <TableHead className="text-right">CR</TableHead>
-                    <TableHead className="text-right">Pending Conv.</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -514,11 +530,11 @@ export default function CountryPerformance() {
                           onClick={() => setSelectedCountryForBreakdown(row.country_code)}
                         >
                           <TableCell className="font-medium">{row.country_code}</TableCell>
+                          <TableCell className="text-right">{row.clicks}</TableCell>
+                          <TableCell className="text-right">{row.c2l.toFixed(2)}%</TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
-                          <TableCell className="text-right">{row.accepted}</TableCell>
-                          <TableCell className="text-right">{row.conversions}</TableCell>
+                          <TableCell className="text-right">{row.rejected}</TableCell>
                           <TableCell className="text-right">{row.cr.toFixed(2)}%</TableCell>
-                          <TableCell className="text-right">{row.pending_conversions}</TableCell>
                           <TableCell>
                             <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           </TableCell>
@@ -527,11 +543,11 @@ export default function CountryPerformance() {
                       {/* Totals Row */}
                       <TableRow className="bg-muted/50 font-semibold">
                         <TableCell>Total:</TableCell>
+                        <TableCell className="text-right">{totals.clicks}</TableCell>
+                        <TableCell className="text-right">{totalC2L.toFixed(2)}%</TableCell>
                         <TableCell className="text-right">{totals.leads}</TableCell>
-                        <TableCell className="text-right">{totals.accepted}</TableCell>
-                        <TableCell className="text-right">{totals.conversions}</TableCell>
+                        <TableCell className="text-right">{totals.rejected}</TableCell>
                         <TableCell className="text-right">{totalCR.toFixed(2)}%</TableCell>
-                        <TableCell className="text-right">{totals.pending_conversions}</TableCell>
                         <TableCell></TableCell>
                       </TableRow>
                     </>
