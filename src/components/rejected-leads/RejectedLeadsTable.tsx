@@ -14,15 +14,6 @@ import { cn, shortId, parseRequestPayload } from "@/lib/utils";
 import { countryData } from "@/components/advertisers/countryData";
 import { toast } from "sonner";
 
-const statusColors: Record<string, string> = {
-  new:       "bg-blue-100 text-blue-800",
-  contacted: "bg-yellow-100 text-yellow-800",
-  qualified: "bg-purple-100 text-purple-800",
-  converted: "bg-green-100 text-green-800",
-  lost:      "bg-red-100 text-red-800",
-  rejected:  "bg-red-100 text-red-800",
-};
-
 interface RejectedLeadsTableProps {
   rejections: any[];
   columns: ColumnConfig[];
@@ -101,12 +92,6 @@ export function RejectedLeadsTable({
         return lead?.city || "-";
       case "ip_address":
         return lead?.ip_address || "-";
-      case "status":
-        return lead?.status ? (
-          <Badge className={`${statusColors[lead.status] || "bg-gray-100 text-gray-800"} pointer-events-none`}>
-            {lead.status}
-          </Badge>
-        ) : "-";
       case "sale_status":
         return lead?.sale_status ? (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
