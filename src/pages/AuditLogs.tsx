@@ -30,6 +30,7 @@ export default function AuditLogs() {
   const [action, setAction] = useState<string>("");
   const [tableName, setTableName] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
   const [recordId, setRecordId] = useState<string>("");
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -43,6 +44,7 @@ export default function AuditLogs() {
     action: action || undefined,
     tableName: tableName || undefined,
     userEmail: userEmail || undefined,
+    username: username || undefined,
     recordId: recordId || undefined,
     dateFrom: showAllDates ? undefined : getStartOfDay(fromDate).toISOString(),
     dateTo: showAllDates ? undefined : getEndOfDay(toDate).toISOString(),
@@ -71,10 +73,10 @@ export default function AuditLogs() {
     setSelectedIds(next);
   };
 
-  const hasActiveFilter = !!(action || tableName || userEmail || recordId);
+  const hasActiveFilter = !!(action || tableName || userEmail || username || recordId);
 
   const clearFilters = () => {
-    setAction(""); setTableName(""); setUserEmail(""); setRecordId(""); setPage(1);
+    setAction(""); setTableName(""); setUserEmail(""); setUsername(""); setRecordId(""); setPage(1);
   };
 
   const exportCsv = () => {
@@ -173,6 +175,16 @@ export default function AuditLogs() {
                 value={userEmail}
                 onChange={(e) => { setUserEmail(e.target.value); setPage(1); }}
                 className="pl-8 h-8 w-44 text-sm"
+              />
+            </div>
+
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Username..."
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setPage(1); }}
+                className="pl-8 h-8 w-40 text-sm"
               />
             </div>
 
