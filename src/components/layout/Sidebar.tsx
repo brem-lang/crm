@@ -309,7 +309,7 @@ export function Sidebar() {
             );
           }
 
-          const showUnseenBadge = item.href === "/rejected-leads" && rejectedLeadsUnseenCount > 0;
+          const isRejectedLeadsItem = item.href === "/rejected-leads";
 
           return (
             <Link
@@ -327,15 +327,18 @@ export function Sidebar() {
             >
               <span className="relative flex-shrink-0">
                 <item.icon className="h-4 w-4" />
-                {showUnseenBadge && isCollapsed && (
+                {isRejectedLeadsItem && isCollapsed && rejectedLeadsUnseenCount > 0 && (
                   <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
                 )}
               </span>
               {!isCollapsed && (
                 <span className="flex flex-1 items-center justify-between gap-2">
                   {item.title}
-                  {showUnseenBadge && (
-                    <Badge variant="destructive" className="h-5 min-w-5 justify-center px-1 text-xs">
+                  {isRejectedLeadsItem && (
+                    <Badge
+                      variant={rejectedLeadsUnseenCount > 0 ? "destructive" : "secondary"}
+                      className="h-5 min-w-5 justify-center px-1 text-xs"
+                    >
                       {rejectedLeadsUnseenCount > 99 ? "99+" : rejectedLeadsUnseenCount}
                     </Badge>
                   )}
