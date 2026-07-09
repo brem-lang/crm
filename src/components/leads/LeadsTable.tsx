@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FlaskConical, MoreHorizontal, Pencil, Trash2, Send, Copy, History, Link, ExternalLink, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { ColumnConfig } from "./LeadColumnSelector";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
-import { cn, shortId, parseRequestPayload } from "@/lib/utils";
+import { cn, shortId, parseRequestPayload, deepParseJsonStrings } from "@/lib/utils";
 import { SortableHeader, SortConfig } from "./SortableHeader";
 import { toast } from "sonner";
 import { LeadActivityTimeline } from "./LeadActivityTimeline";
@@ -623,7 +623,12 @@ export function LeadsTable({
           : null;
 
         const buildResponseContent = () => {
-          const parsed = dist?.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
+          const rawParsed = dist?.response ? (() => { try { return JSON.parse(dist.response); } catch { return null; } })() : null;
+          // Some advertisers (e.g. Capital Trading) embed a JSON object as an
+          // escaped string in a field like "request_body" — expand those too
+          // so the whole response pretty-prints instead of leaving one
+          // unreadable escaped line buried in the middle.
+          const parsed = rawParsed ? (deepParseJsonStrings(rawParsed) as Record<string, any>) : null;
           if (parsed && trackerUrl) {
             const replaced = { ...parsed };
             const autologinFields = ['autologin_url', 'autologinUrl', 'autoLoginUrl', 'redirect_url', 'login_url', 'loginUrl'];

@@ -40,3 +40,32 @@ export function parseRequestPayload(raw: string | null | undefined): ParsedReque
 
   return { kind: "raw", value: raw };
 }
+
+// Some advertiser responses embed a JSON object as an escaped string within a
+// field (e.g. a "request_body" field that is itself a JSON string) — a plain
+// JSON.stringify(parsed, null, 2) leaves that field as one unreadable escaped
+// line. Recursively parse any string value that looks like JSON so the whole
+// structure pretty-prints consistently.
+export function deepParseJsonStrings(value: unknown): unknown {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const looksLikeJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"));
+    if (!looksLikeJson) return value;
+    try {
+      return deepParseJsonStrings(JSON.parse(trimmed));
+    } catch {
+      return value;
+    }
+  }
+  if (Array.isArray(value)) {
+    return value.map(deepParseJsonStrings);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepParseJsonStrings(v)])
+    );
+  }
+  return value;
+}
