@@ -65,7 +65,7 @@ const NAME_COLUMN_IDS      = new Set(["firstname", "lastname"]);
 const ID_COLUMN_IDS        = new Set(["request_id", "api_request_id"]);
 const COUNTRY_COLUMN_IDS   = new Set(["country_code", "country", "city"]);
 const IP_COLUMN_IDS        = new Set(["ip_address"]);
-const STATUS_COLUMN_IDS    = new Set(["status", "sale_status"]);
+const STATUS_COLUMN_IDS    = new Set(["sale_status"]);
 const FTD_COLUMN_IDS       = new Set(["is_ftd", "ftd_date", "ftd_id", "injection_ftd"]);
 const AFFILIATE_COLUMN_IDS = new Set(["affiliate", "affiliate_id"]);
 const OFFER_COLUMN_IDS     = new Set(["offer_name"]);
@@ -87,7 +87,6 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: "city", label: "City", visible: false },
   { id: "ip_address",    label: "IP Address", visible: false },
   { id: "locale",        label: "Locale",     visible: false },
-  { id: "status", label: "Status", visible: false },
   { id: "sale_status", label: "Sale Status", visible: true },
   { id: "advertiser", label: "Advertiser", visible: true },
   { id: "advertiser_id", label: "Advertiser ID", visible: false },
@@ -447,7 +446,6 @@ export default function Leads() {
         case "email":
         case "mobile":
         case "country_code":
-        case "status":
           aVal = a[sortConfig.column] || "";
           bVal = b[sortConfig.column] || "";
           break;
@@ -621,7 +619,6 @@ export default function Leads() {
       case "city": return lead.city || "";
       case "ip_address": return lead.ip_address || "";
       case "locale": return lead.locale || "";
-      case "status": return lead.is_ftd ? "converted" : lead.status || "";
       case "sale_status": return lead.sale_status || "";
       case "advertiser": {
         const sentDist = lead.lead_distributions?.find((d: any) => d.status === "sent");
