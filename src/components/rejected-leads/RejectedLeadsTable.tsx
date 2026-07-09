@@ -92,12 +92,6 @@ export function RejectedLeadsTable({
         return lead?.city || "-";
       case "ip_address":
         return lead?.ip_address || "-";
-      case "sale_status":
-        return lead?.sale_status ? (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-            {lead.sale_status}
-          </Badge>
-        ) : <span className="text-muted-foreground">-</span>;
       case "advertiser":
         return <Badge variant="outline">{advertiser?.name || "Unknown"}</Badge>;
       case "advertiser_id":
