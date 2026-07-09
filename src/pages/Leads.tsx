@@ -197,7 +197,7 @@ export default function Leads() {
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfDay(getNow()));
   const [toDate, setToDate] = useState<Date>(() => getEndOfDay(getNow()));
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
-  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
   const [freeSearch, setFreeSearch] = useState("");
 
@@ -376,7 +376,7 @@ export default function Leads() {
 
         // Country filter
         const matchesCountry =
-          countryFilter === "all" || lead.country_code === countryFilter;
+          countryFilter.length === 0 || countryFilter.includes(lead.country_code);
 
         // Affiliate filter by ID
         const matchesAffiliate =

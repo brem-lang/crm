@@ -32,8 +32,8 @@ interface LeadsFilterBarProps {
   onToDateChange: (date: Date) => void;
   advertiserFilter: string;
   onAdvertiserFilterChange: (value: string) => void;
-  countryFilter: string;
-  onCountryFilterChange: (value: string) => void;
+  countryFilter: string[];
+  onCountryFilterChange: (value: string[]) => void;
   affiliateFilter: string;
   onAffiliateFilterChange: (value: string) => void;
   freeSearch: string;
@@ -272,14 +272,14 @@ export function LeadsFilterBar({
           className="w-full sm:w-[160px]"
         />
 
-        <SearchableSelect
-          value={countryFilter}
-          onValueChange={onCountryFilterChange}
+        <MultiSelect
           options={countries.map((code) => ({ value: code, label: code }))}
+          selected={countryFilter}
+          onChange={onCountryFilterChange}
           placeholder="All Countries"
           searchPlaceholder="Search country..."
           emptyMessage="No countries found"
-          className="w-full sm:w-[140px]"
+          className="w-full sm:w-[160px]"
         />
 
         <SearchableSelect
