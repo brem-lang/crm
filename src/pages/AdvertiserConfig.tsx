@@ -318,6 +318,7 @@ export default function AdvertiserConfig() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Issues / all-clear badge */}
             <button
+              type="button"
               onClick={() => issues.length > 0 && setIssuesSummaryOpen(true)}
               disabled={issues.length === 0}
               className={cn(issues.length > 0 && "cursor-pointer")}
