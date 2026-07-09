@@ -12,7 +12,7 @@ import {
 import { useTodayDistributionCounts } from "@/hooks/useTodayDistributionCounts";
 import { useRecentDistributionStats } from "@/hooks/useRecentDistributionStats";
 import { AdvertiserConfigPanel } from "@/components/distribution/AdvertiserConfigPanel";
-import { ConflictLinterBadge, ConflictLinterSheet } from "@/components/distribution/ConflictLinterSheet";
+import { ConflictLinterBadge, ConflictLinterSheet, computeWarnings } from "@/components/distribution/ConflictLinterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -246,6 +246,11 @@ export default function AdvertiserConfig() {
     return list;
   }, [advertisers, settings, throughput]);
 
+  const linterWarningsCount = useMemo(
+    () => computeWarnings(advertisers || [], (settings as any[]) || [], avgStats).length,
+    [advertisers, settings, avgStats]
+  );
+
   const selectedAdvertiser = (advertisers || []).find((a) => a.id === selectedAdvertiserId) ?? null;
   const issuesAdvertiser = (advertisers || []).find((a) => a.id === issuesAdvertiserId) ?? null;
   const { data: advertiserFailures, isLoading: loadingFailures } = useAdvertiserFailures(issuesAdvertiserId);
@@ -342,11 +347,15 @@ export default function AdvertiserConfig() {
             </button>
 
             {/* Conflict linter badge (detailed) */}
-            <ConflictLinterBadge
-              advertisers={advertisers || []}
-              settings={settings as any[] || []}
-              avgStats={avgStats}
-            />
+            {linterWarningsCount > 0 && (
+              <button type="button" onClick={() => setLinterOpen(true)} className="cursor-pointer">
+                <ConflictLinterBadge
+                  advertisers={advertisers || []}
+                  settings={settings as any[] || []}
+                  avgStats={avgStats}
+                />
+              </button>
+            )}
 
             <Badge variant="secondary" className="gap-1.5">
               <Activity className="h-3 w-3 animate-pulse text-emerald-500" />
