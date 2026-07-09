@@ -2194,6 +2194,99 @@ async function pollWeBullUpLeads(
   return { updated, errors };
 }
 
+// Capital Trading — same GET endpoint used to create leads also returns their
+// current status. No working query-param filtering (updatedFrom/limit/page all
+// no-ops, confirmed by testing) so this is a single unpaginated request, and
+// email/phone come back redacted so matching is by external id only.
+async function pollCapitalTradingLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+  const baseUrl = (advertiser.url || 'https://api.capital-trading-group.co').replace(/\/$/, '');
+  const now = new Date().toISOString();
+
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  try {
+    const response = await fetch(`${baseUrl}/api/lead_management/api/affiliates`, {
+      method: 'GET',
+      headers: { authorization: advertiser.api_key || '' },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`Capital Trading status check failed: ${response.status}, body: ${errorText}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const items: Record<string, unknown>[] = Array.isArray(data.leads) ? data.leads : [];
+    console.log(`Capital Trading returned ${items.length} leads`);
+
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const item of items) {
+      if (item.id != null) byId.set(String(item.id), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      distIds.push(dist.id);
+      const item = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
+      if (!item) continue;
+
+      const status = (item.status as string) || '';
+      const leadUpdates: Record<string, unknown> = {};
+
+      const oldSaleStatus = (dist.leads as any).sale_status;
+      if (status && status !== oldSaleStatus) {
+        leadUpdates.sale_status = status;
+        collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
+      }
+
+      const hasFtd = (item.ftd === 'true' || item.ftd === true) && !dist.leads.is_ftd;
+      if (hasFtd) {
+        leadUpdates.is_ftd = true;
+        leadUpdates.ftd_date = (item.ftd_update_date as string) || now;
+        leadUpdates.ftd_id = String(item.id);
+        collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+        ftdCount++;
+      }
+
+      if (Object.keys(leadUpdates).length > 0) {
+        await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+        updated++;
+      }
+    }
+
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling Capital Trading: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -2731,6 +2824,14 @@ Deno.serve(async (req) => {
       // We Bull Up uses bulk paginated GET /leads?updatedFrom=
       if (advertiserType === 'webullup') {
         const result = await pollWeBullUpLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
+      // Capital Trading uses bulk GET /api/lead_management/api/affiliates (no filtering support)
+      if (advertiserType === 'capitaltrading') {
+        const result = await pollCapitalTradingLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;
