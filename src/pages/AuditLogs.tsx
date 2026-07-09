@@ -8,9 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useAuditLogs, useAuditLogActions, useAuditLogTables, useAuditLogsRealtime } from "@/hooks/useAuditLogs";
+import { useAuditLogs, useAuditLogActions, useAuditLogTables, useAuditLogUsers, useAuditLogsRealtime } from "@/hooks/useAuditLogs";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useCurrentUserPermissions } from "@/hooks/useUserPermissions";
@@ -30,7 +31,7 @@ export default function AuditLogs() {
   const [action, setAction] = useState<string>("");
   const [tableName, setTableName] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
-  const [username, setUsername] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
   const [recordId, setRecordId] = useState<string>("");
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));
@@ -44,7 +45,7 @@ export default function AuditLogs() {
     action: action || undefined,
     tableName: tableName || undefined,
     userEmail: userEmail || undefined,
-    username: username || undefined,
+    userId: userId && userId !== "all" ? userId : undefined,
     recordId: recordId || undefined,
     dateFrom: showAllDates ? undefined : getStartOfDay(fromDate).toISOString(),
     dateTo: showAllDates ? undefined : getEndOfDay(toDate).toISOString(),
@@ -54,6 +55,7 @@ export default function AuditLogs() {
 
   const { data: actions } = useAuditLogActions();
   const { data: tables } = useAuditLogTables();
+  const { data: auditUsers } = useAuditLogUsers();
 
   const logs = data?.logs ?? [];
   const total = data?.total ?? 0;
@@ -73,10 +75,10 @@ export default function AuditLogs() {
     setSelectedIds(next);
   };
 
-  const hasActiveFilter = !!(action || tableName || userEmail || username || recordId);
+  const hasActiveFilter = !!(action || tableName || userEmail || (userId && userId !== "all") || recordId);
 
   const clearFilters = () => {
-    setAction(""); setTableName(""); setUserEmail(""); setUsername(""); setRecordId(""); setPage(1);
+    setAction(""); setTableName(""); setUserEmail(""); setUserId(""); setRecordId(""); setPage(1);
   };
 
   const exportCsv = () => {
@@ -178,15 +180,15 @@ export default function AuditLogs() {
               />
             </div>
 
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Username..."
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setPage(1); }}
-                className="pl-8 h-8 w-40 text-sm"
-              />
-            </div>
+            <SearchableSelect
+              value={userId}
+              onValueChange={(v) => { setUserId(v); setPage(1); }}
+              options={(auditUsers || []).map((u) => ({ value: u.id, label: u.username }))}
+              placeholder="All Users"
+              searchPlaceholder="Search username..."
+              emptyMessage="No users found"
+              className="h-8 w-40 text-sm"
+            />
 
             <Input
               placeholder="Record ID..."

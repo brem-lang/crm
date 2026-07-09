@@ -22,7 +22,7 @@ interface AuditLogsFilters {
   action?: string;
   tableName?: string;
   userEmail?: string;
-  username?: string;
+  userId?: string;
   recordId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -31,28 +31,12 @@ interface AuditLogsFilters {
 }
 
 export function useAuditLogs(filters: AuditLogsFilters = {}) {
-  const { action, tableName, userEmail, username, recordId, dateFrom, dateTo, page = 1, pageSize = 50 } = filters;
+  const { action, tableName, userEmail, userId, recordId, dateFrom, dateTo, page = 1, pageSize = 50 } = filters;
 
   return useQuery({
-    queryKey: ['audit-logs', action, tableName, userEmail, username, recordId, dateFrom, dateTo, page, pageSize],
+    queryKey: ['audit-logs', action, tableName, userEmail, userId, recordId, dateFrom, dateTo, page, pageSize],
     staleTime: 60 * 1000,
     queryFn: async () => {
-      // audit_logs has no username column (only user_id/user_email) — usernames
-      // live on profiles, so resolve matching profile ids first and filter by
-      // user_id. No matches means no results, short-circuit before the main query.
-      let matchingUserIds: string[] | null = null;
-      if (username) {
-        const { data: matchedProfiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .ilike('username', `%${username}%`);
-        if (profileError) throw profileError;
-        matchingUserIds = (matchedProfiles || []).map((p) => p.id);
-        if (matchingUserIds.length === 0) {
-          return { logs: [], total: 0, page, pageSize, totalPages: 0 };
-        }
-      }
-
       let query = supabase
         .from('audit_logs')
         .select('id, action, table_name, record_id, user_id, user_email, old_data, new_data, changes_summary, ip_address, created_at', { count: 'exact' })
@@ -67,8 +51,8 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
       if (userEmail) {
         query = query.ilike('user_email', `%${userEmail}%`);
       }
-      if (matchingUserIds) {
-        query = query.in('user_id', matchingUserIds);
+      if (userId) {
+        query = query.eq('user_id', userId);
       }
       if (recordId) {
         query = query.ilike('record_id', `%${recordId}%`);
@@ -133,6 +117,25 @@ export function useAuditLogTables() {
       if (error) throw error;
 
       return [...new Set(data?.map(d => d.table_name).filter(Boolean) || [])] as string[];
+    },
+  });
+}
+
+// Username dropdown options — audit_logs has no username column itself
+// (only user_id/user_email), so the filter needs profiles.username separately.
+export function useAuditLogUsers() {
+  return useQuery({
+    queryKey: ['audit-log-users'],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .not('username', 'is', null)
+        .order('username');
+
+      if (error) throw error;
+      return (data || []) as { id: string; username: string }[];
     },
   });
 }
