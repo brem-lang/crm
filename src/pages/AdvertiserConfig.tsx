@@ -201,6 +201,7 @@ function KpiTile({
 export default function AdvertiserConfig() {
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string | null>(null);
   const [issuesAdvertiserId, setIssuesAdvertiserId] = useState<string | null>(null);
+  const [issuesSummaryOpen, setIssuesSummaryOpen] = useState(false);
   const [linterOpen, setLinterOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -316,22 +317,28 @@ export default function AdvertiserConfig() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Issues / all-clear badge */}
-            <Badge
-              variant="outline"
-              className={cn(
-                "gap-1.5 px-2.5 py-1 font-medium",
-                issues.length === 0
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-              )}
+            <button
+              onClick={() => issues.length > 0 && setIssuesSummaryOpen(true)}
+              disabled={issues.length === 0}
+              className={cn(issues.length > 0 && "cursor-pointer")}
             >
-              {issues.length === 0 ? (
-                <CheckCircle2 className="h-3.5 w-3.5" />
-              ) : (
-                <AlertTriangle className="h-3.5 w-3.5" />
-              )}
-              {issues.length === 0 ? "All systems normal" : `${issues.length} issues`}
-            </Badge>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "gap-1.5 px-2.5 py-1 font-medium",
+                  issues.length === 0
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                )}
+              >
+                {issues.length === 0 ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                )}
+                {issues.length === 0 ? "All systems normal" : `${issues.length} issues`}
+              </Badge>
+            </button>
 
             {/* Conflict linter badge (detailed) */}
             <ConflictLinterBadge
@@ -622,6 +629,25 @@ export default function AdvertiserConfig() {
                 ))}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Issues summary dialog */}
+      <Dialog open={issuesSummaryOpen} onOpenChange={setIssuesSummaryOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              {issues.length} issue{issues.length === 1 ? "" : "s"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {issues.map((issue, i) => (
+              <div key={i} className="rounded-md border bg-amber-500/5 border-amber-500/20 px-3 py-2 text-sm">
+                {issue}
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
