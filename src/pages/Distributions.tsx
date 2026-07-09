@@ -18,6 +18,7 @@ import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useBulkDeleteDistributions } from "@/hooks/useDistributions";
+import { deepParseJsonStrings } from "@/lib/utils";
 
 const statusIcons = {
   sent: <CheckCircle className="h-4 w-4 text-green-500" />,
@@ -202,7 +203,10 @@ export default function Distributions() {
     if (!response) return null;
     try {
       const parsed = JSON.parse(response);
-      return JSON.stringify(parsed, null, 2);
+      // Some advertisers embed a JSON object as an escaped string in a field
+      // like "request_body" — expand those too so the whole response
+      // pretty-prints instead of leaving one unreadable escaped line.
+      return JSON.stringify(deepParseJsonStrings(parsed), null, 2);
     } catch {
       return response;
     }
