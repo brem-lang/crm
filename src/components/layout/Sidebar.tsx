@@ -139,7 +139,10 @@ const navItems: NavItem[] = [
     children: [
       { title: "Affiliate API Logs", href: "/affiliate-api-logs", icon: ShieldCheck, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
       { title: "Test Logs", href: "/test-logs", icon: TestTube2, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
-      { title: "Callback Logs", href: "/logs/callback-logs", icon: Radio, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      // Hidden for now — every logged callback fails due to a misconfigured
+      // affiliate callback_url pointing at our own API instead of a real
+      // webhook. Route/page still work directly; just not linked in the nav.
+      // { title: "Callback Logs", href: "/logs/callback-logs", icon: Radio, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
       { title: "Audit Logs", href: "/audit-logs", icon: ScrollText, roles: ["super_admin"], customRoles: ["Admin"] },
     ]
   },
