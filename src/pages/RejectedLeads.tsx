@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useRejectedLeads, useDeleteRejectedLeads } from "@/hooks/useRejectedLeads";
+import { useRejectedLeads, useDeleteRejectedLeads, markRejectedLeadsSeen } from "@/hooks/useRejectedLeads";
 import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnSelector";
 import { SortConfig } from "@/components/leads/SortableHeader";
 import { RejectedLeadsFilterBar } from "@/components/rejected-leads/RejectedLeadsFilterBar";
@@ -82,6 +82,12 @@ export default function RejectedLeads() {
   const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
   const { canDeleteLeads } = useCurrentUserPermissions();
   const { isSuperAdmin } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Visiting this page clears the sidebar's unread-count badge.
+  useEffect(() => {
+    markRejectedLeadsSeen(queryClient);
+  }, [queryClient]);
 
   const [showAllDates, setShowAllDates] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => getStartOfMonth(getNow()));

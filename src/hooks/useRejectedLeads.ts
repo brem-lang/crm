@@ -1,6 +1,57 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useCRMSettings } from "./useCRMSettings";
+
+const LAST_SEEN_KEY = "rejected-leads-last-seen";
+
+// First-ever read seeds "now" instead of epoch, so a fresh browser starts at
+// 0 unread instead of counting every rejection that ever happened.
+function getLastSeen(): string {
+  const stored = localStorage.getItem(LAST_SEEN_KEY);
+  if (stored) return stored;
+  const now = new Date().toISOString();
+  localStorage.setItem(LAST_SEEN_KEY, now);
+  return now;
+}
+
+export function markRejectedLeadsSeen(queryClient: QueryClient) {
+  localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+  queryClient.invalidateQueries({ queryKey: ['rejected-leads-unseen-count'] });
+}
+
+// Lightweight count-only query for the sidebar badge — deliberately not
+// reusing useRejectedLeads() below, which does expensive joined queries
+// fanned out to one row per failed distribution for the full page table.
+// This is an approximation (raw row counts, no fan-out) good enough for a
+// notification badge.
+export function useRejectedLeadsUnseenCount() {
+  const { autoRefreshInterval } = useCRMSettings();
+  // Default to a 60s poll even with auto-refresh off, since the global
+  // QueryClient has refetchOnWindowFocus disabled — otherwise this would
+  // only update on remount/navigation.
+  const refetchMs = autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : 60_000;
+
+  return useQuery({
+    queryKey: ['rejected-leads-unseen-count'],
+    refetchInterval: refetchMs,
+    queryFn: async () => {
+      const lastSeen = getLastSeen();
+      const [statusRes, tableRes] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'rejected')
+          .gt('created_at', lastSeen),
+        supabase
+          .from('rejected_leads')
+          .select('id', { count: 'exact', head: true })
+          .gt('created_at', lastSeen),
+      ]);
+      return (statusRes.count || 0) + (tableRes.count || 0);
+    },
+  });
+}
 
 export function useRejectedLeads() {
   return useQuery({

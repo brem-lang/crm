@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { useRejectedLeadsUnseenCount } from "@/hooks/useRejectedLeads";
+import { Badge } from "@/components/ui/badge";
 import { getTimezoneLabel } from "@/lib/timezones";
 import {
   LayoutDashboard,
@@ -167,6 +169,7 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { data: rejectedLeadsUnseenCount = 0 } = useRejectedLeadsUnseenCount();
 
   // Update time every second
   useEffect(() => {
@@ -306,6 +309,8 @@ export function Sidebar() {
             );
           }
 
+          const showUnseenBadge = item.href === "/rejected-leads" && rejectedLeadsUnseenCount > 0;
+
           return (
             <Link
               key={item.href}
@@ -320,8 +325,22 @@ export function Sidebar() {
                 isCollapsed && "justify-center px-2"
               )}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
-              {!isCollapsed && item.title}
+              <span className="relative flex-shrink-0">
+                <item.icon className="h-4 w-4" />
+                {showUnseenBadge && isCollapsed && (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+                )}
+              </span>
+              {!isCollapsed && (
+                <span className="flex flex-1 items-center justify-between gap-2">
+                  {item.title}
+                  {showUnseenBadge && (
+                    <Badge variant="destructive" className="h-5 min-w-5 justify-center px-1 text-xs">
+                      {rejectedLeadsUnseenCount > 99 ? "99+" : rejectedLeadsUnseenCount}
+                    </Badge>
+                  )}
+                </span>
+              )}
             </Link>
           );
         })}
