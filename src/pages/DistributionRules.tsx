@@ -427,10 +427,40 @@ export default function DistributionRules() {
                               {rule.priority_type === "fallback" ? "Fallback" : "Primary"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground" title="Lower = tried first within its tier">
-                            {rule.priority}
+                          <TableCell className="text-right" title="Lower = tried first within its tier">
+                            <Input
+                              key={`${rule.id}-priority-${rule.priority}`}
+                              type="number"
+                              min={0}
+                              defaultValue={rule.priority}
+                              disabled={updateRule.isPending}
+                              className="h-7 w-16 text-right text-sm px-1.5 ml-auto"
+                              onBlur={(e) => {
+                                const next = Number(e.target.value);
+                                if (!Number.isNaN(next) && next !== rule.priority) {
+                                  updateRule.mutate({ id: rule.id, priority: next });
+                                }
+                              }}
+                              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                            />
                           </TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{rule.weight}</TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              key={`${rule.id}-weight-${rule.weight}`}
+                              type="number"
+                              min={1}
+                              defaultValue={rule.weight}
+                              disabled={updateRule.isPending}
+                              className="h-7 w-16 text-right text-sm px-1.5 ml-auto"
+                              onBlur={(e) => {
+                                const next = Number(e.target.value);
+                                if (!Number.isNaN(next) && next !== rule.weight && next >= 1) {
+                                  updateRule.mutate({ id: rule.id, weight: next });
+                                }
+                              }}
+                              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                            />
+                          </TableCell>
                           <TableCell className="text-center">
                             <Switch
                               checked={advertiserInactive ? false : rule.is_active}
