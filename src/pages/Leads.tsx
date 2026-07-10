@@ -230,12 +230,9 @@ export default function Leads() {
   });
 
   // Extract unique countries from leads
-  const countries = useMemo(() => {
-    const codes = new Set(
-      leads?.map((l) => l.country_code).filter(Boolean) || [],
-    );
-    return Array.from(codes).sort();
-  }, [leads]);
+  // Full country list, not just codes currently present in loaded leads —
+  // lets you filter by a country even before any lead from it has arrived.
+  const countries = useMemo(() => Object.keys(countryData).sort(), []);
 
   // Extract unique sale statuses from leads
   const saleStatuses = useMemo(() => {
