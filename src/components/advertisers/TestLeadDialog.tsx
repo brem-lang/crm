@@ -57,6 +57,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   const [isLoading, setIsLoading] = useState(false);
   const [generatedData, setGeneratedData] = useState(() => blankTestData());
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [succeededThisSession, setSucceededThisSession] = useState(false);
 
   // Additional fields
   const [offerName, setOfferName] = useState("");
@@ -84,6 +85,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   const handleClose = (open: boolean) => {
     if (!open) {
       setTestResult(null);
+      setSucceededThisSession(false);
     }
     onOpenChange(open);
   };
@@ -164,6 +166,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
       });
 
       if (funcData?.success) {
+        setSucceededThisSession(true);
         toast.success(`Test lead sent to ${advertiserName}`);
       } else {
         toast.warning("Test lead was rejected by advertiser");
@@ -508,23 +511,31 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
           </div>
         )}
 
+        {succeededThisSession && (
+          <p className="text-xs text-muted-foreground text-right">
+            Already sent successfully to {advertiserName} — close and reopen this dialog to test again.
+          </p>
+        )}
+
         <DialogFooter>
           {testResult ? (
             <>
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Close
               </Button>
-              <Button onClick={resetDialog}>
-                <Send className="h-4 w-4 mr-2" />
-                Send Another
-              </Button>
+              {!testResult.success && (
+                <Button onClick={resetDialog}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Another
+                </Button>
+              )}
             </>
           ) : (
             <>
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSendTestLead} disabled={isLoading || !!isCountryBlocked || noCountrySelected}>
+              <Button onClick={handleSendTestLead} disabled={isLoading || !!isCountryBlocked || noCountrySelected || succeededThisSession}>
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,7 +17,7 @@ interface ResendLeadsDialogProps {
     lastname: string;
     mobile: string;
     country_code: string;
-    lead_distributions?: Array<{ advertiser_id: string; advertisers?: { name: string } }>;
+    lead_distributions?: Array<{ advertiser_id: string; status?: string; advertisers?: { name: string } }>;
   }>;
   advertisers: Array<{ id: string; name: string }>;
   onSuccess: () => void;
@@ -31,19 +30,32 @@ export function ResendLeadsDialog({
   advertisers,
   onSuccess,
 }: ResendLeadsDialogProps) {
-  const [resendOption, setResendOption] = useState<"same" | "different">("same");
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get current advertisers from selected leads
-  const currentAdvertisers = selectedLeads.map(lead => {
-    const dist = lead.lead_distributions?.find(d => d.advertisers?.name);
-    return dist?.advertisers?.name || "Unknown";
-  });
-  const uniqueCurrentAdvertisers = [...new Set(currentAdvertisers)];
+  // Leads that already have a successful delivery don't need (and can't) be
+  // resent — resend only makes sense for leads whose attempts so far failed.
+  const eligibleLeads = useMemo(
+    () => selectedLeads.filter(lead => !lead.lead_distributions?.some(d => d.status === "sent")),
+    [selectedLeads]
+  );
+  const alreadyDeliveredCount = selectedLeads.length - eligibleLeads.length;
+
+  // Advertisers already tried (any status) by any eligible lead can't be
+  // picked again — resend must always go to a different advertiser.
+  const triedAdvertiserIds = useMemo(
+    () => new Set(eligibleLeads.flatMap(l => (l.lead_distributions ?? []).map(d => d.advertiser_id).filter(Boolean))),
+    [eligibleLeads]
+  );
+  const availableAdvertisers = useMemo(
+    () => advertisers.filter(a => !triedAdvertiserIds.has(a.id)),
+    [advertisers, triedAdvertiserIds]
+  );
+
+  const canResend = eligibleLeads.length > 0 && availableAdvertisers.length > 0;
 
   const handleResend = async () => {
-    if (resendOption === "different" && !selectedAdvertiserId) {
+    if (!selectedAdvertiserId) {
       toast.error("Please select an advertiser");
       return;
     }
@@ -53,28 +65,18 @@ export function ResendLeadsDialog({
     let errorCount = 0;
 
     try {
-      for (const lead of selectedLeads) {
-        // Determine target advertiser
-        let targetAdvertiserId: string | null = null;
-        
-        if (resendOption === "same") {
-          // Get the original advertiser from distributions
-          const dist = lead.lead_distributions?.find(d => d.advertiser_id);
-          targetAdvertiserId = dist?.advertiser_id || null;
-          
-          if (!targetAdvertiserId) {
-            errorCount++;
-            continue;
-          }
-        } else {
-          targetAdvertiserId = selectedAdvertiserId;
+      for (const lead of eligibleLeads) {
+        // Defensive: never resend to an advertiser this lead already went to.
+        if (lead.lead_distributions?.some(d => d.advertiser_id === selectedAdvertiserId)) {
+          errorCount++;
+          continue;
         }
 
         // Call distribute-lead edge function to resend
         const { error } = await supabase.functions.invoke('distribute-lead', {
           body: {
             lead_id: lead.id,
-            force_advertiser_id: targetAdvertiserId,
+            force_advertiser_id: selectedAdvertiserId,
             is_resend: true,
           },
         });
@@ -92,7 +94,7 @@ export function ResendLeadsDialog({
         onSuccess();
         onOpenChange(false);
       }
-      
+
       if (errorCount > 0) {
         toast.error(`Failed to resend ${errorCount} lead${errorCount > 1 ? 's' : ''}`);
       }
@@ -108,48 +110,42 @@ export function ResendLeadsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Resend Leads</DialogTitle>
+          <DialogTitle>Resend to a Different Advertiser</DialogTitle>
           <DialogDescription>
-            Resend {selectedLeads.length} selected lead{selectedLeads.length > 1 ? 's' : ''} to an advertiser.
-            {uniqueCurrentAdvertisers.length > 0 && (
+            Resend {eligibleLeads.length} lead{eligibleLeads.length !== 1 ? 's' : ''} to an advertiser they haven't been sent to yet.
+            {alreadyDeliveredCount > 0 && (
               <span className="block mt-1 text-xs">
-                Current: {uniqueCurrentAdvertisers.join(", ")}
+                {alreadyDeliveredCount} selected lead{alreadyDeliveredCount > 1 ? 's were' : ' was'} already delivered successfully and will be skipped.
               </span>
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <RadioGroup value={resendOption} onValueChange={(v) => setResendOption(v as "same" | "different")}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="same" id="same" />
-              <Label htmlFor="same" className="cursor-pointer">
-                Resend to same advertiser
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="different" id="different" />
-              <Label htmlFor="different" className="cursor-pointer">
-                Send to different advertiser
-              </Label>
-            </div>
-          </RadioGroup>
-
-          {resendOption === "different" && (
+          {eligibleLeads.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              All selected leads have already been delivered successfully — there's nothing to resend.
+            </p>
+          ) : (
             <div className="space-y-2">
               <Label>Select Advertiser</Label>
-              <Select value={selectedAdvertiserId} onValueChange={setSelectedAdvertiserId}>
+              <Select value={selectedAdvertiserId} onValueChange={setSelectedAdvertiserId} disabled={availableAdvertisers.length === 0}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose advertiser..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {advertisers.map((adv) => (
+                  {availableAdvertisers.map((adv) => (
                     <SelectItem key={adv.id} value={adv.id}>
                       {adv.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {availableAdvertisers.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Every advertiser has already been tried for the selected lead(s).
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -158,13 +154,13 @@ export function ResendLeadsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleResend} disabled={isSubmitting}>
+          <Button onClick={handleResend} disabled={isSubmitting || !canResend || !selectedAdvertiserId}>
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            Resend {selectedLeads.length} Lead{selectedLeads.length > 1 ? 's' : ''}
+            Resend {eligibleLeads.length} Lead{eligibleLeads.length !== 1 ? 's' : ''}
           </Button>
         </DialogFooter>
       </DialogContent>

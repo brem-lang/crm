@@ -2857,6 +2857,27 @@ Deno.serve(async (req) => {
     // For resends, use force_advertiser_id if provided
     const targetAdvertiserId = is_resend && force_advertiser_id ? force_advertiser_id : advertiser_id;
 
+    if (is_resend && force_advertiser_id) {
+      const { data: priorDistributions } = await supabase
+        .from('lead_distributions')
+        .select('advertiser_id, status')
+        .eq('lead_id', typedLead.id);
+
+      if ((priorDistributions || []).some((d: any) => d.status === 'sent')) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'Lead was already successfully delivered; resend is not needed' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if ((priorDistributions || []).some((d: any) => d.advertiser_id === force_advertiser_id)) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'Lead was already sent to this advertiser; choose a different advertiser' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // If specific advertiser is provided (or force_advertiser_id for resends), distribute to that advertiser only
     if (targetAdvertiserId) {
       const { data: advertiser, error: advError } = await supabase
