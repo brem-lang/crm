@@ -14,11 +14,15 @@ import { useRecentDistributionStats } from "@/hooks/useRecentDistributionStats";
 import { AdvertiserConfigPanel } from "@/components/distribution/AdvertiserConfigPanel";
 import { ConflictLinterBadge, ConflictLinterSheet, computeWarnings } from "@/components/distribution/ConflictLinterSheet";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -26,8 +30,6 @@ import {
   AlertTriangle,
   Building2,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleDot,
   Search,
   ShieldAlert,
@@ -35,8 +37,6 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-
-const PAGE_SIZE = 12;
 
 // ─── throughput query ────────────────────────────────────────────────────────
 
@@ -204,7 +204,9 @@ export default function AdvertiserConfig() {
   const [issuesSummaryOpen, setIssuesSummaryOpen] = useState(false);
   const [linterOpen, setLinterOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSizeState();
 
   const { data: advertisers, isLoading: loadingAdvertisers } = useAdvertisers();
   const { data: affiliates, isLoading: loadingAffiliates } = useAffiliates();
@@ -218,21 +220,26 @@ export default function AdvertiserConfig() {
   // ── derived ──────────────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
-    const list = advertisers || [];
-    if (!search.trim()) return list;
-    const q = search.toLowerCase();
-    return list.filter((a) => a.name.toLowerCase().includes(q));
-  }, [advertisers, search]);
+    let list = advertisers || [];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((a) => a.name.toLowerCase().includes(q));
+    }
+    if (statusFilter !== "all") {
+      list = list.filter((a) => statusFor(a, throughput?.byAdv[a.id]).tone === statusFilter);
+    }
+    return list;
+  }, [advertisers, search, statusFilter, throughput]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search]);
+  }, [search, statusFilter]);
 
   const issues = useMemo(() => {
     const list: string[] = [];
@@ -290,8 +297,8 @@ export default function AdvertiserConfig() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-40" />)}
+          <div className="space-y-2">
+            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         </div>
       </DashboardLayout>
@@ -396,18 +403,32 @@ export default function AdvertiserConfig() {
           />
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search advertisers…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 pl-8"
-          />
+        {/* Search + status filter */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search advertisers…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 pl-8"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-40">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="ok">Live</SelectItem>
+              <SelectItem value="danger">Failing</SelectItem>
+              <SelectItem value="idle">Idle</SelectItem>
+              <SelectItem value="muted">Paused</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Card grid */}
+        {/* Table */}
         {filtered.length === 0 ? (
           <Card>
             <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
@@ -415,131 +436,109 @@ export default function AdvertiserConfig() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {paginated.map((a) => {
-              const stats = throughput?.byAdv[a.id];
-              const setting = (settings || []).find((s) => s.advertiser_id === a.id);
-              const cap = setting?.default_daily_cap ?? null;
-              const sent24 = stats?.sent24 ?? todayCounts[a.id] ?? 0;
-              const pct = cap ? Math.min(100, (sent24 / cap) * 100) : 0;
-              const status = statusFor(a, stats);
-              return (
-                <div
-                  key={a.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleCardClick(a.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleCardClick(a.id);
-                    }
-                  }}
-                  className={cn(
-                    "group relative overflow-hidden rounded-lg border bg-card p-4 text-left shadow-sm transition-all cursor-pointer",
-                    "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-                    "focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  )}
-                >
-                  {/* Status color bar */}
-                  <span className={cn("absolute inset-x-0 top-0 h-1", TONE_BAR[status.tone])} />
-
-                  <div className="flex items-start justify-between gap-2 mt-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/40 shrink-0">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    {status.tone === "danger" ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIssuesAdvertiserId(a.id);
-                        }}
-                        title="Click to see recent failures"
-                        className="shrink-0"
-                      >
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "gap-1 text-[10px] shrink-0 cursor-pointer ring-1 ring-red-500/40 hover:ring-red-500/70",
-                            TONE_BADGE[status.tone]
-                          )}
-                        >
-                          <CircleDot className="h-2.5 w-2.5" />
-                          {status.label}
-                        </Badge>
-                      </button>
-                    ) : (
-                      <Badge variant="outline" className={cn("gap-1 text-[10px] shrink-0", TONE_BADGE[status.tone])}>
-                        <CircleDot className="h-2.5 w-2.5" />
-                        {status.label}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <h3 className="mt-3 truncate text-sm font-semibold">{a.name}</h3>
-
-                  <div className="mt-3 flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">24h sent</span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {sent24}
-                      {cap != null ? (
-                        <span className="text-muted-foreground"> / {cap}</span>
-                      ) : (
-                        <span className="text-muted-foreground"> / ∞</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-muted">
-                    <div
-                      className={cn(
-                        "h-full rounded transition-all",
-                        pct >= 100 ? "bg-red-500" : pct >= 90 ? "bg-amber-500" : "bg-emerald-500"
-                      )}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-sm text-muted-foreground">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} advertisers
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <Button
-                  key={page}
-                  variant={page === currentPage ? "default" : "outline"}
-                  size="sm"
-                  className="w-8"
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </Button>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Advertiser</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">24h Sent</TableHead>
+                      <TableHead className="text-right">Failed</TableHead>
+                      <TableHead className="text-right">Hourly</TableHead>
+                      <TableHead className="w-40">Daily Usage</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginated.map((a) => {
+                      const stats = throughput?.byAdv[a.id];
+                      const setting = (settings || []).find((s) => s.advertiser_id === a.id);
+                      const cap = setting?.default_daily_cap ?? null;
+                      const sent24 = stats?.sent24 ?? todayCounts[a.id] ?? 0;
+                      const failed24 = stats?.failed24 ?? 0;
+                      const sentHour = stats?.sentHour ?? 0;
+                      const pct = cap ? Math.min(100, (sent24 / cap) * 100) : 0;
+                      const status = statusFor(a, stats);
+                      return (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span className={cn("h-2 w-2 rounded-full shrink-0", TONE_BAR[status.tone])} />
+                              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                              {a.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {status.tone === "danger" ? (
+                              <button
+                                type="button"
+                                onClick={() => setIssuesAdvertiserId(a.id)}
+                                title="Click to see recent failures"
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "gap-1 text-[10px] cursor-pointer ring-1 ring-red-500/40 hover:ring-red-500/70",
+                                    TONE_BADGE[status.tone]
+                                  )}
+                                >
+                                  <CircleDot className="h-2.5 w-2.5" />
+                                  {status.label}
+                                </Badge>
+                              </button>
+                            ) : (
+                              <Badge variant="outline" className={cn("gap-1 text-[10px]", TONE_BADGE[status.tone])}>
+                                <CircleDot className="h-2.5 w-2.5" />
+                                {status.label}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{sent24}</TableCell>
+                          <TableCell className={cn("text-right tabular-nums", failed24 > 0 && "text-destructive")}>
+                            {failed24}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{sentHour}</TableCell>
+                          <TableCell>
+                            <div className="flex items-baseline justify-between text-xs tabular-nums">
+                              <span>{sent24}</span>
+                              <span className="text-muted-foreground">{cap != null ? `/ ${cap}` : "/ ∞"}</span>
+                            </div>
+                            <div className="mt-1 h-1 w-full overflow-hidden rounded bg-muted">
+                              <div
+                                className={cn(
+                                  "h-full rounded transition-all",
+                                  pct >= 100 ? "bg-red-500" : pct >= 90 ? "bg-amber-500" : "bg-emerald-500"
+                                )}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" onClick={() => handleCardClick(a.id)}>
+                              Configure
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filtered.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                itemLabel="advertisers"
+              />
+            </CardFooter>
+          </Card>
         )}
       </div>
 
