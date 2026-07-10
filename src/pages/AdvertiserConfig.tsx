@@ -25,6 +25,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { summarizeWorkingHours } from "@/lib/scheduleUtils";
 import {
   Activity,
   AlertTriangle,
@@ -448,6 +449,7 @@ export default function AdvertiserConfig() {
                       <TableHead className="text-right">Failed</TableHead>
                       <TableHead className="text-right">Hourly</TableHead>
                       <TableHead className="w-40">Daily Usage</TableHead>
+                      <TableHead>Working Hours</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -514,6 +516,9 @@ export default function AdvertiserConfig() {
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {summarizeWorkingHours(setting)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button size="sm" variant="outline" onClick={() => handleCardClick(a.id)}>

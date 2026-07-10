@@ -65,6 +65,78 @@ export function isWithinSchedule(
   return currentMinutes >= start && currentMinutes <= end;
 }
 
+function hourLabel(h: number): string {
+  return `${String(h % 24).padStart(2, "0")}:00`;
+}
+
+// Compact "Mon-Fri 09:00–17:00"-style summary for the Advertiser Config
+// table's Working Hours column, covering all three schedule shapes:
+// heatmap matrix, legacy per-day WeeklySchedule, and plain start/end time.
+export function summarizeWorkingHours(setting: {
+  start_time?: string | null;
+  end_time?: string | null;
+  weekly_schedule?: unknown;
+} | null | undefined): string {
+  if (!setting) return "24/7";
+  const ws = setting.weekly_schedule;
+
+  if (isHeatmapSchedule(ws)) {
+    const { matrix, timezone } = ws;
+    const tzSuffix = timezone && timezone !== "UTC" ? ` (${timezone})` : "";
+    const activeRows = matrix.filter(row => row.some(Boolean));
+    if (activeRows.length === 0) return "All days off";
+
+    const first = activeRows[0];
+    const allSame = activeRows.every(row => row.every((v, h) => v === first[h]));
+    const hoursFor = (row: boolean[]): string => {
+      const hours = row.map((v, h) => (v ? h : -1)).filter(h => h >= 0);
+      if (hours.length === row.length) return "24h";
+      const contiguous = hours.every((h, idx) => h === hours[0] + idx);
+      return contiguous ? `${hourLabel(hours[0])}–${hourLabel(hours[hours.length - 1] + 1)}` : "custom hours";
+    };
+
+    const isWeekdaysOnly =
+      matrix[0].some(Boolean) && matrix[1].some(Boolean) && matrix[2].some(Boolean) &&
+      matrix[3].some(Boolean) && matrix[4].some(Boolean) &&
+      !matrix[5].some(Boolean) && !matrix[6].some(Boolean);
+
+    if (activeRows.length === 7 && allSame) {
+      const hrs = hoursFor(first);
+      return hrs === "24h" ? `24/7${tzSuffix}` : `Every day ${hrs}${tzSuffix}`;
+    }
+    if (isWeekdaysOnly && allSame) return `Mon-Fri ${hoursFor(first)}${tzSuffix}`;
+
+    return `Custom (${activeRows.length} day${activeRows.length === 1 ? "" : "s"})${tzSuffix}`;
+  }
+
+  if (ws && typeof ws === "object" && !Array.isArray(ws)) {
+    const legacyWs = ws as WeeklySchedule;
+    const days: (keyof WeeklySchedule)[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const active = days.filter(d => legacyWs[d]?.is_active);
+    if (active.length === 0) return "All days off";
+
+    const isWeekdaysOnly = ["monday", "tuesday", "wednesday", "thursday", "friday"].every(d => legacyWs[d as keyof WeeklySchedule]?.is_active)
+      && !legacyWs.saturday?.is_active && !legacyWs.sunday?.is_active;
+
+    if (active.length === 7 || isWeekdaysOnly) {
+      const times = active.map(d => legacyWs[d]);
+      const firstStart = times[0].start_time;
+      const firstEnd = times[0].end_time;
+      const sameHours = times.every(t => t.start_time === firstStart && t.end_time === firstEnd);
+      const label = active.length === 7 ? "Every day" : "Mon-Fri";
+      return sameHours && firstStart && firstEnd ? `${label} ${firstStart.slice(0, 5)}–${firstEnd.slice(0, 5)}` : `${label} custom`;
+    }
+
+    const short: Record<string, string> = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
+    return active.map(d => short[d]).join(", ");
+  }
+
+  const start = setting.start_time || "00:00";
+  const end = setting.end_time || "23:59";
+  if (start === "00:00" && (end === "23:59" || end === "24:00")) return "24/7";
+  return `${start.slice(0, 5)}–${end.slice(0, 5)}`;
+}
+
 // Convert legacy WeeklySchedule → 7×24 boolean matrix (Mon=0)
 export function legacyScheduleToMatrix(ws: WeeklySchedule): boolean[][] {
   const days: (keyof WeeklySchedule)[] = [
