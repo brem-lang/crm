@@ -90,6 +90,34 @@ export function useAllDistributionRules() {
   });
 }
 
+// All-time sent-lead count per rule (affiliate_id + country_code + advertiser_id),
+// for the Distribution Rules "Leads" column. One batched query grouped
+// client-side — same pattern as AdvertiserConfig.tsx's useThroughput() —
+// instead of a per-row query.
+export function useDistributionRuleLeadCounts() {
+  return useQuery({
+    queryKey: ['distribution-rule-lead-counts'],
+    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lead_distributions')
+        .select('affiliate_id, advertiser_id, leads:lead_id(country_code)')
+        .eq('status', 'sent')
+        .limit(10000);
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      for (const d of (data || []) as any[]) {
+        const countryCode = d.leads?.country_code;
+        if (!d.affiliate_id || !countryCode || !d.advertiser_id) continue;
+        const key = `${d.affiliate_id}|${countryCode}|${d.advertiser_id}`;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      return counts;
+    },
+  });
+}
+
 export function useCreateDistributionRule() {
   const queryClient = useQueryClient();
 

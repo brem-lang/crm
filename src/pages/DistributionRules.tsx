@@ -52,6 +52,7 @@ import {
   useDeleteDistributionRule,
   useBulkUpdateDistributionRules,
   useBulkDeleteDistributionRules,
+  useDistributionRuleLeadCounts,
   type AffiliateDistributionRule,
   type BulkRuleUpdates,
 } from "@/hooks/useAffiliateDistributionRules";
@@ -90,6 +91,7 @@ export default function DistributionRules() {
   const { data: affiliates } = useAffiliates();
 
   const { data: allRules, isLoading: loadingRules } = useAllDistributionRules();
+  const { data: leadCounts } = useDistributionRuleLeadCounts();
   const updateRule = useUpdateDistributionRule();
   const deleteRule = useDeleteDistributionRule();
   const bulkUpdateRules = useBulkUpdateDistributionRules();
@@ -359,6 +361,7 @@ export default function DistributionRules() {
                       <TableHead>Affiliate</TableHead>
                       <TableHead>Country</TableHead>
                       <TableHead>Advertiser</TableHead>
+                      <TableHead className="w-20 text-right">Leads</TableHead>
                       <TableHead className="w-24">Tier</TableHead>
                       <TableHead className="w-20 text-right">Priority</TableHead>
                       <TableHead className="w-20 text-right">Weight</TableHead>
@@ -415,6 +418,9 @@ export default function DistributionRules() {
                                 </Badge>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {leadCounts?.[`${rule.affiliate_id}|${rule.country_code}|${rule.advertiser_id}`] ?? 0}
                           </TableCell>
                           <TableCell>
                             <Badge variant={rule.priority_type === "fallback" ? "outline" : "secondary"} className="text-xs">
