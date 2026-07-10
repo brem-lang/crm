@@ -419,8 +419,17 @@ export default function DistributionRules() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">
-                            {leadCounts?.[`${rule.affiliate_id}|${rule.country_code}|${rule.advertiser_id}`] ?? 0}
+                          <TableCell className="text-right">
+                            {(() => {
+                              const leadCount = leadCounts?.[`${rule.affiliate_id}|${rule.country_code}|${rule.advertiser_id}`] ?? 0;
+                              return leadCount > 0 ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 tabular-nums">
+                                  {leadCount}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground tabular-nums">0</span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Badge variant={rule.priority_type === "fallback" ? "outline" : "secondary"} className="text-xs">
