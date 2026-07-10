@@ -7,11 +7,12 @@ import { ColumnConfig, LeadColumnSelector } from "@/components/leads/LeadColumnS
 import { SortConfig } from "@/components/leads/SortableHeader";
 import { RejectedLeadsFilterBar } from "@/components/rejected-leads/RejectedLeadsFilterBar";
 import { RejectedLeadsTable } from "@/components/rejected-leads/RejectedLeadsTable";
+import { ResendLeadsDialog } from "@/components/leads/ResendLeadsDialog";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { RefreshCw, Send, Trash2 } from "lucide-react";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -80,7 +81,7 @@ export default function RejectedLeads() {
   const { data: rejectedLeads, isLoading, isFetching, error, refetch } = useRejectedLeads();
   const deleteRejectedLeads = useDeleteRejectedLeads();
   const { formatDate, getStartOfMonth, getEndOfMonth, getNow, getStartOfDay, getEndOfDay } = useCRMSettings();
-  const { canDeleteLeads } = useCurrentUserPermissions();
+  const { canDeleteLeads, canEditLeads } = useCurrentUserPermissions();
   const { isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
 
@@ -103,6 +104,7 @@ export default function RejectedLeads() {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: "", direction: null });
   const [pendingDelete, setPendingDelete] = useState<any | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isResendOpen, setIsResendOpen] = useState(false);
 
   // Fetch advertisers/affiliates for filter dropdowns
   const { data: advertisers = [] } = useQuery({
@@ -254,6 +256,49 @@ export default function RejectedLeads() {
     return sortedLeads.slice(start, start + pageSize);
   }, [sortedLeads, currentPage, pageSize]);
 
+  // Build the resend dialog's input from selected rejection rows: one entry
+  // per distinct underlying lead_id, always including this rejection's own
+  // advertiser_id in lead_distributions (even if no lead_distributions row
+  // exists for it, e.g. "no advertiser available" rejections) so the resend
+  // dialog can never offer that same advertiser back.
+  const resendLeadsInput = useMemo(() => {
+    const byLeadId = new Map<string, {
+      id: string;
+      email: string;
+      firstname: string;
+      lastname: string;
+      mobile: string;
+      country_code: string;
+      lead_distributions: Array<{ advertiser_id: string; status?: string }>;
+    }>();
+
+    sortedLeads.forEach((r: any) => {
+      if (!selectedIds.has(r.id) || !r.lead_id) return;
+      const lead = r.leads || {};
+      const dists = [...(lead.lead_distributions ?? [])];
+      if (r.advertiser_id && !dists.some((d: any) => d.advertiser_id === r.advertiser_id)) {
+        dists.push({ advertiser_id: r.advertiser_id, status: 'failed' });
+      }
+
+      const existing = byLeadId.get(r.lead_id);
+      if (existing) {
+        existing.lead_distributions.push(...dists);
+      } else {
+        byLeadId.set(r.lead_id, {
+          id: r.lead_id,
+          email: lead.email,
+          firstname: lead.firstname,
+          lastname: lead.lastname,
+          mobile: lead.mobile,
+          country_code: lead.country_code,
+          lead_distributions: dists,
+        });
+      }
+    });
+
+    return Array.from(byLeadId.values());
+  }, [sortedLeads, selectedIds]);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(new Set(sortedLeads.map((lead: any) => lead.id)));
@@ -339,6 +384,12 @@ export default function RejectedLeads() {
               onReorder={handleReorderColumns}
               isSuperAdmin={isSuperAdmin}
             />
+            {canEditLeads && selectedIds.size > 0 && (
+              <Button variant="secondary" size="sm" onClick={() => setIsResendOpen(true)}>
+                <Send className="h-4 w-4 mr-2" />
+                Resend ({selectedIds.size})
+              </Button>
+            )}
             {canDeleteLeads && selectedIds.size > 0 && (
               <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
                 <AlertDialogTrigger asChild>
@@ -426,6 +477,17 @@ export default function RejectedLeads() {
           )}
         </Card>
       </div>
+
+      <ResendLeadsDialog
+        open={isResendOpen}
+        onOpenChange={setIsResendOpen}
+        selectedLeads={resendLeadsInput}
+        advertisers={advertisers}
+        onSuccess={() => {
+          refetch();
+          setSelectedIds(new Set());
+        }}
+      />
 
       {/* Single-row delete confirmation */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
