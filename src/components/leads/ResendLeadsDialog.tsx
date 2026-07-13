@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -201,18 +203,27 @@ export function ResendLeadsDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Select Affiliate</Label>
-            <Select value={selectedAffiliateId} onValueChange={setSelectedAffiliateId} disabled={availableAffiliates.length === 0}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose affiliate..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableAffiliates.map((aff) => (
-                  <SelectItem key={aff.id} value={aff.id}>
-                    {aff.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ScrollArea className="h-40 rounded-md border">
+              <div className="p-2 space-y-1">
+                {affiliates.map((aff) => {
+                  const isCurrent = excludedAffiliateIds.has(aff.id);
+                  return (
+                    <label
+                      key={aff.id}
+                      className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm ${isCurrent ? "opacity-60" : "cursor-pointer hover:bg-muted"}`}
+                    >
+                      <Checkbox
+                        checked={isCurrent || selectedAffiliateId === aff.id}
+                        disabled={isCurrent}
+                        onCheckedChange={(checked) => setSelectedAffiliateId(checked ? aff.id : "")}
+                      />
+                      <span>{aff.name}</span>
+                      {isCurrent && <span className="text-xs text-muted-foreground">(current — can't resend to same affiliate)</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            </ScrollArea>
             {availableAffiliates.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 Every affiliate is already attributed to the selected lead(s).
