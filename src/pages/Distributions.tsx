@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { countryData } from "@/components/advertisers/countryData";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +54,8 @@ export default function Distributions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
+  const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [selectedDistribution, setSelectedDistribution] = useState<Distribution | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -99,6 +104,23 @@ export default function Distributions() {
     },
   });
 
+  const { data: affiliates } = useQuery({
+    queryKey: ['affiliates-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('affiliates')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Full country list, not just codes present in loaded distributions —
+  // matches the Leads page's country filter (Leads.tsx).
+  const countries = useMemo(() => Object.keys(countryData).sort(), []);
+
   // Memoize date boundaries for queries
   const fromStartISO = useMemo(() => startOfDay(fromDate).toISOString(), [fromDate]);
   const toEndISO = useMemo(() => endOfDay(toDate).toISOString(), [toDate]);
@@ -129,15 +151,19 @@ export default function Distributions() {
       
       const matchesAdvertiser = advertiserFilter === "all" || dist.advertiser_id === advertiserFilter;
 
+      const matchesAffiliate = affiliateFilter === "all" || dist.affiliate_id === affiliateFilter;
+
+      const matchesCountry = countryFilter.length === 0 || (dist.leads?.country_code && countryFilter.includes(dist.leads.country_code));
+
       // Date filter - ensure proper day boundaries
       const distDate = new Date(dist.created_at);
       const fromStart = startOfDay(fromDate);
       const toEnd = endOfDay(toDate);
       const matchesDate = showAllDates || (distDate >= fromStart && distDate <= toEnd);
 
-      return matchesSearch && matchesStatus && matchesAdvertiser && matchesDate;
+      return matchesSearch && matchesStatus && matchesAdvertiser && matchesAffiliate && matchesCountry && matchesDate;
     }) || [];
-  }, [distributions, searchTerm, statusFilter, advertiserFilter, fromDate, toDate]);
+  }, [distributions, searchTerm, statusFilter, advertiserFilter, affiliateFilter, countryFilter, fromDate, toDate]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredDistributions.length / pageSize);
@@ -149,7 +175,7 @@ export default function Distributions() {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, advertiserFilter, searchTerm, pageSize, fromDate, toDate]);
+  }, [statusFilter, advertiserFilter, affiliateFilter, countryFilter, searchTerm, pageSize, fromDate, toDate]);
 
   // Selection helpers - use paginated distributions for current page selection
   const allVisibleSelected = paginatedDistributions.length > 0 && 
@@ -245,19 +271,33 @@ export default function Distributions() {
             onPageSizeChange={setPageSize}
             itemLabel="distributions"
           >
-            <Select value={advertiserFilter} onValueChange={setAdvertiserFilter}>
-              <SelectTrigger className="w-[200px] h-9">
-                <SelectValue placeholder="Filter by advertiser" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Advertisers</SelectItem>
-                {advertisers?.map((adv) => (
-                  <SelectItem key={adv.id} value={adv.id}>
-                    {adv.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={advertiserFilter}
+              onValueChange={setAdvertiserFilter}
+              options={(advertisers ?? []).map((adv) => ({ value: adv.id, label: adv.name }))}
+              placeholder="All Advertisers"
+              searchPlaceholder="Search advertiser..."
+              emptyMessage="No advertisers found"
+              className="w-full sm:w-[160px]"
+            />
+            <SearchableSelect
+              value={affiliateFilter}
+              onValueChange={setAffiliateFilter}
+              options={(affiliates ?? []).map((aff) => ({ value: aff.id, label: aff.name }))}
+              placeholder="All Affiliates"
+              searchPlaceholder="Search affiliate..."
+              emptyMessage="No affiliates found"
+              className="w-full sm:w-[160px]"
+            />
+            <MultiSelect
+              options={countries.map((code) => ({ value: code, label: code }))}
+              selected={countryFilter}
+              onChange={setCountryFilter}
+              placeholder="All Countries"
+              searchPlaceholder="Search country..."
+              emptyMessage="No countries found"
+              className="w-full sm:w-[160px]"
+            />
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -353,7 +393,7 @@ export default function Distributions() {
               </p>
             ) : paginatedDistributions.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                {searchTerm || statusFilter !== "all" 
+                {searchTerm || statusFilter !== "all" || advertiserFilter !== "all" || affiliateFilter !== "all" || countryFilter.length > 0
                   ? "No distributions match your filters."
                   : "No distributions found."}
               </p>
