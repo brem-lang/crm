@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -69,6 +70,7 @@ type TierChoice = "no_change" | "primary" | "fallback";
 export default function DistributionRules() {
   const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
   const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = usePageSizeState();
@@ -109,6 +111,9 @@ export default function DistributionRules() {
       result = result.filter((rule) => rule.affiliate_id === affiliateFilter);
     }
 
+    if (activeFilter === "active") result = result.filter((rule) => rule.is_active);
+    else if (activeFilter === "inactive") result = result.filter((rule) => !rule.is_active);
+
     const q = search.trim().toLowerCase();
     if (q) {
       result = result.filter((rule) => {
@@ -123,7 +128,7 @@ export default function DistributionRules() {
     }
 
     return result;
-  }, [allRules, affiliateFilter, search]);
+  }, [allRules, affiliateFilter, activeFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRules.length / pageSize));
   const paginatedRules = useMemo(() => {
@@ -256,6 +261,15 @@ export default function DistributionRules() {
                 </div>
               </div>
 
+              {/* Active/Inactive tabs */}
+              <Tabs value={activeFilter} onValueChange={(v) => { setActiveFilter(v as "all" | "active" | "inactive"); setCurrentPage(1); }}>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               {/* Filters */}
               <div className="flex items-center gap-2 flex-wrap">
                 <Select value={affiliateFilter} onValueChange={(v) => { setAffiliateFilter(v); setCurrentPage(1); }}>
@@ -337,9 +351,9 @@ export default function DistributionRules() {
               <div className="text-center py-16 text-muted-foreground space-y-3">
                 <Users className="h-12 w-12 mx-auto opacity-20" />
                 <p className="font-medium">
-                  {search || affiliateFilter !== "all" ? "No rules match your filters" : "No distribution rules configured yet"}
+                  {search || affiliateFilter !== "all" || activeFilter !== "all" ? "No rules match your filters" : "No distribution rules configured yet"}
                 </p>
-                {!search && affiliateFilter === "all" && (
+                {!search && affiliateFilter === "all" && activeFilter === "all" && (
                   <Button variant="outline" onClick={() => setIsAddRuleOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Rules

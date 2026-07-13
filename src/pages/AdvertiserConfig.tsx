@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -206,6 +207,7 @@ export default function AdvertiserConfig() {
   const [linterOpen, setLinterOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = usePageSizeState();
 
@@ -229,8 +231,10 @@ export default function AdvertiserConfig() {
     if (statusFilter !== "all") {
       list = list.filter((a) => statusFor(a, throughput?.byAdv[a.id]).tone === statusFilter);
     }
+    if (activeFilter === "active") list = list.filter((a) => a.is_active);
+    else if (activeFilter === "inactive") list = list.filter((a) => !a.is_active);
     return list;
-  }, [advertisers, search, statusFilter, throughput]);
+  }, [advertisers, search, statusFilter, activeFilter, throughput]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
@@ -240,7 +244,7 @@ export default function AdvertiserConfig() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, activeFilter]);
 
   const issues = useMemo(() => {
     const list: string[] = [];
@@ -403,6 +407,15 @@ export default function AdvertiserConfig() {
             accent="indigo"
           />
         </div>
+
+        {/* Active/Inactive tabs */}
+        <Tabs value={activeFilter} onValueChange={(v) => setActiveFilter(v as "all" | "active" | "inactive")}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="inactive">Inactive</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Search + status filter */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
