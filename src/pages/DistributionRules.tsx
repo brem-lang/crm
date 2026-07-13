@@ -70,6 +70,8 @@ type TierChoice = "no_change" | "primary" | "fallback";
 export default function DistributionRules() {
   const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
   const [affiliateFilter, setAffiliateFilter] = useState<string>("all");
+  const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,12 +110,30 @@ export default function DistributionRules() {
     return (affiliates ?? []).filter((a) => ids.has(a.id));
   }, [affiliates, allRules]);
 
+  const advertisersWithRules = useMemo(() => {
+    const ids = new Set((allRules ?? []).map((rule) => rule.advertiser_id));
+    return (advertisers ?? []).filter((a) => ids.has(a.id));
+  }, [advertisers, allRules]);
+
+  const countriesWithRules = useMemo(() => {
+    const codes = new Set((allRules ?? []).map((rule) => rule.country_code));
+    return Array.from(codes).sort();
+  }, [allRules]);
+
   const filteredRules = useMemo(() => {
     if (!allRules) return [];
     let result = allRules;
 
     if (affiliateFilter !== "all") {
       result = result.filter((rule) => rule.affiliate_id === affiliateFilter);
+    }
+
+    if (advertiserFilter !== "all") {
+      result = result.filter((rule) => rule.advertiser_id === advertiserFilter);
+    }
+
+    if (countryFilter !== "all") {
+      result = result.filter((rule) => rule.country_code === countryFilter);
     }
 
     if (activeFilter === "active") result = result.filter((rule) => rule.is_active);
@@ -133,7 +153,7 @@ export default function DistributionRules() {
     }
 
     return result;
-  }, [allRules, affiliateFilter, activeFilter, search]);
+  }, [allRules, affiliateFilter, advertiserFilter, countryFilter, activeFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRules.length / pageSize));
   const paginatedRules = useMemo(() => {
@@ -290,6 +310,32 @@ export default function DistributionRules() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={advertiserFilter} onValueChange={(v) => { setAdvertiserFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger className="h-8 w-56 text-xs">
+                    <SelectValue placeholder="Advertiser" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All advertisers</SelectItem>
+                    {advertisersWithRules.map((a) => (
+                      <SelectItem key={a.id} value={a.id} className="text-xs">
+                        {a.name}{!a.is_active && " (Inactive)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue placeholder="Country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All countries</SelectItem>
+                    {countriesWithRules.map((code) => (
+                      <SelectItem key={code} value={code} className="text-xs">
+                        {(countryData as Record<string, { name: string }>)[code]?.name || code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   placeholder="Search affiliate, country or advertiser..."
                   value={search}
@@ -356,9 +402,9 @@ export default function DistributionRules() {
               <div className="text-center py-16 text-muted-foreground space-y-3">
                 <Users className="h-12 w-12 mx-auto opacity-20" />
                 <p className="font-medium">
-                  {search || affiliateFilter !== "all" || activeFilter !== "all" ? "No rules match your filters" : "No distribution rules configured yet"}
+                  {search || affiliateFilter !== "all" || advertiserFilter !== "all" || countryFilter !== "all" || activeFilter !== "all" ? "No rules match your filters" : "No distribution rules configured yet"}
                 </p>
-                {!search && affiliateFilter === "all" && activeFilter === "all" && (
+                {!search && affiliateFilter === "all" && advertiserFilter === "all" && countryFilter === "all" && activeFilter === "all" && (
                   <Button variant="outline" onClick={() => setIsAddRuleOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Rules
