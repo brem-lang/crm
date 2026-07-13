@@ -103,6 +103,11 @@ export default function DistributionRules() {
     if (confirm('Delete this distribution rule?')) deleteRule.mutate(id);
   };
 
+  const affiliatesWithRules = useMemo(() => {
+    const ids = new Set((allRules ?? []).map((rule) => rule.affiliate_id));
+    return (affiliates ?? []).filter((a) => ids.has(a.id));
+  }, [affiliates, allRules]);
+
   const filteredRules = useMemo(() => {
     if (!allRules) return [];
     let result = allRules;
@@ -278,7 +283,7 @@ export default function DistributionRules() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="text-xs">All affiliates</SelectItem>
-                    {affiliates?.map((a) => (
+                    {affiliatesWithRules.map((a) => (
                       <SelectItem key={a.id} value={a.id} className="text-xs">
                         {a.name}{!a.is_active && " (Inactive)"}
                       </SelectItem>
@@ -375,7 +380,7 @@ export default function DistributionRules() {
                       <TableHead>Affiliate</TableHead>
                       <TableHead>Country</TableHead>
                       <TableHead>Advertiser</TableHead>
-                      <TableHead className="w-20 text-right">Leads</TableHead>
+                      <TableHead className="w-20 text-center">Leads</TableHead>
                       <TableHead className="w-24">Tier</TableHead>
                       <TableHead className="w-20 text-right">Priority</TableHead>
                       <TableHead className="w-20 text-right">Weight</TableHead>
@@ -433,7 +438,7 @@ export default function DistributionRules() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-center">
                             {(() => {
                               const leadCount = leadCounts?.[`${rule.affiliate_id}|${rule.country_code}|${rule.advertiser_id}`] ?? 0;
                               return leadCount > 0 ? (
