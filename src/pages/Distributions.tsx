@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -413,11 +414,11 @@ export default function Distributions() {
                       <TableHead>Lead</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
-                      <TableHead>Sale Status</TableHead>
-                      <TableHead>Lead Status</TableHead>
                       <TableHead>Country</TableHead>
+                      <TableHead>Sale Status</TableHead>
                       <TableHead>Advertiser</TableHead>
                       <TableHead>Affiliate</TableHead>
+                      <TableHead>Lead Status</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Autologin</TableHead>
                       <TableHead>Sent At</TableHead>
@@ -453,6 +454,9 @@ export default function Distributions() {
                           <span className="text-sm">{dist.leads?.mobile || "-"}</span>
                         </TableCell>
                         <TableCell>
+                          {dist.leads?.country_code || "-"}
+                        </TableCell>
+                        <TableCell>
                           {dist.leads?.sale_status ? (
                             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
                               {dist.leads.sale_status}
@@ -460,18 +464,6 @@ export default function Distributions() {
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          {dist.leads?.status ? (
-                            <Badge variant="secondary" className="text-xs">
-                              {dist.leads.status}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {dist.leads?.country_code || "-"}
                         </TableCell>
                         <TableCell>
                           {dist.advertisers?.name ? (
@@ -484,6 +476,15 @@ export default function Distributions() {
                         </TableCell>
                         <TableCell>
                           {dist.affiliates?.name || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {dist.leads?.status ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {dist.leads.status}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -531,6 +532,20 @@ export default function Distributions() {
               </div>
             )}
           </CardContent>
+          {!isLoading && !error && filteredDistributions.length > 0 && (
+            <CardFooter className="pt-0">
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                pageSizeOptions={pageSizeOptions}
+                totalItems={filteredDistributions.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="distributions"
+              />
+            </CardFooter>
+          )}
         </Card>
 
         {/* Response Detail Modal */}
