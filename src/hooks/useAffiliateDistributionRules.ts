@@ -73,9 +73,7 @@ export function useAllDistributionRules() {
           advertisers:advertiser_id(name, is_active),
           affiliates:affiliate_id(name, is_active)
         `)
-        .order("affiliate_id", { ascending: true })
-        .order("country_code", { ascending: true })
-        .order("weight", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
