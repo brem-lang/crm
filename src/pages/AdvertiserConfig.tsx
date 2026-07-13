@@ -443,14 +443,14 @@ export default function AdvertiserConfig() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Advertiser</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">24h Sent</TableHead>
-                      <TableHead className="text-right">Failed</TableHead>
-                      <TableHead className="text-right">Hourly</TableHead>
+                      <TableHead className="min-w-[180px]">Advertiser</TableHead>
+                      <TableHead className="w-28">Status</TableHead>
+                      <TableHead className="w-24 text-right">24h Sent</TableHead>
+                      <TableHead className="w-20 text-right">Failed</TableHead>
+                      <TableHead className="w-20 text-right">Hourly</TableHead>
                       <TableHead className="w-40">Daily Usage</TableHead>
-                      <TableHead>Working Hours</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="w-44">Working Hours</TableHead>
+                      <TableHead className="w-28 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
