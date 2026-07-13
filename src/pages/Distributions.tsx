@@ -399,7 +399,7 @@ export default function Distributions() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="whitespace-nowrap">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px]">
@@ -442,11 +442,9 @@ export default function Distributions() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {dist.leads?.firstname} {dist.leads?.lastname}
-                            </p>
-                          </div>
+                          <span className="font-medium">
+                            {dist.leads?.firstname} {dist.leads?.lastname}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">{dist.leads?.email || "-"}</span>
@@ -476,14 +474,12 @@ export default function Distributions() {
                           {dist.leads?.country_code || "-"}
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{dist.advertisers?.name || "-"}</p>
-                            {dist.advertisers?.advertiser_type && (
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {dist.advertisers.advertiser_type.replace('_', ' ')}
-                              </p>
-                            )}
-                          </div>
+                          <span className="font-medium">{dist.advertisers?.name || "-"}</span>
+                          {dist.advertisers?.advertiser_type && (
+                            <span className="text-xs text-muted-foreground capitalize ml-1.5">
+                              ({dist.advertisers.advertiser_type.replace('_', ' ')})
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {dist.affiliates?.name || "-"}
