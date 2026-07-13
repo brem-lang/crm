@@ -454,7 +454,7 @@ export default function Distributions() {
                         </TableCell>
                         <TableCell>
                           {dist.leads?.sale_status ? (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
                               {dist.leads.sale_status}
                             </Badge>
                           ) : (
@@ -474,11 +474,12 @@ export default function Distributions() {
                           {dist.leads?.country_code || "-"}
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{dist.advertisers?.name || "-"}</span>
-                          {dist.advertisers?.advertiser_type && (
-                            <span className="text-xs text-muted-foreground capitalize ml-1.5">
-                              ({dist.advertisers.advertiser_type.replace('_', ' ')})
-                            </span>
+                          {dist.advertisers?.name ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                              {dist.advertisers.name}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </TableCell>
                         <TableCell>
