@@ -63,14 +63,16 @@ const MAPPED_COLUMNS: DistColumn[] = [
     },
   },
   {
-    key: "lead_name",
-    label: "Lead",
-    orderIds: ["firstname", "lastname"],
-    cell: (dist) => (
-      <span className="font-medium">
-        {dist.leads?.firstname} {dist.leads?.lastname}
-      </span>
-    ),
+    key: "firstname",
+    label: "First Name",
+    orderIds: ["firstname"],
+    cell: (dist) => <span className="font-medium">{dist.leads?.firstname || "-"}</span>,
+  },
+  {
+    key: "lastname",
+    label: "Last Name",
+    orderIds: ["lastname"],
+    cell: (dist) => <span className="font-medium">{dist.leads?.lastname || "-"}</span>,
   },
   {
     key: "email",
