@@ -2190,7 +2190,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { lead_id, advertiser_id, test_mode, test_lead_data, user_id, is_resend, force_advertiser_id } = body;
+    const { lead_id, advertiser_id, test_mode, test_lead_data, user_id } = body;
 
     // Test mode: Try distribution first, create lead only if successful
     // This is used by both manual "Send Test Lead" and affiliate API submissions
@@ -2846,39 +2846,17 @@ Deno.serve(async (req) => {
 
     const typedLead = lead as Lead;
 
-    // Check if already distributed (skip for resends)
-    if (typedLead.distributed_at && !is_resend) {
+    // Check if already distributed
+    if (typedLead.distributed_at) {
       return new Response(
         JSON.stringify({ success: false, message: 'Lead already distributed' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // For resends, use force_advertiser_id if provided
-    const targetAdvertiserId = is_resend && force_advertiser_id ? force_advertiser_id : advertiser_id;
+    const targetAdvertiserId = advertiser_id;
 
-    if (is_resend && force_advertiser_id) {
-      const { data: priorDistributions } = await supabase
-        .from('lead_distributions')
-        .select('advertiser_id, status')
-        .eq('lead_id', typedLead.id);
-
-      if ((priorDistributions || []).some((d: any) => d.status === 'sent')) {
-        return new Response(
-          JSON.stringify({ success: false, message: 'Lead was already successfully delivered; resend is not needed' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if ((priorDistributions || []).some((d: any) => d.advertiser_id === force_advertiser_id)) {
-        return new Response(
-          JSON.stringify({ success: false, message: 'Lead was already sent to this advertiser; choose a different advertiser' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // If specific advertiser is provided (or force_advertiser_id for resends), distribute to that advertiser only
+    // If specific advertiser is provided, distribute to that advertiser only
     if (targetAdvertiserId) {
       const { data: advertiser, error: advError } = await supabase
         .from('advertisers')

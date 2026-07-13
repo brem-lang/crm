@@ -932,6 +932,7 @@ export default function Leads() {
           onOpenChange={setIsResendOpen}
           selectedLeads={sortedLeads.filter((l) => selectedIds.has(l.id))}
           advertisers={advertisers || []}
+          affiliates={affiliates || []}
           onSuccess={() => setSelectedIds(new Set())}
         />
 

@@ -264,11 +264,36 @@ export default function RejectedLeads() {
   const resendLeadsInput = useMemo(() => {
     const byLeadId = new Map<string, {
       id: string;
+      affiliate_id: string | null;
       email: string;
       firstname: string;
       lastname: string;
       mobile: string;
       country_code: string;
+      country: string | null;
+      ip_address: string | null;
+      custom1: string | null;
+      custom2: string | null;
+      custom3: string | null;
+      custom4: string | null;
+      custom5: string | null;
+      offer_name: string | null;
+      comment: string | null;
+      city: string | null;
+      user_agent: string | null;
+      platform: string | null;
+      browser: string | null;
+      click_ip: string | null;
+      click_country: string | null;
+      click_asn: string | null;
+      submission_country: string | null;
+      submission_asn: string | null;
+      click_ua: string | null;
+      time_to_click: number | null;
+      is_proxy: boolean | null;
+      locale: string | null;
+      click_id: string | null;
+      submission_ua: string | null;
       lead_distributions: Array<{ advertiser_id: string; status?: string }>;
     }>();
 
@@ -286,11 +311,36 @@ export default function RejectedLeads() {
       } else {
         byLeadId.set(r.lead_id, {
           id: r.lead_id,
+          affiliate_id: lead.affiliate_id ?? null,
           email: lead.email,
           firstname: lead.firstname,
           lastname: lead.lastname,
           mobile: lead.mobile,
           country_code: lead.country_code,
+          country: lead.country ?? null,
+          ip_address: lead.ip_address ?? null,
+          custom1: lead.custom1 ?? null,
+          custom2: lead.custom2 ?? null,
+          custom3: lead.custom3 ?? null,
+          custom4: lead.custom4 ?? null,
+          custom5: lead.custom5 ?? null,
+          offer_name: lead.offer_name ?? null,
+          comment: lead.comment ?? null,
+          city: lead.city ?? null,
+          user_agent: lead.user_agent ?? null,
+          platform: lead.platform ?? null,
+          browser: lead.browser ?? null,
+          click_ip: lead.click_ip ?? null,
+          click_country: lead.click_country ?? null,
+          click_asn: lead.click_asn ?? null,
+          submission_country: lead.submission_country ?? null,
+          submission_asn: lead.submission_asn ?? null,
+          click_ua: lead.click_ua ?? null,
+          time_to_click: lead.time_to_click ?? null,
+          is_proxy: lead.is_proxy ?? null,
+          locale: lead.locale ?? null,
+          click_id: lead.click_id ?? null,
+          submission_ua: lead.submission_ua ?? null,
           lead_distributions: dists,
         });
       }
@@ -483,6 +533,7 @@ export default function RejectedLeads() {
         onOpenChange={setIsResendOpen}
         selectedLeads={resendLeadsInput}
         advertisers={advertisers}
+        affiliates={affiliates}
         onSuccess={() => {
           refetch();
           setSelectedIds(new Set());
