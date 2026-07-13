@@ -22,6 +22,7 @@ import { DateFilterBar } from "@/components/filters/DateFilterBar";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { useBulkDeleteDistributions } from "@/hooks/useDistributions";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { deepParseJsonStrings } from "@/lib/utils";
 
 const statusIcons = {
@@ -33,6 +34,151 @@ const statusColors = {
   sent: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
+
+// Columns shared conceptually with the Leads page's own columns — each
+// lists the Leads column id(s) it corresponds to, so the Leads page's
+// saved `leads_column_order` (super_admin-managed, in crm_settings) can
+// reorder these the same way. Columns with no Leads counterpart (the
+// distribution-specific ones) are appended after these, always in the
+// same relative order.
+interface DistColumn {
+  key: string;
+  label: string;
+  orderIds: string[];
+  cell: (dist: Distribution) => React.ReactNode;
+}
+
+const MAPPED_COLUMNS: DistColumn[] = [
+  {
+    key: "request_id",
+    label: "Lead ID",
+    orderIds: ["request_id"],
+    cell: (dist) => {
+      const fullLeadId = dist.leads?.request_id || dist.lead_id;
+      return (
+        <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={fullLeadId}>
+          {fullLeadId.slice(0, 8)}
+        </span>
+      );
+    },
+  },
+  {
+    key: "lead_name",
+    label: "Lead",
+    orderIds: ["firstname", "lastname"],
+    cell: (dist) => (
+      <span className="font-medium">
+        {dist.leads?.firstname} {dist.leads?.lastname}
+      </span>
+    ),
+  },
+  {
+    key: "email",
+    label: "Email",
+    orderIds: ["email"],
+    cell: (dist) => <span className="text-sm">{dist.leads?.email || "-"}</span>,
+  },
+  {
+    key: "mobile",
+    label: "Phone",
+    orderIds: ["mobile"],
+    cell: (dist) => <span className="text-sm">{dist.leads?.mobile || "-"}</span>,
+  },
+  {
+    key: "country_code",
+    label: "Country",
+    orderIds: ["country_code", "country"],
+    cell: (dist) => <>{dist.leads?.country_code || "-"}</>,
+  },
+  {
+    key: "sale_status",
+    label: "Sale Status",
+    orderIds: ["sale_status"],
+    cell: (dist) =>
+      dist.leads?.sale_status ? (
+        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+          {dist.leads.sale_status}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground text-sm">-</span>
+      ),
+  },
+  {
+    key: "advertiser",
+    label: "Advertiser",
+    orderIds: ["advertiser"],
+    cell: (dist) =>
+      dist.advertisers?.name ? (
+        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+          {dist.advertisers.name}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground text-sm">-</span>
+      ),
+  },
+  {
+    key: "affiliate",
+    label: "Affiliate",
+    orderIds: ["affiliate"],
+    cell: (dist) => <>{dist.affiliates?.name || "-"}</>,
+  },
+  {
+    key: "autologin",
+    label: "Autologin",
+    orderIds: ["autologin"],
+    cell: (dist) =>
+      dist.autologin_url ? (
+        <a
+          href={dist.autologin_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Open
+        </a>
+      ) : (
+        <span className="text-muted-foreground text-sm">-</span>
+      ),
+  },
+];
+
+// Distribution-specific columns with no Leads counterpart — always appended
+// after the mapped/reorderable ones above, in this fixed relative order.
+const EXTRA_COLUMNS: DistColumn[] = [
+  {
+    key: "lead_status",
+    label: "Lead Status",
+    orderIds: [],
+    cell: (dist) =>
+      dist.leads?.status ? (
+        <Badge variant="secondary" className="text-xs">
+          {dist.leads.status}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground text-sm">-</span>
+      ),
+  },
+  {
+    key: "status",
+    label: "Status",
+    orderIds: [],
+    cell: (dist) => (
+      <div className="flex items-center gap-2">
+        {statusIcons[dist.status as keyof typeof statusIcons]}
+        <Badge className={statusColors[dist.status as keyof typeof statusColors]}>
+          {dist.status}
+        </Badge>
+      </div>
+    ),
+  },
+  {
+    key: "sent_at",
+    label: "Sent At",
+    orderIds: [],
+    cell: (dist) => <>{dist.sent_at ? format(new Date(dist.sent_at), "MMM d, yyyy HH:mm") : "-"}</>,
+  },
+];
 
 interface Distribution {
   id: string;
@@ -51,7 +197,32 @@ interface Distribution {
 
 export default function Distributions() {
   const { getStartOfMonth, getEndOfMonth, getNow } = useCRMSettings();
-  
+  const { data: systemSettings } = useSystemSettings();
+
+  // Reorder the mapped columns to match the Leads page's saved column
+  // order (crm_settings.leads_column_order), falling back to MAPPED_COLUMNS'
+  // own default order when nothing's been customized yet.
+  const orderedColumns = useMemo(() => {
+    const orderIds = systemSettings?.leads_column_order;
+    if (!orderIds || orderIds.length === 0) return MAPPED_COLUMNS;
+
+    const seen = new Set<string>();
+    const ordered: DistColumn[] = [];
+    for (const id of orderIds) {
+      const col = MAPPED_COLUMNS.find((c) => !seen.has(c.key) && c.orderIds.includes(id));
+      if (col) {
+        ordered.push(col);
+        seen.add(col.key);
+      }
+    }
+    for (const col of MAPPED_COLUMNS) {
+      if (!seen.has(col.key)) ordered.push(col);
+    }
+    return ordered;
+  }, [systemSettings?.leads_column_order]);
+
+  const displayColumns = useMemo(() => [...orderedColumns, ...EXTRA_COLUMNS], [orderedColumns]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [advertiserFilter, setAdvertiserFilter] = useState<string>("all");
@@ -410,25 +581,14 @@ export default function Distributions() {
                           aria-label="Select all"
                         />
                       </TableHead>
-                      <TableHead>Lead ID</TableHead>
-                      <TableHead>Lead</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Country</TableHead>
-                      <TableHead>Sale Status</TableHead>
-                      <TableHead>Advertiser</TableHead>
-                      <TableHead>Affiliate</TableHead>
-                      <TableHead>Lead Status</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Autologin</TableHead>
-                      <TableHead>Sent At</TableHead>
+                      {displayColumns.map((col) => (
+                        <TableHead key={col.key}>{col.label}</TableHead>
+                      ))}
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedDistributions.map((dist) => {
-                      const fullLeadId = dist.leads?.request_id || dist.lead_id;
-                      return (
+                    {paginatedDistributions.map((dist) => (
                       <TableRow key={dist.id} className={selectedIds.has(dist.id) ? "bg-muted/50" : ""}>
                         <TableCell>
                           <Checkbox
@@ -437,84 +597,9 @@ export default function Distributions() {
                             aria-label={`Select ${dist.leads?.email || 'distribution'}`}
                           />
                         </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded" title={fullLeadId}>
-                            {fullLeadId.slice(0, 8)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">
-                            {dist.leads?.firstname} {dist.leads?.lastname}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{dist.leads?.email || "-"}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{dist.leads?.mobile || "-"}</span>
-                        </TableCell>
-                        <TableCell>
-                          {dist.leads?.country_code || "-"}
-                        </TableCell>
-                        <TableCell>
-                          {dist.leads?.sale_status ? (
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                              {dist.leads.sale_status}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {dist.advertisers?.name ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                              {dist.advertisers.name}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {dist.affiliates?.name || "-"}
-                        </TableCell>
-                        <TableCell>
-                          {dist.leads?.status ? (
-                            <Badge variant="secondary" className="text-xs">
-                              {dist.leads.status}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {statusIcons[dist.status as keyof typeof statusIcons]}
-                            <Badge className={statusColors[dist.status as keyof typeof statusColors]}>
-                              {dist.status}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {dist.autologin_url ? (
-                            <a
-                              href={dist.autologin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              Open
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {dist.sent_at 
-                            ? format(new Date(dist.sent_at), "MMM d, yyyy HH:mm")
-                            : "-"
-                          }
-                        </TableCell>
+                        {displayColumns.map((col) => (
+                          <TableCell key={col.key}>{col.cell(dist)}</TableCell>
+                        ))}
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
@@ -525,8 +610,7 @@ export default function Distributions() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                      );
-                    })}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
