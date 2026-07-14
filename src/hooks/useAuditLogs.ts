@@ -15,6 +15,9 @@ export interface AuditLog {
   ip_address: string | null;
   user_agent: string | null;
   request_path: string | null;
+  country: string | null;
+  city: string | null;
+  isp: string | null;
   created_at: string;
 }
 
@@ -39,7 +42,7 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
     queryFn: async () => {
       let query = supabase
         .from('audit_logs')
-        .select('id, action, table_name, record_id, user_id, user_email, old_data, new_data, changes_summary, ip_address, created_at', { count: 'exact' })
+        .select('id, action, table_name, record_id, user_id, user_email, old_data, new_data, changes_summary, ip_address, country, city, isp, created_at', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (action) {

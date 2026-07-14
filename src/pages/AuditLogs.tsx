@@ -83,7 +83,7 @@ export default function AuditLogs() {
 
   const exportCsv = () => {
     if (!logs.length) return;
-    const headers = ["Timestamp", "User", "Action", "Table", "Record ID", "Summary", "IP Address"];
+    const headers = ["Timestamp", "User", "Action", "Table", "Record ID", "Summary", "IP Address", "Country"];
     const rows = logs.map((log) => [
       format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss"),
       log.user_email || "System",
@@ -92,6 +92,7 @@ export default function AuditLogs() {
       log.record_id || "",
       log.changes_summary || "",
       log.ip_address || "",
+      log.country || "",
     ]);
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -285,13 +286,14 @@ export default function AuditLogs() {
                       <TableHead>Table</TableHead>
                       <TableHead>Summary</TableHead>
                       <TableHead>IP Address</TableHead>
+                      <TableHead>Country</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {logs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                           No audit logs found
                         </TableCell>
                       </TableRow>
@@ -330,6 +332,9 @@ export default function AuditLogs() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {log.ip_address || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {log.country || "-"}
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
@@ -397,6 +402,16 @@ export default function AuditLogs() {
                 <div>
                   <span className="text-muted-foreground">IP:</span>
                   <span className="ml-2">{detailLog.ip_address || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Location:</span>
+                  <span className="ml-2">
+                    {[detailLog.city, detailLog.country].filter(Boolean).join(", ") || "N/A"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">ISP:</span>
+                  <span className="ml-2">{detailLog.isp || "N/A"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Time:</span>

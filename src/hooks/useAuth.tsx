@@ -80,16 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchUserData(session.user.id), 0);
 
-          // Log successful login
+          // Log successful login (server-side, so the real client IP +
+          // geolocation can be captured — the browser can't see its own IP).
           if (event === 'SIGNED_IN') {
             setTimeout(async () => {
               try {
-                await supabase.from('audit_logs').insert({
-                  user_id: session.user.id,
-                  user_email: session.user.email ?? null,
-                  action: 'login',
-                  changes_summary: `User signed in: ${session.user.email}`,
-                  request_path: window.location.pathname,
+                await supabase.functions.invoke('log-login', {
+                  body: { action: 'login', request_path: window.location.pathname },
                 });
               } catch { /* non-critical */ }
             }, 0);
@@ -222,15 +219,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Always clear impersonation key so a stale session isn't restored after re-login
     localStorage.removeItem(IMPERSONATION_KEY);
 
-    // Log before session is destroyed
+    // Log before session is destroyed (needs the still-valid access token)
     if (user) {
       try {
-        await supabase.from('audit_logs').insert({
-          user_id: user.id,
-          user_email: user.email ?? null,
-          action: 'logout',
-          changes_summary: `User signed out: ${user.email}`,
-          request_path: window.location.pathname,
+        await supabase.functions.invoke('log-login', {
+          body: { action: 'logout', request_path: window.location.pathname },
         });
       } catch { /* non-critical */ }
     }
