@@ -21,3 +21,14 @@ export const TIMEZONES = [
 export function getTimezoneLabel(timezone: string): string {
   return TIMEZONES.find(tz => tz.value === timezone)?.label ?? timezone;
 }
+
+// Live abbreviation (e.g. "EST" or "EDT" depending on current DST state),
+// rather than the hardcoded "EST/EDT" pair in the label above.
+export function getTimezoneAbbreviation(timezone: string, date: Date = new Date()): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "short" }).formatToParts(date);
+    return parts.find(p => p.type === "timeZoneName")?.value ?? timezone;
+  } catch {
+    return timezone;
+  }
+}

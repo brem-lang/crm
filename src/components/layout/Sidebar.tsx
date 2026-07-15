@@ -5,7 +5,7 @@ import { useSidebarState } from "@/hooks/useSidebarState";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 import { useRejectedLeadsUnseenCount } from "@/hooks/useRejectedLeads";
 import { Badge } from "@/components/ui/badge";
-import { getTimezoneLabel } from "@/lib/timezones";
+import { getTimezoneLabel, getTimezoneAbbreviation } from "@/lib/timezones";
 import {
   LayoutDashboard,
   Users,
@@ -169,6 +169,7 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const timezoneAbbr = getTimezoneAbbreviation(timezone, currentTime);
   const { data: rejectedLeadsUnseenCount = 0 } = useRejectedLeadsUnseenCount();
 
   // Update time every second
@@ -238,7 +239,7 @@ export function Sidebar() {
         {!isCollapsed && (
           <div className="mt-2 text-xs text-muted-foreground font-mono">
             <div>{formatDate(currentTime)}</div>
-            <div className="truncate" title={timezoneLabel}>{timezoneLabel}</div>
+            <div className="truncate" title={timezoneLabel}>{timezoneAbbr}</div>
           </div>
         )}
       </div>
