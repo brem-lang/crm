@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
         affiliates(name),
         lead_distributions(advertiser_id, status, sent_at, advertisers(name))
       `, { count: 'exact' })
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 
     // fromDate/toDate are optional here (unlike get-leads) — omitting them
