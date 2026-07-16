@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
     const leadId = url.searchParams.get('lead_id');
     const isTest = url.searchParams.get('is_test');
     const includeRejected = url.searchParams.get('includeRejected');
+    const since = url.searchParams.get('since');
+    const afterId = url.searchParams.get('after_id');
 
     // Pagination — page is 0-indexed, limit capped at 1000
     const page = Math.max(0, parseInt(url.searchParams.get('page') || '0'));
@@ -160,6 +162,33 @@ Deno.serve(async (req) => {
       return new Date(year, parseInt(month) - 1, parseInt(day));
     };
 
+    // Keyset cursor for incremental polling — after_id takes precedence
+    // over since (immune to multiple leads sharing the same created_at,
+    // which since alone could skip or double-return).
+    let cursorRow: { created_at: string } | null = null;
+    if (afterId) {
+      const { data: row, error: cursorError } = await supabase
+        .from('leads')
+        .select('created_at')
+        .eq('id', afterId)
+        .maybeSingle();
+      if (cursorError || !row) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'after_id does not match any lead' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      cursorRow = row;
+    } else if (since) {
+      const sinceDate = new Date(since);
+      if (isNaN(sinceDate.getTime())) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'since must be a valid ISO timestamp' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     let query = supabase
       .from('leads')
       .select(`
@@ -169,6 +198,12 @@ Deno.serve(async (req) => {
       `, { count: 'exact' })
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
+
+    if (cursorRow) {
+      query = query.or(`created_at.gt.${cursorRow.created_at},and(created_at.eq.${cursorRow.created_at},id.gt.${afterId})`);
+    } else if (since) {
+      query = query.gt('created_at', new Date(since).toISOString());
+    }
 
     // fromDate/toDate are optional here (unlike get-leads) — omitting them
     // returns leads across all time.
@@ -226,6 +261,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Unfiltered count of every lead in the table, regardless of any
+    // filters applied above — for callers that want the overall dataset
+    // size alongside the (possibly narrowed) result set.
+    const { count: allLeadsCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true });
+
     try {
       await supabase.from('affiliate_api_logs').insert({
         affiliate_id: null,
@@ -243,10 +285,13 @@ Deno.serve(async (req) => {
         success: true,
         message: 'Leads fetched successfully',
         total: count ?? leads.length,
+        all_leads_count: allLeadsCount ?? null,
         page,
         limit,
         pages: count ? Math.ceil(count / limit) : 1,
         count: leads.length,
+        next_cursor: leads.length ? leads[leads.length - 1].id : (afterId ?? null),
+        next_since: leads.length ? leads[leads.length - 1].created_at : (since ?? null),
         data: leads,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
