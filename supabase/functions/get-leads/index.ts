@@ -182,10 +182,15 @@ Deno.serve(async (req) => {
     }
 
     // Apply filters
+    // Filter on ftd_released, not the raw is_ftd column — the response
+    // below reports is_ftd based on ftd_released (a lead can be flagged
+    // FTD internally before being manually released), so the filter must
+    // match that same field or hasFTD=1/0 would silently disagree with
+    // what the response payload actually shows.
     if (hasFTD === '1') {
-      query = query.eq('is_ftd', true);
+      query = query.eq('ftd_released', true);
     } else if (hasFTD === '0') {
-      query = query.eq('is_ftd', false);
+      query = query.eq('ftd_released', false);
     }
 
     if (status) {
