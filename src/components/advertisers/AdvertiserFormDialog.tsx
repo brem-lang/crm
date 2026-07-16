@@ -94,6 +94,7 @@ export function AdvertiserFormDialog({
       streamline11: "https://gpapi.org/leads",
       saxo: "https://platform.saxoltd.com/api/external",
       webullup: "https://trading.we-bull-up.com/api/external",
+      notion: "https://bo.team23822.xyz",
       custom: "",
     };
     
@@ -478,6 +479,34 @@ export function AdvertiserFormDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Overrides the default "API - ProviderName" source shown on the We Bull Up side
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* === Notion (Jetpack API) === */}
+          {formData.advertiser_type === 'notion' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">Notion Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Affiliate Token <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. 9d1c32a4-9e24-4273-93d9-2d1cce6c0b34"
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Source <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. stonex"
+                  value={formData.config.source || ''}
+                  onChange={(e) => updateConfig('source', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sent as the "source" field with every lead submission
                 </p>
               </div>
             </>

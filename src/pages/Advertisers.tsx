@@ -106,6 +106,12 @@ const advertiserTypes = [
     description: "We Bull Up — JSON POST with x-api-key header, dedup by phone/email, paginated status polling",
     fields: ["url", "api_key"],
   },
+  {
+    value: "notion",
+    label: "Notion",
+    description: "Notion (Jetpack API) — JSON POST with token+source fields, GET get-leads/get-deposits for status/FTD polling",
+    fields: ["url", "api_key", "source"],
+  },
 ];
 
 interface AdvertiserConfig {
@@ -290,7 +296,7 @@ export default function Advertisers() {
   const handleFormSubmit = () => {
     const payload = {
       name: formData.name,
-      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "capitaltrading" | "webullup",
+      advertiser_type: formData.advertiser_type as "trackbox" | "drmailer" | "enigma" | "timelocal" | "elitecrm" | "gsi" | "elnopy" | "custom" | "mock" | "getlinked" | "streamline11" | "affilio" | "capitaltrading" | "webullup" | "notion",
       url: formData.url,
       api_key: formData.api_key,
       is_active: formData.is_active,

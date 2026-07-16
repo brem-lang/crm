@@ -1391,6 +1391,55 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
+  // Notion (Jetpack API) — JSON POST with token+source fields, success
+  // determined by the body's `success` flag, not just HTTP status.
+  notion: async (lead, advertiser) => {
+    const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/jetpack-api/api/aff/store`;
+
+    const payload = {
+      first_name: lead.firstname,
+      last_name: lead.lastname,
+      email: lead.email,
+      phone: lead.mobile,
+      country_code: lead.country_code,
+      token: advertiser.api_key || '',
+      source: String(advertiser.config?.source || ''),
+      tracking: lead.offer_name || lead.custom1 || '',
+      extra: { custom1: lead.custom1 || '', custom2: lead.custom2 || '' },
+    };
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const body = JSON.stringify(payload);
+    console.log('Notion endpoint:', endpoint);
+    console.log('Notion payload:', body);
+
+    let responseText = '';
+    let isSuccess = false;
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers, body });
+      responseText = await response.text();
+      console.log('Notion raw response:', response.status, responseText);
+      isSuccess = response.ok;
+      try {
+        const json = JSON.parse(responseText);
+        if (json.success !== true) isSuccess = false;
+      } catch {
+        // Not JSON — fall back to the status code check above.
+      }
+    } catch (err) {
+      console.error('Notion fetch error:', err);
+      responseText = String(err);
+      isSuccess = false;
+    }
+
+    return {
+      success: isSuccess,
+      response: responseText,
+      requestMetadata: { url: endpoint, headers, payload: body },
+    };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');

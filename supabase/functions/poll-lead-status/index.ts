@@ -2287,6 +2287,111 @@ async function pollCapitalTradingLeads(
   return { updated, errors };
 }
 
+async function pollNotionLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+  const baseUrl = (advertiser.url || '').replace(/\/$/, '');
+  const token = advertiser.api_key || '';
+  const now = new Date().toISOString();
+
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  try {
+    const [leadsRes, depositsRes] = await Promise.all([
+      fetch(`${baseUrl}/jetpack-api/api/affiliate/${token}/get-leads`),
+      fetch(`${baseUrl}/jetpack-api/api/affiliate/${token}/get-deposits`),
+    ]);
+
+    if (!leadsRes.ok || !depositsRes.ok) {
+      console.log(`Notion status check failed: get-leads=${leadsRes.status}, get-deposits=${depositsRes.status}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const leadsData = await leadsRes.json();
+    const depositsData = await depositsRes.json();
+    const leadItems: Record<string, unknown>[] = Array.isArray(leadsData.data) ? leadsData.data : [];
+    const depositItems: Record<string, unknown>[] = Array.isArray(depositsData.data) ? depositsData.data : [];
+    console.log(`Notion returned ${leadItems.length} leads, ${depositItems.length} deposits`);
+
+    const byId = new Map<string, Record<string, unknown>>();
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const item of leadItems) {
+      if (item.id != null) byId.set(String(item.id), item);
+      if (item.email) byEmail.set(String(item.email).toLowerCase(), item);
+    }
+
+    const depositById = new Map<string, Record<string, unknown>>();
+    const depositByEmail = new Map<string, Record<string, unknown>>();
+    for (const item of depositItems) {
+      if (item.id != null) depositById.set(String(item.id), item);
+      if (item.email) depositByEmail.set(String(item.email).toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      distIds.push(dist.id);
+
+      let item = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
+      if (!item && dist.leads?.email) item = byEmail.get(dist.leads.email.toLowerCase());
+
+      let deposit = dist.external_lead_id ? depositById.get(dist.external_lead_id) : undefined;
+      if (!deposit && dist.leads?.email) deposit = depositByEmail.get(dist.leads.email.toLowerCase());
+
+      const leadUpdates: Record<string, unknown> = {};
+
+      if (item) {
+        const status = item.status as string | undefined;
+        const oldSaleStatus = (dist.leads as any).sale_status;
+        if (status && status !== oldSaleStatus) {
+          leadUpdates.sale_status = status;
+          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
+        }
+      }
+
+      if (deposit && !dist.leads.is_ftd) {
+        leadUpdates.is_ftd = true;
+        leadUpdates.ftd_date = (deposit.deposit_at as string) || now;
+        leadUpdates.ftd_id = String(deposit.id);
+        collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+        ftdCount++;
+      }
+
+      if (Object.keys(leadUpdates).length > 0) {
+        await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+        updated++;
+      }
+    }
+
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling Notion: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -2832,6 +2937,14 @@ Deno.serve(async (req) => {
       // Capital Trading uses bulk GET /api/lead_management/api/affiliates (no filtering support)
       if (advertiserType === 'capitaltrading') {
         const result = await pollCapitalTradingLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
+      // Notion (Jetpack API) uses bulk GET get-leads (status) + get-deposits (FTD)
+      if (advertiserType === 'notion') {
+        const result = await pollNotionLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;
