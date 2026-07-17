@@ -25,6 +25,9 @@ interface LeadData {
   // Tracking fields
   locale?: string;
   click_id?: string;
+  // Notion (Jetpack API) Clients endpoint requires these per-lead
+  password?: string;
+  currency?: string;
 }
 
 interface DistributionSettings {
@@ -522,6 +525,8 @@ Deno.serve(async (req) => {
         locale: (body as LeadData).locale?.substring(0, 20) || COUNTRY_LOCALE_MAP[normalizedCountryCode] || null,
         click_id: (body as LeadData).click_id?.substring(0, 255) || null,
         submission_ua: submissionUa?.substring(0, 500) || null,
+        password: (body as LeadData).password?.substring(0, 255) || null,
+        currency: (body as LeadData).currency?.substring(0, 10) || null,
       })
       .select('id')
       .single();

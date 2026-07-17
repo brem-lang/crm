@@ -109,8 +109,8 @@ const advertiserTypes = [
   {
     value: "notion",
     label: "Notion",
-    description: "Notion (Jetpack API) — JSON POST with token+source fields, GET get-leads/get-deposits for status/FTD polling",
-    fields: ["url", "api_key", "source"],
+    description: "Notion (Jetpack API) — Clients endpoint, JSON POST with token+source+password+currency fields, GET get-clients for status/FTD polling, returns an autologin url",
+    fields: ["url", "api_key", "source", "password", "currency"],
   },
 ];
 

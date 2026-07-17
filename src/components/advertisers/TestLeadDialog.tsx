@@ -64,6 +64,8 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   const [custom1, setCustom1] = useState("");
   const [custom2, setCustom2] = useState("");
   const [custom3, setCustom3] = useState("");
+  const [password, setPassword] = useState("");
+  const [currency, setCurrency] = useState("");
 
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
@@ -80,6 +82,8 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
     setMode("auto");
     setSelectedCountry("");
     setGeneratedData(blankTestData());
+    setPassword("");
+    setCurrency("");
   };
 
   const handleClose = (open: boolean) => {
@@ -124,6 +128,8 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
       custom2: custom2 || undefined,
       custom3: custom3 || undefined,
       locale: navigator.language || undefined,
+      password: password || undefined,
+      currency: currency || undefined,
     };
 
     try {
@@ -508,6 +514,25 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                 />
               </div>
             </div>
+
+            {/* Notion (Jetpack API) requires these per lead — no sensible generic default */}
+            {advertiserType === "notion" && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Notion Client Fields</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                  />
+                  <Input
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    placeholder="Currency (e.g. EUR)"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

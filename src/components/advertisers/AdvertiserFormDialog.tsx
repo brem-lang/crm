@@ -509,6 +509,28 @@ export function AdvertiserFormDialog({
                   Sent as the "source" field with every lead submission
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label>Default Password</Label>
+                <Input
+                  placeholder="Used when a lead doesn't supply its own"
+                  value={formData.config.password || ''}
+                  onChange={(e) => updateConfig('password', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fallback only — affiliates can supply a per-lead password via the submit-lead API
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Default Currency</Label>
+                <Input
+                  placeholder="e.g. EUR"
+                  value={formData.config.currency || ''}
+                  onChange={(e) => updateConfig('currency', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fallback only — affiliates can supply a per-lead currency via the submit-lead API
+                </p>
+              </div>
             </>
           )}
 

@@ -38,6 +38,9 @@ interface LeadData {
   // Tracking fields
   locale?: string;
   click_id?: string;
+  // Notion (Jetpack API) Clients endpoint requires these per-lead
+  password?: string;
+  currency?: string;
 }
 
 interface ApiResponse {
@@ -458,6 +461,8 @@ Deno.serve(async (req) => {
         locale: leadData.locale?.substring(0, 20) || COUNTRY_LOCALE_MAP[leadData.country_code.trim().toUpperCase()] || null,
         click_id: leadData.click_id?.substring(0, 255) || null,
         submission_ua: submissionUa?.substring(0, 500) || null,
+        password: leadData.password?.substring(0, 255) || null,
+        currency: leadData.currency?.substring(0, 10) || null,
       })
       .select('id')
       .single();

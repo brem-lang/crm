@@ -2306,34 +2306,25 @@ async function pollNotionLeads(
     .maybeSingle();
 
   try {
-    const [leadsRes, depositsRes] = await Promise.all([
-      fetch(`${baseUrl}/jetpack-api/api/affiliate/${token}/get-leads`),
-      fetch(`${baseUrl}/jetpack-api/api/affiliate/${token}/get-deposits`),
-    ]);
+    // get-clients covers both status and FTD/deposits (status === 'FTD') in
+    // a single endpoint — replaces the old separate get-leads/get-deposits
+    // calls from the Leads API.
+    const clientsRes = await fetch(`${baseUrl}/jetpack-api/api/client/${token}/get-clients`);
 
-    if (!leadsRes.ok || !depositsRes.ok) {
-      console.log(`Notion status check failed: get-leads=${leadsRes.status}, get-deposits=${depositsRes.status}`);
+    if (!clientsRes.ok) {
+      console.log(`Notion status check failed: get-clients=${clientsRes.status}`);
       return { updated: 0, errors: 1 };
     }
 
-    const leadsData = await leadsRes.json();
-    const depositsData = await depositsRes.json();
-    const leadItems: Record<string, unknown>[] = Array.isArray(leadsData.data) ? leadsData.data : [];
-    const depositItems: Record<string, unknown>[] = Array.isArray(depositsData.data) ? depositsData.data : [];
-    console.log(`Notion returned ${leadItems.length} leads, ${depositItems.length} deposits`);
+    const clientsData = await clientsRes.json();
+    const items: Record<string, unknown>[] = Array.isArray(clientsData.data) ? clientsData.data : [];
+    console.log(`Notion returned ${items.length} clients`);
 
     const byId = new Map<string, Record<string, unknown>>();
     const byEmail = new Map<string, Record<string, unknown>>();
-    for (const item of leadItems) {
+    for (const item of items) {
       if (item.id != null) byId.set(String(item.id), item);
       if (item.email) byEmail.set(String(item.email).toLowerCase(), item);
-    }
-
-    const depositById = new Map<string, Record<string, unknown>>();
-    const depositByEmail = new Map<string, Record<string, unknown>>();
-    for (const item of depositItems) {
-      if (item.id != null) depositById.set(String(item.id), item);
-      if (item.email) depositByEmail.set(String(item.email).toLowerCase(), item);
     }
 
     const historyBatch: HistoryEntry[] = [];
@@ -2345,25 +2336,22 @@ async function pollNotionLeads(
 
       let item = dist.external_lead_id ? byId.get(dist.external_lead_id) : undefined;
       if (!item && dist.leads?.email) item = byEmail.get(dist.leads.email.toLowerCase());
+      if (!item) continue;
 
-      let deposit = dist.external_lead_id ? depositById.get(dist.external_lead_id) : undefined;
-      if (!deposit && dist.leads?.email) deposit = depositByEmail.get(dist.leads.email.toLowerCase());
-
+      const status = item.status as string | undefined;
       const leadUpdates: Record<string, unknown> = {};
 
-      if (item) {
-        const status = item.status as string | undefined;
-        const oldSaleStatus = (dist.leads as any).sale_status;
-        if (status && status !== oldSaleStatus) {
-          leadUpdates.sale_status = status;
-          collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
-        }
+      const oldSaleStatus = (dist.leads as any).sale_status;
+      if (status && status !== oldSaleStatus) {
+        leadUpdates.sale_status = status;
+        collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
       }
 
-      if (deposit && !dist.leads.is_ftd) {
+      const hasFtd = status?.toUpperCase() === 'FTD' && !dist.leads.is_ftd;
+      if (hasFtd) {
         leadUpdates.is_ftd = true;
-        leadUpdates.ftd_date = (deposit.deposit_at as string) || now;
-        leadUpdates.ftd_id = String(deposit.id);
+        leadUpdates.ftd_date = now;
+        leadUpdates.ftd_id = String(item.id);
         collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
         ftdCount++;
       }

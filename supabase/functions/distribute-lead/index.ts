@@ -31,6 +31,9 @@ interface Lead {
   offer_name?: string;
   comment?: string;
   distributed_at?: string;
+  // Notion (Jetpack API) Clients endpoint requires these per-lead
+  password?: string;
+  currency?: string;
 }
 
 interface Advertiser {
@@ -1391,18 +1394,23 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
-  // Notion (Jetpack API) — JSON POST with token+source fields, success
-  // determined by the body's `success` flag, not just HTTP status.
+  // Notion (Jetpack API) — Clients endpoint (not Leads): JSON POST with
+  // token+source+password+currency fields. Success determined by the
+  // body's `success` flag, not just HTTP status. The response's `url`
+  // field (a JWT-embedded autologin link) is picked up automatically by
+  // the generic extractAutologinUrl() below — no extra handling needed.
   notion: async (lead, advertiser) => {
     const baseUrl = (advertiser.url || '').replace(/\/$/, '');
-    const endpoint = `${baseUrl}/jetpack-api/api/aff/store`;
+    const endpoint = `${baseUrl}/jetpack-api/api/client/store`;
 
     const payload = {
       first_name: lead.firstname,
       last_name: lead.lastname,
       email: lead.email,
-      phone: lead.mobile,
+      phone_number: lead.mobile,
       country_code: lead.country_code,
+      password: String(lead.password || advertiser.config?.password || ''),
+      currency: String(lead.currency || advertiser.config?.currency || ''),
       token: advertiser.api_key || '',
       source: String(advertiser.config?.source || ''),
       tracking: lead.offer_name || lead.custom1 || '',
@@ -2393,6 +2401,8 @@ Deno.serve(async (req) => {
           custom2: test_lead_data.custom2,
           custom3: test_lead_data.custom3,
           affiliate_id: test_lead_data.affiliate_id,
+          password: test_lead_data.password,
+          currency: test_lead_data.currency,
         };
 
         console.log(`[TEST MODE] Sending test lead to ${typedAdvertiser.name}`);
