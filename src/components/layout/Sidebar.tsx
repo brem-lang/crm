@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
@@ -34,6 +35,8 @@ import {
   Clock,
   ScrollText,
   GitMerge,
+  Sun,
+  Moon,
   Network,
   ShieldCheck,
   MessageCircle,
@@ -158,6 +161,8 @@ export function Sidebar() {
   const location = useLocation();
   const { signOut, roles, customRoleNames, user, username, isChatSupport } = useAuth();
   const { isCollapsed, toggleCollapsed } = useSidebarState();
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const { formatDate, crmName, timezone } = useCRMSettings();
   const timezoneLabel = getTimezoneLabel(timezone);
   const crmInitials = crmName
@@ -362,6 +367,15 @@ export function Sidebar() {
             </p>
           </div>
         )}
+        <Button
+          variant="ghost"
+          className={cn("w-full gap-3", isCollapsed ? "justify-center px-2" : "justify-start")}
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+          title={isCollapsed ? (isDark ? "Switch to Light Mode" : "Switch to Dark Mode") : undefined}
+        >
+          {isDark ? <Sun className="h-4 w-4 flex-shrink-0" /> : <Moon className="h-4 w-4 flex-shrink-0" />}
+          {!isCollapsed && (isDark ? "Light Mode" : "Dark Mode")}
+        </Button>
         <Button
           variant="ghost"
           className={cn("w-full gap-3", isCollapsed ? "justify-center px-2" : "justify-start")}
