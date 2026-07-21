@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
       .select(`
         *,
         affiliates(name),
-        lead_distributions(advertiser_id, status, sent_at, advertisers(name))
+        lead_distributions(*, advertisers(name))
       `, { count: 'exact' })
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
