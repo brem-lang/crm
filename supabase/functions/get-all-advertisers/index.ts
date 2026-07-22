@@ -170,7 +170,6 @@ Deno.serve(async (req) => {
     let query = supabase
       .from('advertisers')
       .select('*', { count: 'exact' })
-      .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -198,8 +197,7 @@ Deno.serve(async (req) => {
 
     const { count: allAdvertisersCount } = await supabase
       .from('advertisers')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
+      .select('*', { count: 'exact', head: true });
 
     try {
       await supabase.from('affiliate_api_logs').insert({

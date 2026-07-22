@@ -196,7 +196,6 @@ Deno.serve(async (req) => {
         affiliates(name),
         lead_distributions(*, advertisers(name))
       `, { count: 'exact' })
-      .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -267,8 +266,7 @@ Deno.serve(async (req) => {
     // size alongside the (possibly narrowed) result set.
     const { count: allLeadsCount } = await supabase
       .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
+      .select('*', { count: 'exact', head: true });
 
     try {
       await supabase.from('affiliate_api_logs').insert({
