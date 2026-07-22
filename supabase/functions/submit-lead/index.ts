@@ -262,7 +262,6 @@ Deno.serve(async (req) => {
       .select('id, name, is_active, allowed_countries, ip_whitelist_required, allowed_ips')
       .eq('api_key', apiKey)
       .eq('is_active', true)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (affiliateError || !affiliate) {
@@ -417,7 +416,6 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('id')
       .eq('email', body.email.trim().toLowerCase())
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingLead) {
@@ -441,7 +439,6 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('id')
       .eq('ip_address', submittedIp)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingIpLead) {

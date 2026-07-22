@@ -1592,7 +1592,6 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
       .from('affiliates')
       .select('test_mode')
       .eq('id', lead.affiliate_id)
-      .is('deleted_at', null)
       .single();
     
     if (affiliate?.test_mode === true) {
@@ -1604,7 +1603,6 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
         .select('*')
         .eq('advertiser_type', 'mock')
         .eq('is_active', true)
-        .is('deleted_at', null)
         .limit(1)
         .single();
       
@@ -1647,8 +1645,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
         .from('advertisers')
         .select('*')
         .in('id', advertiserIds)
-        .eq('is_active', true)
-        .is('deleted_at', null);
+        .eq('is_active', true);
 
       if (!advertisers?.length) {
         console.log('No active advertisers found from affiliate rules');
@@ -1767,8 +1764,7 @@ async function getEligibleAdvertisers(supabase: any, lead: Lead): Promise<Eligib
   const { data: advertisers, error: advError } = await supabase
     .from('advertisers')
     .select('*')
-    .eq('is_active', true)
-    .is('deleted_at', null);
+    .eq('is_active', true);
 
   if (advError || !advertisers?.length) {
     console.log('No active advertisers found');
@@ -1963,7 +1959,6 @@ async function sendAffiliateCallback(
     .from('affiliates')
     .select('id, name, callback_url')
     .eq('id', lead.affiliate_id)
-    .is('deleted_at', null)
     .maybeSingle();
 
   if (affError || !affiliate) {
@@ -2295,7 +2290,6 @@ Deno.serve(async (req) => {
           .from('leads')
           .select('id')
           .eq('ip_address', test_lead_data.ip_address)
-          .is('deleted_at', null)
           .maybeSingle();
 
         if (dupIpLead) {
@@ -2317,7 +2311,6 @@ Deno.serve(async (req) => {
           .select('*')
           .eq('id', advertiser_id)
           .eq('is_active', true)
-          .is('deleted_at', null)
           .single();
 
         if (advError || !advertiser) {
@@ -2901,7 +2894,6 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('*')
       .eq('id', lead_id)
-      .is('deleted_at', null)
       .single();
 
     if (leadError || !lead) {
@@ -2930,7 +2922,6 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('id', targetAdvertiserId)
         .eq('is_active', true)
-        .is('deleted_at', null)
         .single();
 
       if (advError || !advertiser) {

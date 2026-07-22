@@ -2799,9 +2799,7 @@ Deno.serve(async (req) => {
       `)
       .eq('status', 'sent')
       .not('external_lead_id', 'is', null)
-      .neq('leads.status', 'rejected')
-      .is('leads.deleted_at', null)
-      .is('advertisers.deleted_at', null);
+      .neq('leads.status', 'rejected');
 
     // If targeting a specific email, filter by it
     if (targetEmail) {
@@ -3036,7 +3034,6 @@ Deno.serve(async (req) => {
       `)
       .eq('status', 'sent')
       .not('external_lead_id', 'is', null)
-      .is('advertisers.deleted_at', null)
       .limit(500);
 
     if (injError) {

@@ -183,9 +183,9 @@ export function useDeleteLead() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('leads')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', id);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -205,7 +205,7 @@ export function useBulkDeleteLeads() {
     mutationFn: async (ids: string[]) => {
       const { error } = await supabase
         .from('leads')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .in('id', ids);
 
       if (error) throw error;

@@ -50,7 +50,6 @@ Deno.serve(async (req) => {
       .select('id, name')
       .eq('api_key', apiKey)
       .eq('is_active', true)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (affiliateError || !affiliate) {
@@ -117,8 +116,7 @@ Deno.serve(async (req) => {
           external_lead_id
         )
       `)
-      .eq('affiliate_id', affiliate.id)
-      .is('deleted_at', null);
+      .eq('affiliate_id', affiliate.id);
 
     if (leadId) {
       query = query.eq('id', leadId);

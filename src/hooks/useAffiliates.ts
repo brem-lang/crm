@@ -100,9 +100,9 @@ export function useDeleteAffiliate() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('affiliates')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', id);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {

@@ -76,8 +76,7 @@ Deno.serve(async (req) => {
     const { data: advertisers } = await supabase
       .from('advertisers')
       .select('id, name')
-      .in('id', advertiserIds)
-      .is('deleted_at', null);
+      .in('id', advertiserIds);
 
     const advertiserMap = new Map(advertisers?.map(a => [a.id, a.name]) || []);
 

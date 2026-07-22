@@ -101,7 +101,6 @@ Deno.serve(async (req) => {
       .select('id')
       .eq('api_key', apiKey)
       .eq('is_active', true)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (affiliateError || !affiliate) {
@@ -172,7 +171,6 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('id, request_id, firstname, lastname, email, country_code, mobile, status, sale_status, is_ftd, ftd_date, ftd_released, created_at', { count: 'exact' })
       .eq('affiliate_id', affiliate.id)
-      .is('deleted_at', null)
       .gte('updated_at', startDate.toISOString())
       .lte('updated_at', endDate.toISOString())
       .order('created_at', { ascending: false })
