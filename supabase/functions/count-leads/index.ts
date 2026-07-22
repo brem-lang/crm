@@ -135,7 +135,8 @@ Deno.serve(async (req) => {
 
     const { count, error } = await supabase
       .from('leads')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
 
     if (error) {
       return new Response(
