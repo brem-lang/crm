@@ -117,7 +117,8 @@ Deno.serve(async (req) => {
           external_lead_id
         )
       `)
-      .eq('affiliate_id', affiliate.id);
+      .eq('affiliate_id', affiliate.id)
+      .is('deleted_at', null);
 
     if (leadId) {
       query = query.eq('id', leadId);

@@ -417,6 +417,7 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('id')
       .eq('email', body.email.trim().toLowerCase())
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingLead) {
@@ -440,6 +441,7 @@ Deno.serve(async (req) => {
       .from('leads')
       .select('id')
       .eq('ip_address', submittedIp)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingIpLead) {
