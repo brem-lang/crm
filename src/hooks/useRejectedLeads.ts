@@ -308,10 +308,7 @@ export function useDeleteRejectedLeads() {
       // Soft-delete leads with rejected status
       if (statusItems.length > 0) {
         const leadIds = statusItems.map(item => item.lead_id || item.id.replace('status-', ''));
-        const { error: leadsError } = await supabase
-          .from('leads')
-          .update({ deleted_at: new Date().toISOString() })
-          .in('id', leadIds);
+        const { error: leadsError } = await supabase.rpc('soft_delete_leads', { _ids: leadIds });
 
         if (leadsError) throw leadsError;
       }

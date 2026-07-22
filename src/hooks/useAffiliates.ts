@@ -98,10 +98,7 @@ export function useDeleteAffiliate() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('affiliates')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
+      const { error } = await supabase.rpc('soft_delete_affiliate', { _id: id });
 
       if (error) throw error;
     },

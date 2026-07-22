@@ -107,10 +107,7 @@ export function useDeleteAdvertiser() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('advertisers')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
+      const { error } = await supabase.rpc('soft_delete_advertiser', { _id: id });
 
       if (error) throw error;
     },

@@ -181,10 +181,7 @@ export function useDeleteLead() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('leads')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
+      const { error } = await supabase.rpc('soft_delete_lead', { _id: id });
 
       if (error) throw error;
     },
@@ -203,10 +200,7 @@ export function useBulkDeleteLeads() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from('leads')
-        .update({ deleted_at: new Date().toISOString() })
-        .in('id', ids);
+      const { error } = await supabase.rpc('soft_delete_leads', { _ids: ids });
 
       if (error) throw error;
     },
