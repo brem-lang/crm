@@ -163,13 +163,13 @@ Deno.serve(async (req) => {
     };
 
     // Keyset cursor for incremental polling — after_id takes precedence
-    // over since (immune to multiple leads sharing the same created_at,
+    // over since (immune to multiple leads sharing the same updated_at,
     // which since alone could skip or double-return).
-    let cursorRow: { created_at: string } | null = null;
+    let cursorRow: { updated_at: string } | null = null;
     if (afterId) {
       const { data: row, error: cursorError } = await supabase
         .from('leads')
-        .select('created_at')
+        .select('updated_at')
         .eq('id', afterId)
         .maybeSingle();
       if (cursorError || !row) {
@@ -196,13 +196,14 @@ Deno.serve(async (req) => {
         affiliates(name),
         lead_distributions(*, advertisers(name))
       `, { count: 'exact' })
-      .order('created_at', { ascending: true })
+      .order('updated_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (cursorRow) {
-      query = query.or(`created_at.gt.${cursorRow.created_at},and(created_at.eq.${cursorRow.created_at},id.gt.${afterId})`);
+      query = query.or(`updated_at.gt.${cursorRow.updated_at},and(updated_at.eq.${cursorRow.updated_at},id.gt.${afterId})`);
     } else if (since) {
-      query = query.gt('created_at', new Date(since).toISOString());
+      query = query.gte('updated_at', new Date(since).toISOString());
     }
 
     // fromDate/toDate are optional here (unlike get-leads) — omitting them
@@ -291,7 +292,7 @@ Deno.serve(async (req) => {
         pages: count ? Math.ceil(count / limit) : 1,
         count: leads.length,
         next_cursor: leads.length ? leads[leads.length - 1].id : (afterId ?? null),
-        next_since: leads.length ? leads[leads.length - 1].created_at : (since ?? null),
+        next_since: leads.length ? leads[leads.length - 1].updated_at : (since ?? null),
         data: leads,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -143,11 +143,11 @@ Deno.serve(async (req) => {
     const limit = Math.min(Math.max(1, parseInt(url.searchParams.get('limit') || '500')), 1000);
     const offset = page * limit;
 
-    let cursorRow: { created_at: string } | null = null;
+    let cursorRow: { updated_at: string } | null = null;
     if (afterId) {
       const { data: row, error: cursorError } = await supabase
         .from('advertisers')
-        .select('created_at')
+        .select('updated_at')
         .eq('id', afterId)
         .maybeSingle();
       if (cursorError || !row) {
@@ -170,13 +170,14 @@ Deno.serve(async (req) => {
     let query = supabase
       .from('advertisers')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: true })
+      .order('updated_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (cursorRow) {
-      query = query.or(`created_at.gt.${cursorRow.created_at},and(created_at.eq.${cursorRow.created_at},id.gt.${afterId})`);
+      query = query.or(`updated_at.gt.${cursorRow.updated_at},and(updated_at.eq.${cursorRow.updated_at},id.gt.${afterId})`);
     } else if (since) {
-      query = query.gt('created_at', new Date(since).toISOString());
+      query = query.gte('updated_at', new Date(since).toISOString());
     }
 
     if (isActive === '1') query = query.eq('is_active', true);
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
         pages: count ? Math.ceil(count / limit) : 1,
         count: advertisers.length,
         next_cursor: advertisers.length ? advertisers[advertisers.length - 1].id : (afterId ?? null),
-        next_since: advertisers.length ? advertisers[advertisers.length - 1].created_at : (since ?? null),
+        next_since: advertisers.length ? advertisers[advertisers.length - 1].updated_at : (since ?? null),
         data: advertisers,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
