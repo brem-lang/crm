@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
       .select('id, name')
       .eq('api_key', apiKey)
       .eq('is_active', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (advError || !advertiser) {

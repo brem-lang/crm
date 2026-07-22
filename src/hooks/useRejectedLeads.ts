@@ -305,14 +305,14 @@ export function useDeleteRejectedLeads() {
       const statusItems = items.filter(item => item.source === 'status');
       const tableItems = items.filter(item => item.source === 'table');
 
-      // Delete leads with rejected status (this removes the lead entirely)
+      // Soft-delete leads with rejected status
       if (statusItems.length > 0) {
         const leadIds = statusItems.map(item => item.lead_id || item.id.replace('status-', ''));
         const { error: leadsError } = await supabase
           .from('leads')
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .in('id', leadIds);
-        
+
         if (leadsError) throw leadsError;
       }
 

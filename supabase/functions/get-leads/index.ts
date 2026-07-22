@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
       .select('id')
       .eq('api_key', apiKey)
       .eq('is_active', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (affiliateError || !affiliate) {

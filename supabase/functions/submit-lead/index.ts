@@ -262,6 +262,7 @@ Deno.serve(async (req) => {
       .select('id, name, is_active, allowed_countries, ip_whitelist_required, allowed_ips')
       .eq('api_key', apiKey)
       .eq('is_active', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (affiliateError || !affiliate) {
