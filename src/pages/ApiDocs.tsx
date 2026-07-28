@@ -7,7 +7,7 @@ import { Download, Loader2 } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { useCRMSettings } from "@/hooks/useCRMSettings";
 
-const BASE_URL = "https://backend.marketlinkco.live/functions/v1";
+const BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 // Inline styles used only in the hidden print layout (no Tailwind classes that may not apply)
 const ps = {

@@ -78,7 +78,7 @@ export function useEdgeFunctionHealth() {
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'apikey': "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiYXVkIjoiYXV0aGVudGljYXRlZCIsImlhdCI6MTc3MTAwMDcwNSwiZXhwIjoyMDg2MzYwNzA1fQ.PsgCd_zNLIa-bst3Peu_dduPqvQLugDHWJRCv1l1WSk",
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       };
 
       if (session?.access_token) {
@@ -86,7 +86,7 @@ export function useEdgeFunctionHealth() {
       }
 
       const response = await fetch(
-        `https://api.marketlinkco.live/functions/v1/${fnName}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`,
         {
           method: 'POST',
           headers,
