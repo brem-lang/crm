@@ -43,6 +43,7 @@ Edge Functions read these from the Supabase Docker Compose `functions` service's
 | `TRACKING_BASE_URL` | tracking/autologin/injection functions | Public-facing base URL used in generated links — must be the real external domain, not `kong:8000` |
 | `PUBLIC_SUPABASE_URL` / `PUBLIC_URL` | a few lead-intake functions | Public-facing URL used in generated links |
 | `HTTP_PROXY` / `HTTPS_PROXY` | outbound adapter calls | Egress proxy some advertiser integrations route through — see the IP-whitelisting note in the fresh-install section below |
+| `VPS_URL` | `vps-health` | This server's own public URL, pinged to populate the VPS status indicator on the Monitoring page — must be this server's domain, not another instance's. Falls back to `https://backend.marketlinkco.live` if unset, so it must be set explicitly on every server other than the original one |
 
 ## 1. Database Migrations
 
@@ -162,7 +163,7 @@ In the Supabase project's `docker-compose.yml`, under the `functions` service's 
 
 ### 4.4 Update hardcoded domain references before building
 - `nginx.conf`: `server_name`, both `ssl_certificate*` paths, all 6 `proxy_pass` targets (should point at the new server's Kong endpoint, typically `127.0.0.1:8000` if Kong and nginx share a host)
-- `supabase/functions/vps-health/index.ts`: the `VPS_URL` constant
+- `VPS_URL` env var in this server's `docker-compose.yml` `functions` environment block, set to this server's own public URL (see the Environment Variables table above) — the `vps-health` function no longer has this hardcoded in source
 - `.env.production`: `VITE_SUPABASE_URL` → new domain, `VITE_SUPABASE_PUBLISHABLE_KEY` → the new `ANON_KEY` from step 4.1
 
 ### 4.5 TLS certificate
