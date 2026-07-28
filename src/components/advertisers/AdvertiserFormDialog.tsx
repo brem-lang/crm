@@ -95,6 +95,7 @@ export function AdvertiserFormDialog({
       saxo: "https://platform.saxoltd.com/api/external",
       webullup: "https://trading.we-bull-up.com/api/external",
       notion: "https://bo.team23822.xyz",
+      wex: "https://andromeda.host",
       custom: "",
     };
     
@@ -529,6 +530,37 @@ export function AdvertiserFormDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Fallback only — affiliates can supply a per-lead currency via the submit-lead API
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* === Wex (BackBone CRM) === */}
+          {formData.advertiser_type === 'wex' && (
+            <>
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">Wex Configuration</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>API Key <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="bb_live_..."
+                  value={formData.api_key}
+                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sent as the X-API-Key header
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Ref Code <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. MRC"
+                  value={formData.config.ref || ''}
+                  onChange={(e) => updateConfig('ref', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your affiliate ref code — sent with every lead submission and used to scope status polling
                 </p>
               </div>
             </>

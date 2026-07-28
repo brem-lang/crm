@@ -2380,6 +2380,102 @@ async function pollNotionLeads(
   return { updated, errors };
 }
 
+// BackBone CRM (Wex) — GET /api/affiliate/leads?ref=... returns clientId,
+// not the leadId our external_lead_id was set from at creation time, so
+// matching must be done by email (the only key both endpoints share).
+async function pollWexLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+  const baseUrl = (advertiser.url || 'https://andromeda.host').replace(/\/$/, '');
+  const ref = String(advertiser.config?.ref || 'MRC');
+  const now = new Date().toISOString();
+
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  try {
+    const url = `${baseUrl}/api/affiliate/leads?ref=${encodeURIComponent(ref)}&limit=100`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-API-Key': advertiser.api_key || '' },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`Wex status check failed: ${response.status}, body: ${errorText}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const items: Record<string, unknown>[] = Array.isArray(data.leads) ? data.leads : [];
+    console.log(`Wex returned ${items.length} leads`);
+
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const item of items) {
+      if (item.email) byEmail.set(String(item.email).toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      distIds.push(dist.id);
+
+      const email = dist.leads?.email;
+      const item = email ? byEmail.get(email.toLowerCase()) : undefined;
+      if (!item) continue;
+
+      const status = item.status as string | undefined;
+      const leadUpdates: Record<string, unknown> = {};
+
+      const oldSaleStatus = (dist.leads as any).sale_status;
+      if (status && status !== oldSaleStatus) {
+        leadUpdates.sale_status = status;
+        collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
+      }
+
+      const hasFtd = String(status || '').toLowerCase().includes('ftd') && !dist.leads.is_ftd;
+      if (hasFtd) {
+        leadUpdates.is_ftd = true;
+        leadUpdates.ftd_date = now;
+        leadUpdates.ftd_id = item.clientId != null ? String(item.clientId) : null;
+        collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+        ftdCount++;
+      }
+
+      if (Object.keys(leadUpdates).length > 0) {
+        await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+        updated++;
+      }
+    }
+
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling Wex: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -2935,6 +3031,14 @@ Deno.serve(async (req) => {
       // Notion (Jetpack API) uses bulk GET get-leads (status) + get-deposits (FTD)
       if (advertiserType === 'notion') {
         const result = await pollNotionLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
+      // BackBone CRM (Wex) uses bulk GET /api/affiliate/leads (matched by email)
+      if (advertiserType === 'wex') {
+        const result = await pollWexLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;

@@ -1448,6 +1448,56 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
+  // BackBone CRM (Wex) — POST /api/capture, X-API-Key auth. Success is HTTP
+  // 201; 409 (duplicate email), 400, 401, 429, 5xx all naturally resolve to
+  // response.ok === false, which is exactly the "not billable, don't retry
+  // as-is" outcome distribute-lead already treats a failed adapter as — no
+  // special-casing needed. The response's `leadId` field is picked up
+  // automatically by the generic extractExternalLeadId() below (matches its
+  // data.leadId fallback). No autologin URL in this API — extractAutologinUrl()
+  // will just return null, which is fine.
+  wex: async (lead, advertiser) => {
+    const baseUrl = (advertiser.url || 'https://andromeda.host').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/api/capture`;
+    const ref = String(advertiser.config?.ref || 'MRC');
+
+    const payload = {
+      ref,
+      firstName: lead.firstname,
+      lastName: lead.lastname,
+      email: lead.email,
+      phone: lead.mobile,
+      country: lead.country_code,
+    };
+
+    const headers: Record<string, string> = {
+      'X-API-Key': advertiser.api_key || '',
+      'Content-Type': 'application/json',
+    };
+    const body = JSON.stringify(payload);
+    console.log('Wex endpoint:', endpoint);
+    console.log('Wex payload:', body);
+
+    let responseText = '';
+    let isSuccess = false;
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers, body });
+      responseText = await response.text();
+      console.log('Wex raw response:', response.status, responseText);
+      isSuccess = response.ok;
+    } catch (err) {
+      console.error('Wex fetch error:', err);
+      responseText = String(err);
+      isSuccess = false;
+    }
+
+    return {
+      success: isSuccess,
+      response: responseText,
+      requestMetadata: { url: endpoint, headers, payload: body },
+    };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');

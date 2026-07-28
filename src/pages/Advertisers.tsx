@@ -112,7 +112,22 @@ const advertiserTypes = [
     description: "Notion (Jetpack API) — Clients endpoint, JSON POST with token+source+password+currency fields, GET get-clients for status/FTD polling, returns an autologin url",
     fields: ["url", "api_key", "source", "password", "currency"],
   },
+  {
+    value: "wex",
+    label: "BackBone CRM (Wex)",
+    description: "BackBone CRM — POST /api/capture with X-API-Key header, ref code routing, GET /api/affiliate/leads for status/FTD polling (matched by email)",
+    fields: ["url", "api_key", "ref"],
+  },
 ];
+
+// The Wex integration is specific to this deployment's affiliate agreement —
+// hide it from every other build of this codebase (only mercarileads.online
+// has that relationship). Filtered once here so every consumer of
+// advertiserTypes (the type filter bar and the create/edit form dropdown)
+// picks up the restriction automatically.
+const visibleAdvertiserTypes = advertiserTypes.filter(
+  (t) => t.value !== "wex" || import.meta.env.VITE_SUPABASE_URL === "https://mercarileads.online"
+);
 
 interface AdvertiserConfig {
   [key: string]: string | undefined;
@@ -370,7 +385,7 @@ export default function Advertisers() {
               onStatusFilterChange={setStatusFilter}
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
-              advertiserTypes={advertiserTypes}
+              advertiserTypes={visibleAdvertiserTypes}
               selectedCount={selectedIds.size}
               onBulkSelectAll={handleBulkSelectAll}
               onClearSelection={handleClearSelection}
@@ -428,10 +443,10 @@ export default function Advertisers() {
           setFormData={setFormData}
           updateConfig={updateConfig}
           advertiserTypes={[
-            ...advertiserTypes,
+            ...visibleAdvertiserTypes,
             ...customCRMTypes
               .filter((ct) => ct.is_active)
-              .filter((ct) => !advertiserTypes.some((st) => st.value === ct.code))
+              .filter((ct) => !visibleAdvertiserTypes.some((st) => st.value === ct.code))
               .map((ct) => ({
                 value: ct.code,
                 label: `${ct.name} (custom)`,
