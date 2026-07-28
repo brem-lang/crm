@@ -1,16 +1,5 @@
 # BackBone CRM — Affiliate Integration (MRC)
 
-## Connection
-
-| Item          | Value                                                 |
-| ------------- | ----------------------------------------------------- |
-| Base URL      | `https://andromeda.host`                              |
-| Auth header   | `X-API-Key: bb_live_821ea746d8a4f495ab273c169477a509` |
-| Content-Type  | `application/json`                                    |
-| Your ref code | `MRC`                                                 |
-
----
-
 ## 1. Send a lead — `POST /api/capture`
 
 **Headers:** `X-API-Key`, `Content-Type: application/json`
