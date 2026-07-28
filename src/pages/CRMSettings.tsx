@@ -48,6 +48,7 @@ const SYSTEM_TYPES = [
   { code: "capitaltrading", name: "Capital Trading", description: "Capital Trading API — JSON POST with single authorization header, custom_fields for Source_ID/investment amount/case notes", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
   { code: "webullup",    name: "We Bull Up",       description: "We Bull Up provider API — JSON POST, x-api-key header, dedup by phone/email, paginated status polling", request_format: "json", auth_type: "header", required_fields: ["url", "api_key"] },
   { code: "notion",      name: "Notion",           description: "Notion (Jetpack API) — Clients endpoint, JSON POST with token+source+password+currency fields, GET get-clients for status/FTD polling, returns an autologin url", request_format: "json", auth_type: "body", required_fields: ["url", "api_key", "source", "password", "currency"] },
+  { code: "wex",         name: "BackBone CRM (Wex)", description: "POST /api/capture with X-API-Key header and ref code, GET /api/affiliate/leads for status/FTD polling (matched by email)", request_format: "json", auth_type: "header", required_fields: ["url", "api_key", "ref"] },
   { code: "custom",      name: "Custom",           description: "User-defined fields and auth",                            request_format: "json",             auth_type: "none",        required_fields: [] },
 ];
 

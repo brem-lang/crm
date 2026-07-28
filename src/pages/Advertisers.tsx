@@ -120,15 +120,6 @@ const advertiserTypes = [
   },
 ];
 
-// The Wex integration is specific to this deployment's affiliate agreement —
-// hide it from every other build of this codebase (only mercarileads.online
-// has that relationship). Filtered once here so every consumer of
-// advertiserTypes (the type filter bar and the create/edit form dropdown)
-// picks up the restriction automatically.
-const visibleAdvertiserTypes = advertiserTypes.filter(
-  (t) => t.value !== "wex" || import.meta.env.VITE_SUPABASE_URL === "https://mercarileads.online"
-);
-
 interface AdvertiserConfig {
   [key: string]: string | undefined;
 }
@@ -385,7 +376,7 @@ export default function Advertisers() {
               onStatusFilterChange={setStatusFilter}
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
-              advertiserTypes={visibleAdvertiserTypes}
+              advertiserTypes={advertiserTypes}
               selectedCount={selectedIds.size}
               onBulkSelectAll={handleBulkSelectAll}
               onClearSelection={handleClearSelection}
@@ -443,10 +434,10 @@ export default function Advertisers() {
           setFormData={setFormData}
           updateConfig={updateConfig}
           advertiserTypes={[
-            ...visibleAdvertiserTypes,
+            ...advertiserTypes,
             ...customCRMTypes
               .filter((ct) => ct.is_active)
-              .filter((ct) => !visibleAdvertiserTypes.some((st) => st.value === ct.code))
+              .filter((ct) => !advertiserTypes.some((st) => st.value === ct.code))
               .map((ct) => ({
                 value: ct.code,
                 label: `${ct.name} (custom)`,
