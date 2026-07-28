@@ -60,3 +60,7 @@ get-docker.sh
 .env.production
 Dockerfile
 nginx.conf
+supabase/docker/
+
+# Claude Code local settings
+.claude/settings.local.json
