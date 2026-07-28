@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VPS_URL = "https://backend.marketlinkco.live";
+const VPS_URL = Deno.env.get("VPS_URL") || "https://backend.marketlinkco.live";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

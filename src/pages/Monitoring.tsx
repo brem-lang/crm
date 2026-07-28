@@ -383,6 +383,8 @@ export default function Monitoring() {
     refetchInterval: refetchMs,
   });
 
+  const vpsHostname = vpsHealth?.url ? new URL(vpsHealth.url).hostname : null;
+
   // Traffic Simulation Stats
   const { data: trafficSimStats, isLoading: loadingTrafficSim } = useQuery({
     queryKey: ['traffic-sim-stats', lastRefresh],
@@ -908,7 +910,7 @@ export default function Monitoring() {
               </Button>
             </div>
             <CardDescription>
-              Real-time monitoring of marketlinkco.live (174.138.179.173)
+              Real-time monitoring of {vpsHostname || 'the backend server'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -922,13 +924,13 @@ export default function Monitoring() {
                   <>
                     <CheckCircle2 className="h-12 w-12 text-green-500" />
                     <p className="text-lg font-semibold text-green-500">VPS Online</p>
-                    <p className="text-sm text-muted-foreground">backend.marketlinkco.live is reachable</p>
+                    <p className="text-sm text-muted-foreground">{vpsHostname || 'Backend server'} is reachable</p>
                   </>
                 ) : (
                   <>
                     <ServerCrash className="h-12 w-12 text-red-500" />
                     <p className="text-lg font-semibold text-red-500">VPS Unreachable</p>
-                    <p className="text-sm text-muted-foreground">Could not connect to backend.marketlinkco.live</p>
+                    <p className="text-sm text-muted-foreground">Could not connect to {vpsHostname || 'backend server'}</p>
                   </>
                 )}
               </div>
