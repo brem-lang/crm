@@ -7,17 +7,25 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SidebarStateProvider } from "@/hooks/useSidebarState";
-import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { useCRMSettings, SETTINGS_STORAGE_KEY } from "@/hooks/useCRMSettings";
 
 const TitleManager = () => {
-  const { crmName } = useCRMSettings();
+  const { crmName, isReady } = useCRMSettings();
   useEffect(() => {
     document.title = crmName;
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', crmName);
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', `${crmName} - Lead Management System`);
     document.querySelector('meta[name="description"]')?.setAttribute('content', `${crmName} - Lead Management System`);
     document.querySelector('meta[name="author"]')?.setAttribute('content', crmName);
-  }, [crmName]);
+
+    if (isReady) {
+      try {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ crmName }));
+      } catch (e) {
+        // localStorage may be unavailable (e.g. private browsing) — safe to ignore
+      }
+    }
+  }, [crmName, isReady]);
   return null;
 };
 import { lazy, Suspense } from "react";

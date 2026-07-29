@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: CRMSettings = {
 
 export function useCRMSettings() {
   const { data: dbSettings } = useSystemSettings();
+  const isReady = dbSettings !== undefined;
 
   // Merge DB values over defaults — DB is authoritative when available
   const settings: CRMSettings = {
@@ -183,6 +184,7 @@ export function useCRMSettings() {
     dateFormat: settings.dateFormat,
     timezone: settings.timezone,
     crmName: settings.crmName,
+    isReady,
     // Timezone-aware date helpers
     getNow,
     getStartOfDay,
