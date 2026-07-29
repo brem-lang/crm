@@ -43,6 +43,7 @@ import {
   Plug,
   Layers,
   Radio,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -106,6 +107,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Conversions", href: "/conversions", icon: DollarSign, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
       { title: "Country Performance", href: "/country-performance", icon: Globe, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
+      { title: "Demo Report Generator", href: "/reports/demo-generator", icon: Camera, roles: ["super_admin"] },
 
     ]
   },

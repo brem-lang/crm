@@ -40,6 +40,7 @@ const TestLeadLogs = lazy(() => import("./pages/TestLeadLogs"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Conversions = lazy(() => import("./pages/Conversions"));
 const CountryPerformance = lazy(() => import("./pages/CountryPerformance"));
+const DemoReportGenerator = lazy(() => import("./pages/DemoReportGenerator"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const Settings = lazy(() => import("./pages/Settings"));
 const SettingsSection = lazy(() => import("./pages/SettingsSection"));
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/conversions" element={<Conversions />} />
                 <Route path="/country-performance" element={<CountryPerformance />} />
+                <Route path="/reports/demo-generator" element={<DemoReportGenerator />} />
                 <Route path="/monitoring" element={<Monitoring />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/lead-pools" element={<LeadPools />} />
