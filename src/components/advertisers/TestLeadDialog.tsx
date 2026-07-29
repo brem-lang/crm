@@ -486,37 +486,41 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
               </div>
             )}
 
-            {/* Offer Name — shared between both modes */}
-            <div className="space-y-2">
-              <Label>Offer Name (optional)</Label>
-              <Input
-                value={offerName}
-                onChange={(e) => setOfferName(e.target.value)}
-                placeholder="e.g., Summer Promo 2025"
-              />
-            </div>
-
-            {/* Custom Fields — shared between both modes */}
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Custom Parameters (optional)</Label>
-              <div className="grid grid-cols-3 gap-2">
+            {/* Offer Name — shared between both modes, except Wex (BackBone CRM) which has no concept of it */}
+            {advertiserType !== "wex" && (
+              <div className="space-y-2">
+                <Label>Offer Name (optional)</Label>
                 <Input
-                  value={custom1}
-                  onChange={(e) => setCustom1(e.target.value)}
-                  placeholder={customFieldLabels[0]}
-                />
-                <Input
-                  value={custom2}
-                  onChange={(e) => setCustom2(e.target.value)}
-                  placeholder={customFieldLabels[1]}
-                />
-                <Input
-                  value={custom3}
-                  onChange={(e) => setCustom3(e.target.value)}
-                  placeholder={customFieldLabels[2]}
+                  value={offerName}
+                  onChange={(e) => setOfferName(e.target.value)}
+                  placeholder="e.g., Summer Promo 2025"
                 />
               </div>
-            </div>
+            )}
+
+            {/* Custom Fields — shared between both modes, except Wex (BackBone CRM) which uses its own Aff Sub field below */}
+            {advertiserType !== "wex" && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Custom Parameters (optional)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    value={custom1}
+                    onChange={(e) => setCustom1(e.target.value)}
+                    placeholder={customFieldLabels[0]}
+                  />
+                  <Input
+                    value={custom2}
+                    onChange={(e) => setCustom2(e.target.value)}
+                    placeholder={customFieldLabels[1]}
+                  />
+                  <Input
+                    value={custom3}
+                    onChange={(e) => setCustom3(e.target.value)}
+                    placeholder={customFieldLabels[2]}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Notion (Jetpack API) requires these per lead — no sensible generic default */}
             {advertiserType === "notion" && (
