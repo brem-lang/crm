@@ -62,6 +62,12 @@ get-docker.sh
 Dockerfile
 nginx.conf
 supabase/docker/
+.dockerignore
+docker-compose.app.yml
+nginx.app.conf
+
+# Chunk error boundary (local-only component)
+src/components/ChunkErrorBoundary.tsx
 
 # Claude Code local settings
 .claude/settings.local.json
