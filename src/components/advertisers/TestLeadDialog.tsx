@@ -66,6 +66,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
   const [custom3, setCustom3] = useState("");
   const [password, setPassword] = useState("");
   const [currency, setCurrency] = useState("");
+  const [affSub, setAffSub] = useState("");
 
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
@@ -84,6 +85,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
     setGeneratedData(blankTestData());
     setPassword("");
     setCurrency("");
+    setAffSub("");
   };
 
   const handleClose = (open: boolean) => {
@@ -130,6 +132,7 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
       locale: navigator.language || undefined,
       password: password || undefined,
       currency: currency || undefined,
+      aff_sub: affSub || undefined,
     };
 
     try {
@@ -531,6 +534,18 @@ export function TestLeadDialog({ open, onOpenChange, advertiserId, advertiserNam
                     placeholder="Currency (e.g. EUR)"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Wex (BackBone CRM) stores any extra field it receives, e.g. aff_sub for click tracking */}
+            {advertiserType === "wex" && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">BackBone CRM Fields</Label>
+                <Input
+                  value={affSub}
+                  onChange={(e) => setAffSub(e.target.value)}
+                  placeholder="Aff Sub"
+                />
               </div>
             )}
           </div>

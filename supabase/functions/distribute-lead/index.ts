@@ -34,6 +34,8 @@ interface Lead {
   // Notion (Jetpack API) Clients endpoint requires these per-lead
   password?: string;
   currency?: string;
+  // Wex (BackBone CRM) — click-tracking sub id, test-mode only
+  aff_sub?: string;
 }
 
 interface Advertiser {
@@ -1461,7 +1463,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     const endpoint = `${baseUrl}/api/capture`;
     const ref = String(advertiser.config?.ref || 'MRC');
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       ref,
       firstName: lead.firstname,
       lastName: lead.lastname,
@@ -1469,6 +1471,10 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       phone: lead.mobile,
       country: lead.country_code,
     };
+    // BackBone stores any extra field it receives automatically (e.g. aff_sub for click tracking)
+    if (lead.aff_sub) {
+      payload.aff_sub = lead.aff_sub;
+    }
 
     const headers: Record<string, string> = {
       'X-API-Key': advertiser.api_key || '',
