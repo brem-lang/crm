@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
       locale: body.locale ?? undefined,
       password: body.password ?? undefined,
       currency: body.currency ?? undefined,
+      aff_sub: body.aff_sub ?? undefined,
     };
 
     // Delegate to distribute-lead's existing test_mode flow (same one the
