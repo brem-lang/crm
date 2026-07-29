@@ -2466,6 +2466,7 @@ Deno.serve(async (req) => {
           affiliate_id: test_lead_data.affiliate_id,
           password: test_lead_data.password,
           currency: test_lead_data.currency,
+          aff_sub: test_lead_data.aff_sub,
         };
 
         console.log(`[TEST MODE] Sending test lead to ${typedAdvertiser.name}`);
