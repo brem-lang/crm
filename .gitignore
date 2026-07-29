@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 assets/
+/index.html
 
 # Environment variables
 .env
