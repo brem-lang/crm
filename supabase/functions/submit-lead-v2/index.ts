@@ -41,6 +41,8 @@ interface LeadData {
   // Notion (Jetpack API) Clients endpoint requires these per-lead
   password?: string;
   currency?: string;
+  // Wex (BackBone CRM) — click-tracking sub id
+  aff_sub?: string;
 }
 
 interface ApiResponse {
@@ -466,6 +468,7 @@ Deno.serve(async (req) => {
         submission_ua: submissionUa?.substring(0, 500) || null,
         password: leadData.password?.substring(0, 255) || null,
         currency: leadData.currency?.substring(0, 10) || null,
+        aff_sub: leadData.aff_sub?.substring(0, 255) || null,
       })
       .select('id')
       .single();

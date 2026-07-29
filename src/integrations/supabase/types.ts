@@ -1862,6 +1862,7 @@ export type Database = {
       leads: {
         Row: {
           advertiser_id: string | null
+          aff_sub: string | null
           affiliate_id: string | null
           assigned_to: string | null
           autologin: string | null
@@ -1916,6 +1917,7 @@ export type Database = {
         }
         Insert: {
           advertiser_id?: string | null
+          aff_sub?: string | null
           affiliate_id?: string | null
           assigned_to?: string | null
           autologin?: string | null
@@ -1970,6 +1972,7 @@ export type Database = {
         }
         Update: {
           advertiser_id?: string | null
+          aff_sub?: string | null
           affiliate_id?: string | null
           assigned_to?: string | null
           autologin?: string | null

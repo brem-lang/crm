@@ -34,7 +34,7 @@ interface Lead {
   // Notion (Jetpack API) Clients endpoint requires these per-lead
   password?: string;
   currency?: string;
-  // Wex (BackBone CRM) — click-tracking sub id, test-mode only
+  // Wex (BackBone CRM) — click-tracking sub id
   aff_sub?: string;
 }
 
