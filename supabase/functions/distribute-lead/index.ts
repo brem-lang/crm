@@ -1471,9 +1471,12 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       phone: lead.mobile,
       country: lead.country_code,
     };
-    // BackBone stores any extra field it receives automatically (e.g. aff_sub for click tracking)
-    if (lead.aff_sub) {
-      payload.aff_sub = lead.aff_sub;
+    // BackBone stores any extra field it receives automatically (e.g. aff_sub for click
+    // tracking). comment takes priority over aff_sub when both are set — comment isn't
+    // otherwise sent to Wex at all, so this repurposes it as this integration's aff_sub source.
+    const affSub = lead.comment || lead.aff_sub;
+    if (affSub) {
+      payload.aff_sub = affSub;
     }
 
     const headers: Record<string, string> = {
@@ -2333,6 +2336,7 @@ Deno.serve(async (req) => {
             affiliate_id: test_lead_data.affiliate_id || null,
             locale: test_lead_data.locale || null,
             click_id: test_lead_data.click_id || null,
+            comment: test_lead_data.aff_sub || null,
             status: 'rejected',
           })
           .select('id')
@@ -2496,12 +2500,13 @@ Deno.serve(async (req) => {
                 affiliate_id: test_lead_data.affiliate_id || null,
                 locale: test_lead_data.locale || null,
                 click_id: test_lead_data.click_id || null,
+                comment: test_lead_data.aff_sub || null,
                 status: 'contacted',
                 distributed_at: new Date().toISOString(),
               })
               .select('id')
               .single();
-            
+
             if (!leadError && newLead) {
               createdLeadId = newLead.id;
               
