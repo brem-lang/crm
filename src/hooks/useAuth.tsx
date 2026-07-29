@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -80,6 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchUserData(session.user.id), 0);
 
+          // RLS-gated queries (e.g. crm_settings) may have already failed
+          // while unauthenticated — refetch now that a session exists.
+          queryClient.invalidateQueries({ queryKey: ["system-settings"] });
+
           // Log successful login (server-side, so the real client IP +
           // geolocation can be captured — the browser can't see its own IP).
           if (event === 'SIGNED_IN') {
@@ -106,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserData(session.user.id);
+        queryClient.invalidateQueries({ queryKey: ["system-settings"] });
       }
       setLoading(false);
     });
