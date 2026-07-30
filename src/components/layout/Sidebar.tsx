@@ -107,7 +107,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Conversions", href: "/conversions", icon: DollarSign, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
       { title: "Country Performance", href: "/country-performance", icon: Globe, roles: ["super_admin", "manager"], customRoles: ["Admin"] },
-      { title: "Demo Report Generator", href: "/reports/demo-generator", icon: Camera, roles: ["super_admin"] },
+      { title: "Country Performance", href: "/reports/demo-generator", icon: Camera, roles: ["super_admin"] },
 
     ]
   },

@@ -1,29 +1,64 @@
+import { countryData } from "@/components/advertisers/countryData";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useAdvertisers } from "@/hooks/useAdvertisers";
+import { useAuth } from "@/hooks/useAuth";
+import { useCRMSettings } from "@/hooks/useCRMSettings";
+import { cn } from "@/lib/utils";
+import { differenceInDays, format } from "date-fns";
+import html2canvas from "html2canvas";
+import {
+  Camera,
+  CalendarIcon,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import html2canvas from "html2canvas";
 import { toast } from "sonner";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { format } from "date-fns";
-import { Camera, Check, ChevronDown, Trash2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useAdvertisers } from "@/hooks/useAdvertisers";
-import { countryData } from "@/components/advertisers/countryData";
-import { cn } from "@/lib/utils";
 
-type DatePreset = "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
+type DatePreset =
+  | "today"
+  | "yesterday"
+  | "thisWeek"
+  | "lastWeek"
+  | "thisMonth"
+  | "lastMonth"
+  | "custom";
 
 const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "yesterday", label: "Yesterday" },
-  { key: "last7", label: "Last 7 Days" },
+  { key: "thisWeek", label: "This Week" },
+  { key: "lastWeek", label: "Last Week" },
   { key: "thisMonth", label: "This Month" },
   { key: "lastMonth", label: "Last Month" },
   { key: "custom", label: "Custom" },
@@ -37,7 +72,9 @@ interface DemoRow {
   crPercent: number;
 }
 
-const countries = Object.values(countryData).sort((a, b) => a.name.localeCompare(b.name));
+const countries = Object.values(countryData).sort((a, b) =>
+  a.name.localeCompare(b.name),
+);
 
 // Slight random variation so a newly added row's starter numbers don't
 // look artificially round — only applied when the row is created, never
@@ -66,7 +103,10 @@ function computeDeposits(leads: number, crPercent: number): number {
 // the browser's own resolved color as a literal inline style right before
 // the snapshot sidesteps that entirely; restore() reverts it right after.
 function inlineResolvedColors(root: HTMLElement): () => void {
-  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
+  const elements = [
+    root,
+    ...Array.from(root.querySelectorAll<HTMLElement>("*")),
+  ];
   const previous = elements.map((el) => ({
     el,
     color: el.style.color,
@@ -107,9 +147,15 @@ function AdvertiserPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" disabled={disabled} className="w-56 justify-between font-normal">
+        <Button
+          variant="outline"
+          disabled={disabled}
+          className="w-56 justify-between font-normal"
+        >
           <span className="truncate">
-            {selected.length > 0 ? `${selected.length} advertiser${selected.length === 1 ? "" : "s"} selected` : "Select advertisers"}
+            {selected.length > 0
+              ? `${selected.length} advertiser${selected.length === 1 ? "" : "s"} selected`
+              : "Select advertisers"}
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -132,10 +178,15 @@ function AdvertiserPicker({
                     <div
                       className={cn(
                         "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary mr-2",
-                        checked ? "bg-primary" : "bg-transparent"
+                        checked ? "bg-primary" : "bg-transparent",
                       )}
                     >
-                      <Check className={cn("h-3 w-3 text-primary-foreground", checked ? "opacity-100" : "opacity-0")} />
+                      <Check
+                        className={cn(
+                          "h-3 w-3 text-primary-foreground",
+                          checked ? "opacity-100" : "opacity-0",
+                        )}
+                      />
                     </div>
                     <span className="truncate">{advertiser.name}</span>
                   </CommandItem>
@@ -155,11 +206,77 @@ export default function DemoReportGenerator() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
 
+  const {
+    formatDate,
+    getNow,
+    getStartOfDay,
+    getEndOfDay,
+    getStartOfWeek,
+    getEndOfWeek,
+    getStartOfMonth,
+    getEndOfMonth,
+    tzSubDays,
+    tzSubWeeks,
+    tzSubMonths,
+  } = useCRMSettings();
+
   const [rows, setRows] = useState<DemoRow[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("last7");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState<Date>(() => getStartOfDay(getNow()));
+  const [toDate, setToDate] = useState<Date>(() => getEndOfDay(getNow()));
+
+  const handlePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset);
+    const now = getNow();
+
+    switch (preset) {
+      case "today":
+        setFromDate(getStartOfDay(now));
+        setToDate(getEndOfDay(now));
+        break;
+      case "yesterday": {
+        const yesterday = tzSubDays(now, 1);
+        setFromDate(getStartOfDay(yesterday));
+        setToDate(getEndOfDay(yesterday));
+        break;
+      }
+      case "thisWeek":
+        setFromDate(getStartOfWeek(now));
+        setToDate(getEndOfWeek(now));
+        break;
+      case "lastWeek": {
+        const lastWeek = tzSubWeeks(now, 1);
+        setFromDate(getStartOfWeek(lastWeek));
+        setToDate(getEndOfWeek(lastWeek));
+        break;
+      }
+      case "thisMonth":
+        setFromDate(getStartOfMonth(now));
+        setToDate(getEndOfMonth(now));
+        break;
+      case "lastMonth": {
+        const lastMonth = tzSubMonths(now, 1);
+        setFromDate(getStartOfMonth(lastMonth));
+        setToDate(getEndOfMonth(lastMonth));
+        break;
+      }
+    }
+  };
+
+  const shiftDates = (direction: "prev" | "next") => {
+    const days = differenceInDays(toDate, fromDate) + 1;
+    if (direction === "prev") {
+      setFromDate(tzSubDays(fromDate, days));
+      setToDate(tzSubDays(toDate, days));
+    } else {
+      setFromDate(tzSubDays(fromDate, -days));
+      setToDate(tzSubDays(toDate, -days));
+    }
+    setDatePreset("custom");
+  };
+
+  const daysDiff = differenceInDays(toDate, fromDate) + 1;
 
   if (!isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
@@ -167,7 +284,7 @@ export default function DemoReportGenerator() {
 
   const activeAdvertisers = useMemo(
     () => (advertisersData ?? []).filter((a) => a.is_active),
-    [advertisersData]
+    [advertisersData],
   );
 
   // Only rows for the currently selected country are shown/edited at a time —
@@ -175,19 +292,23 @@ export default function DemoReportGenerator() {
   // when you switch back.
   const visibleRows = useMemo(
     () => rows.filter((r) => r.countryCode === selectedCountry),
-    [rows, selectedCountry]
+    [rows, selectedCountry],
   );
 
   const selectedAdvertiserIds = useMemo(
     () => visibleRows.map((r) => r.advertiserId),
-    [visibleRows]
+    [visibleRows],
   );
 
   const totals = useMemo(() => {
     const totalLeads = visibleRows.reduce((sum, r) => sum + r.leads, 0);
-    const totalDeposits = visibleRows.reduce((sum, r) => sum + computeDeposits(r.leads, r.crPercent), 0);
+    const totalDeposits = visibleRows.reduce(
+      (sum, r) => sum + computeDeposits(r.leads, r.crPercent),
+      0,
+    );
     const avgCr = visibleRows.length
-      ? visibleRows.reduce((sum, r) => sum + r.crPercent, 0) / visibleRows.length
+      ? visibleRows.reduce((sum, r) => sum + r.crPercent, 0) /
+        visibleRows.length
       : 0;
     return { totalLeads, totalDeposits, avgCr };
   }, [visibleRows]);
@@ -196,18 +317,26 @@ export default function DemoReportGenerator() {
     if (!selectedCountry) return;
     setRows((prev) => {
       const exists = prev.some(
-        (r) => r.countryCode === selectedCountry && r.advertiserId === advertiserId
+        (r) =>
+          r.countryCode === selectedCountry && r.advertiserId === advertiserId,
       );
       if (exists) {
         return prev.filter(
-          (r) => !(r.countryCode === selectedCountry && r.advertiserId === advertiserId)
+          (r) =>
+            !(
+              r.countryCode === selectedCountry &&
+              r.advertiserId === advertiserId
+            ),
         );
       }
       return [...prev, makeRow(advertiserId, selectedCountry)];
     });
   };
 
-  const updateRow = (id: string, patch: Partial<Pick<DemoRow, "leads" | "crPercent">>) => {
+  const updateRow = (
+    id: string,
+    patch: Partial<Pick<DemoRow, "leads" | "crPercent">>,
+  ) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
@@ -222,11 +351,14 @@ export default function DemoReportGenerator() {
     // Leads/CR% inputs for plain text) before html2canvas snapshots the DOM —
     // native <input> elements render unreliably (often blank) in html2canvas,
     // so the table must show static text at the moment of capture.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
     const restoreColors = inlineResolvedColors(reportRef.current);
     try {
       const canvas = await html2canvas(reportRef.current, {
-        backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
+        backgroundColor:
+          getComputedStyle(document.body).backgroundColor || "#ffffff",
         scale: 2,
         useCORS: true,
       });
@@ -249,10 +381,7 @@ export default function DemoReportGenerator() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Demo Report Generator</h1>
-          <p className="text-muted-foreground">
-            Build a mock performance table and export it as a screenshot. Nothing here is saved or reflects real data.
-          </p>
+          <h1 className="text-3xl font-bold">Country Performance Report</h1>
         </div>
 
         <Card>
@@ -260,7 +389,10 @@ export default function DemoReportGenerator() {
             <SearchableSelect
               value={selectedCountry || "all"}
               onValueChange={(v) => setSelectedCountry(v === "all" ? "" : v)}
-              options={countries.map((c) => ({ value: c.code, label: `${c.name} (${c.code})` }))}
+              options={countries.map((c) => ({
+                value: c.code,
+                label: `${c.name} (${c.code})`,
+              }))}
               placeholder="Select a country"
               searchPlaceholder="Search countries..."
               className="w-48"
@@ -286,35 +418,83 @@ export default function DemoReportGenerator() {
         </Card>
 
         {/* Captured into the screenshot — filters + table only, nothing else */}
-        <div ref={reportRef} className="space-y-4 bg-background p-6 rounded-lg border">
-          <div className="flex flex-wrap items-center gap-2">
-            {DATE_PRESETS.map((preset) => (
-              <Badge
-                key={preset.key}
-                variant={datePreset === preset.key ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => setDatePreset(preset.key)}
-              >
-                {preset.label}
-              </Badge>
-            ))}
-            {datePreset === "custom" && (
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="From (e.g. Jul 1)"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="w-36 h-8"
-                />
-                <span className="text-muted-foreground text-sm">to</span>
-                <Input
-                  placeholder="To (e.g. Jul 29)"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="w-36 h-8"
-                />
+        <div
+          ref={reportRef}
+          className="space-y-4 bg-background p-6 rounded-lg border"
+        >
+          <div className="flex items-center justify-between gap-2 pb-2 border-b overflow-x-auto">
+            <div className="flex gap-1 shrink-0">
+              {DATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  onClick={() => handlePresetChange(preset.key)}
+                  className={cn(
+                    "px-3 py-1.5 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap",
+                    datePreset === preset.key
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                    <CalendarIcon className="h-3 w-3" />
+                    From: {formatDate(fromDate, "yyyy-MM-dd HH:mm:ss")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={fromDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setFromDate(getStartOfDay(date));
+                        setDatePreset("custom");
+                      }
+                    }}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                    <CalendarIcon className="h-3 w-3" />
+                    To: {formatDate(toDate, "yyyy-MM-dd HH:mm:ss")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={toDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setToDate(getEndOfDay(date));
+                        setDatePreset("custom");
+                      }
+                    }}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <div className="flex items-center gap-0.5">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("prev")}>
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs text-muted-foreground min-w-[28px] text-center">{daysDiff}d</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftDates("next")}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            )}
+            </div>
           </div>
 
           <div className="rounded-md border overflow-x-auto">
@@ -332,7 +512,10 @@ export default function DemoReportGenerator() {
               <TableBody>
                 {visibleRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       {selectedCountry
                         ? "Select advertisers above to add rows."
                         : "Select a country to get started."}
@@ -347,23 +530,35 @@ export default function DemoReportGenerator() {
                         <TableCell>
                           <span className="inline-block h-4 w-24 rounded-sm bg-foreground" />
                         </TableCell>
-                        <TableCell>{country ? `${country.name} (${country.code})` : row.countryCode}</TableCell>
+                        <TableCell>
+                          {country
+                            ? `${country.name} (${country.code})`
+                            : row.countryCode}
+                        </TableCell>
                         <TableCell className="text-right">
                           {capturing ? (
-                            <span className="font-medium">{row.leads.toLocaleString()}</span>
+                            <span className="font-medium">
+                              {row.leads.toLocaleString()}
+                            </span>
                           ) : (
                             <Input
                               type="number"
                               min={0}
                               value={row.leads}
-                              onChange={(e) => updateRow(row.id, { leads: Number(e.target.value) || 0 })}
+                              onChange={(e) =>
+                                updateRow(row.id, {
+                                  leads: Number(e.target.value) || 0,
+                                })
+                              }
                               className="w-28 ml-auto text-right"
                             />
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           {capturing ? (
-                            <span className="font-medium">{row.crPercent.toFixed(1)}%</span>
+                            <span className="font-medium">
+                              {row.crPercent.toFixed(1)}%
+                            </span>
                           ) : (
                             <Input
                               type="number"
@@ -371,14 +566,25 @@ export default function DemoReportGenerator() {
                               max={100}
                               step="0.1"
                               value={row.crPercent}
-                              onChange={(e) => updateRow(row.id, { crPercent: Number(e.target.value) || 0 })}
+                              onChange={(e) =>
+                                updateRow(row.id, {
+                                  crPercent: Number(e.target.value) || 0,
+                                })
+                              }
                               className="w-24 ml-auto text-right"
                             />
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-medium">{deposits.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {deposits.toLocaleString()}
+                        </TableCell>
                         <TableCell>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(row.id)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeRow(row.id)}
+                          >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
@@ -391,9 +597,15 @@ export default function DemoReportGenerator() {
                 <TableBody>
                   <TableRow className="font-semibold bg-muted/50">
                     <TableCell colSpan={2}>Total</TableCell>
-                    <TableCell className="text-right">{totals.totalLeads.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{totals.avgCr.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right">{totals.totalDeposits.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      {totals.totalLeads.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {totals.avgCr.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {totals.totalDeposits.toLocaleString()}
+                    </TableCell>
                     <TableCell />
                   </TableRow>
                 </TableBody>
