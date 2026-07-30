@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { Camera, ChevronDown, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdvertisers } from "@/hooks/useAdvertisers";
 import { countryData } from "@/components/advertisers/countryData";
 import { cn } from "@/lib/utils";
 
@@ -26,13 +27,9 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "lastMonth", label: "Last Month" },
 ];
 
-// Fixed pool of placeholder advertiser identities — never rendered as
-// text anywhere, only as a redacted bar, regardless of which one it is.
-const ADVERTISER_POOL = Array.from({ length: 20 }, (_, i) => `ADV-${i + 1}`);
-
 interface DemoRow {
   id: string;
-  advertiserLabel: string;
+  advertiserId: string;
   countryCode: string;
   leads: number;
   crPercent: number;
@@ -47,10 +44,10 @@ function randomInRange(min: number, max: number): number {
   return Math.round(min + Math.random() * (max - min));
 }
 
-function makeRow(advertiserLabel: string, countryCode: string): DemoRow {
+function makeRow(advertiserId: string, countryCode: string): DemoRow {
   return {
     id: crypto.randomUUID(),
-    advertiserLabel,
+    advertiserId,
     countryCode,
     leads: randomInRange(200, 3000),
     crPercent: randomInRange(5, 35) + Math.random(),
@@ -61,15 +58,18 @@ function computeDeposits(leads: number, crPercent: number): number {
   return Math.round((leads * crPercent) / 100);
 }
 
-// Redacted checklist for picking advertisers under the current country —
-// every option renders only a black bar, never the advertiser's id as text.
-function RedactedAdvertiserPicker({
+// Picker for choosing which real advertisers to build fake numbers for —
+// this control sits outside the captured screenshot area, so showing the
+// actual advertiser name here is safe; the table itself never does.
+function AdvertiserPicker({
+  advertisers,
   selected,
   onToggle,
   disabled,
 }: {
+  advertisers: { id: string; name: string }[];
   selected: string[];
-  onToggle: (advertiserLabel: string) => void;
+  onToggle: (advertiserId: string) => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -78,31 +78,37 @@ function RedactedAdvertiserPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" disabled={disabled} className="w-56 justify-between font-normal">
-          <span>{selected.length > 0 ? `${selected.length} selected` : "Select advertisers"}</span>
+          <span className="truncate">
+            {selected.length > 0 ? `${selected.length} advertiser${selected.length === 1 ? "" : "s"} selected` : "Select advertisers"}
+          </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-1 bg-popover" align="start">
+      <PopoverContent className="w-64 p-1 bg-popover" align="start">
         <div className="max-h-72 overflow-y-auto space-y-0.5">
-          {ADVERTISER_POOL.map((label) => {
-            const checked = selected.includes(label);
-            return (
-              <button
-                key={label}
-                type="button"
-                onClick={() => onToggle(label)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent text-left"
-              >
-                <div
-                  className={cn(
-                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
-                    checked ? "bg-primary" : "bg-transparent"
-                  )}
-                />
-                <span className="inline-block h-3.5 w-24 rounded-sm bg-foreground" />
-              </button>
-            );
-          })}
+          {advertisers.length === 0 ? (
+            <p className="text-sm text-muted-foreground px-2 py-1.5">No active advertisers found.</p>
+          ) : (
+            advertisers.map((advertiser) => {
+              const checked = selected.includes(advertiser.id);
+              return (
+                <button
+                  key={advertiser.id}
+                  type="button"
+                  onClick={() => onToggle(advertiser.id)}
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent text-left"
+                >
+                  <div
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
+                      checked ? "bg-primary" : "bg-transparent"
+                    )}
+                  />
+                  <span className="truncate text-sm">{advertiser.name}</span>
+                </button>
+              );
+            })
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -111,6 +117,7 @@ function RedactedAdvertiserPicker({
 
 export default function DemoReportGenerator() {
   const { isSuperAdmin } = useAuth();
+  const { data: advertisersData } = useAdvertisers();
   const reportRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
 
@@ -122,6 +129,11 @@ export default function DemoReportGenerator() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const activeAdvertisers = useMemo(
+    () => (advertisersData ?? []).filter((a) => a.is_active),
+    [advertisersData]
+  );
+
   // Only rows for the currently selected country are shown/edited at a time —
   // rows built for other countries persist in the background and reappear
   // when you switch back.
@@ -130,8 +142,8 @@ export default function DemoReportGenerator() {
     [rows, selectedCountry]
   );
 
-  const selectedAdvertisers = useMemo(
-    () => visibleRows.map((r) => r.advertiserLabel),
+  const selectedAdvertiserIds = useMemo(
+    () => visibleRows.map((r) => r.advertiserId),
     [visibleRows]
   );
 
@@ -144,18 +156,18 @@ export default function DemoReportGenerator() {
     return { totalLeads, totalDeposits, avgCr };
   }, [visibleRows]);
 
-  const toggleAdvertiser = (advertiserLabel: string) => {
+  const toggleAdvertiser = (advertiserId: string) => {
     if (!selectedCountry) return;
     setRows((prev) => {
       const exists = prev.some(
-        (r) => r.countryCode === selectedCountry && r.advertiserLabel === advertiserLabel
+        (r) => r.countryCode === selectedCountry && r.advertiserId === advertiserId
       );
       if (exists) {
         return prev.filter(
-          (r) => !(r.countryCode === selectedCountry && r.advertiserLabel === advertiserLabel)
+          (r) => !(r.countryCode === selectedCountry && r.advertiserId === advertiserId)
         );
       }
-      return [...prev, makeRow(advertiserLabel, selectedCountry)];
+      return [...prev, makeRow(advertiserId, selectedCountry)];
     });
   };
 
@@ -202,6 +214,26 @@ export default function DemoReportGenerator() {
 
         <Card>
           <CardContent className="pt-6 flex flex-wrap items-center gap-3">
+            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select a country" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {countries.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.name} ({c.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <AdvertiserPicker
+              advertisers={activeAdvertisers}
+              selected={selectedAdvertiserIds}
+              onToggle={toggleAdvertiser}
+              disabled={!selectedCountry}
+            />
+
             <Button
               variant="outline"
               onClick={handleGenerateScreenshot}
@@ -216,38 +248,17 @@ export default function DemoReportGenerator() {
 
         {/* Captured into the screenshot — filters + table only, nothing else */}
         <div ref={reportRef} className="space-y-4 bg-background p-6 rounded-lg border">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex flex-wrap gap-2">
-              {DATE_PRESETS.map((preset) => (
-                <Badge
-                  key={preset.key}
-                  variant={datePreset === preset.key ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setDatePreset(preset.key)}
-                >
-                  {preset.label}
-                </Badge>
-              ))}
-            </div>
-
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select a country" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {countries.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.name} ({c.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <RedactedAdvertiserPicker
-              selected={selectedAdvertisers}
-              onToggle={toggleAdvertiser}
-              disabled={!selectedCountry}
-            />
+          <div className="flex flex-wrap gap-2">
+            {DATE_PRESETS.map((preset) => (
+              <Badge
+                key={preset.key}
+                variant={datePreset === preset.key ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setDatePreset(preset.key)}
+              >
+                {preset.label}
+              </Badge>
+            ))}
           </div>
 
           <div className="rounded-md border overflow-x-auto">
