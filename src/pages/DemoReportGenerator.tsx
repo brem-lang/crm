@@ -60,6 +60,34 @@ function computeDeposits(leads: number, crPercent: number): number {
   return Math.round((leads * crPercent) / 100);
 }
 
+// html2canvas can fail to resolve CSS-variable-driven colors (e.g. the
+// Badge component's hsl(var(--primary)) classes), which can render text
+// and its background as the same color — an invisible label. Baking in
+// the browser's own resolved color as a literal inline style right before
+// the snapshot sidesteps that entirely; restore() reverts it right after.
+function inlineResolvedColors(root: HTMLElement): () => void {
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
+  const previous = elements.map((el) => ({
+    el,
+    color: el.style.color,
+    backgroundColor: el.style.backgroundColor,
+    borderColor: el.style.borderColor,
+  }));
+  for (const el of elements) {
+    const computed = getComputedStyle(el);
+    el.style.color = computed.color;
+    el.style.backgroundColor = computed.backgroundColor;
+    el.style.borderColor = computed.borderColor;
+  }
+  return () => {
+    for (const { el, color, backgroundColor, borderColor } of previous) {
+      el.style.color = color;
+      el.style.backgroundColor = backgroundColor;
+      el.style.borderColor = borderColor;
+    }
+  };
+}
+
 // Picker for choosing which real advertisers to build fake numbers for —
 // this control sits outside the captured screenshot area, so showing the
 // actual advertiser name here is safe; the table itself never does.
@@ -195,6 +223,7 @@ export default function DemoReportGenerator() {
     // native <input> elements render unreliably (often blank) in html2canvas,
     // so the table must show static text at the moment of capture.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const restoreColors = inlineResolvedColors(reportRef.current);
     try {
       const canvas = await html2canvas(reportRef.current, {
         backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
@@ -211,6 +240,7 @@ export default function DemoReportGenerator() {
     } catch (err) {
       toast.error("Failed to generate screenshot");
     } finally {
+      restoreColors();
       setCapturing(false);
     }
   };
@@ -257,7 +287,7 @@ export default function DemoReportGenerator() {
 
         {/* Captured into the screenshot — filters + table only, nothing else */}
         <div ref={reportRef} className="space-y-4 bg-background p-6 rounded-lg border">
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {DATE_PRESETS.map((preset) => (
               <Badge
                 key={preset.key}
