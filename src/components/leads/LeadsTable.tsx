@@ -311,9 +311,30 @@ export function LeadsTable({
       }
       case "comment":
         return lead.comment ? (
-          <span className="max-w-32 truncate block" title={lead.comment}>
-            {lead.comment}
-          </span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 max-w-32 justify-start px-2 font-normal">
+                <span className="truncate">{lead.comment}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <p className="text-xs font-medium mb-2 text-muted-foreground">Comment</p>
+              <div className="flex items-start gap-2">
+                <p className="text-xs flex-1 whitespace-pre-wrap">{lead.comment}</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(lead.comment);
+                    toast.success("Comment copied");
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         ) : "-";
       case "created_at":
         return formatDate(lead.created_at);
