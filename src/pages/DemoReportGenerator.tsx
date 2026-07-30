@@ -7,17 +7,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { format } from "date-fns";
-import { Camera, ChevronDown, Trash2 } from "lucide-react";
+import { Camera, Check, ChevronDown, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdvertisers } from "@/hooks/useAdvertisers";
 import { countryData } from "@/components/advertisers/countryData";
 import { cn } from "@/lib/utils";
 
-type DatePreset = "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth";
+type DatePreset = "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 
 const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "today", label: "Today" },
@@ -25,6 +26,7 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "last7", label: "Last 7 Days" },
   { key: "thisMonth", label: "This Month" },
   { key: "lastMonth", label: "Last Month" },
+  { key: "custom", label: "Custom" },
 ];
 
 interface DemoRow {
@@ -84,32 +86,36 @@ function AdvertiserPicker({
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-1 bg-popover" align="start">
-        <div className="max-h-72 overflow-y-auto space-y-0.5">
-          {advertisers.length === 0 ? (
-            <p className="text-sm text-muted-foreground px-2 py-1.5">No active advertisers found.</p>
-          ) : (
-            advertisers.map((advertiser) => {
-              const checked = selected.includes(advertiser.id);
-              return (
-                <button
-                  key={advertiser.id}
-                  type="button"
-                  onClick={() => onToggle(advertiser.id)}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent text-left"
-                >
-                  <div
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
-                      checked ? "bg-primary" : "bg-transparent"
-                    )}
-                  />
-                  <span className="truncate text-sm">{advertiser.name}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
+      <PopoverContent className="w-64 p-0 bg-popover" align="start">
+        <Command>
+          <CommandInput placeholder="Search advertisers..." />
+          <CommandList className="max-h-72">
+            <CommandEmpty>No advertisers found.</CommandEmpty>
+            <CommandGroup>
+              {advertisers.map((advertiser) => {
+                const checked = selected.includes(advertiser.id);
+                return (
+                  <CommandItem
+                    key={advertiser.id}
+                    value={advertiser.id}
+                    keywords={[advertiser.name]}
+                    onSelect={() => onToggle(advertiser.id)}
+                  >
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary mr-2",
+                        checked ? "bg-primary" : "bg-transparent"
+                      )}
+                    >
+                      <Check className={cn("h-3 w-3 text-primary-foreground", checked ? "opacity-100" : "opacity-0")} />
+                    </div>
+                    <span className="truncate">{advertiser.name}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );
@@ -124,6 +130,8 @@ export default function DemoReportGenerator() {
   const [rows, setRows] = useState<DemoRow[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [datePreset, setDatePreset] = useState<DatePreset>("last7");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   if (!isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
@@ -214,18 +222,14 @@ export default function DemoReportGenerator() {
 
         <Card>
           <CardContent className="pt-6 flex flex-wrap items-center gap-3">
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select a country" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {countries.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.name} ({c.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedCountry || "all"}
+              onValueChange={(v) => setSelectedCountry(v === "all" ? "" : v)}
+              options={countries.map((c) => ({ value: c.code, label: `${c.name} (${c.code})` }))}
+              placeholder="Select a country"
+              searchPlaceholder="Search countries..."
+              className="w-48"
+            />
 
             <AdvertiserPicker
               advertisers={activeAdvertisers}
@@ -248,7 +252,7 @@ export default function DemoReportGenerator() {
 
         {/* Captured into the screenshot — filters + table only, nothing else */}
         <div ref={reportRef} className="space-y-4 bg-background p-6 rounded-lg border">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {DATE_PRESETS.map((preset) => (
               <Badge
                 key={preset.key}
@@ -259,6 +263,23 @@ export default function DemoReportGenerator() {
                 {preset.label}
               </Badge>
             ))}
+            {datePreset === "custom" && (
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="From (e.g. Jul 1)"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="w-36 h-8"
+                />
+                <span className="text-muted-foreground text-sm">to</span>
+                <Input
+                  placeholder="To (e.g. Jul 29)"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="w-36 h-8"
+                />
+              </div>
+            )}
           </div>
 
           <div className="rounded-md border overflow-x-auto">
