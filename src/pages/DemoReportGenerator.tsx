@@ -190,6 +190,11 @@ export default function DemoReportGenerator() {
   const handleGenerateScreenshot = async () => {
     if (!reportRef.current) return;
     setCapturing(true);
+    // Wait for React to actually repaint with capturing=true (swapping the
+    // Leads/CR% inputs for plain text) before html2canvas snapshots the DOM —
+    // native <input> elements render unreliably (often blank) in html2canvas,
+    // so the table must show static text at the moment of capture.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       const canvas = await html2canvas(reportRef.current, {
         backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
@@ -252,7 +257,7 @@ export default function DemoReportGenerator() {
 
         {/* Captured into the screenshot — filters + table only, nothing else */}
         <div ref={reportRef} className="space-y-4 bg-background p-6 rounded-lg border">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {DATE_PRESETS.map((preset) => (
               <Badge
                 key={preset.key}
@@ -314,24 +319,32 @@ export default function DemoReportGenerator() {
                         </TableCell>
                         <TableCell>{country ? `${country.name} (${country.code})` : row.countryCode}</TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={row.leads}
-                            onChange={(e) => updateRow(row.id, { leads: Number(e.target.value) || 0 })}
-                            className="w-28 ml-auto text-right"
-                          />
+                          {capturing ? (
+                            <span className="font-medium">{row.leads.toLocaleString()}</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min={0}
+                              value={row.leads}
+                              onChange={(e) => updateRow(row.id, { leads: Number(e.target.value) || 0 })}
+                              className="w-28 ml-auto text-right"
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step="0.1"
-                            value={row.crPercent}
-                            onChange={(e) => updateRow(row.id, { crPercent: Number(e.target.value) || 0 })}
-                            className="w-24 ml-auto text-right"
-                          />
+                          {capturing ? (
+                            <span className="font-medium">{row.crPercent.toFixed(1)}%</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step="0.1"
+                              value={row.crPercent}
+                              onChange={(e) => updateRow(row.id, { crPercent: Number(e.target.value) || 0 })}
+                              className="w-24 ml-auto text-right"
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-medium">{deposits.toLocaleString()}</TableCell>
                         <TableCell>
