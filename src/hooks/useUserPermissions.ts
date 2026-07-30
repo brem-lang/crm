@@ -205,7 +205,7 @@ export function useAllUsersPermissions() {
 }
 
 export function useCurrentUserPermissions() {
-  const { user, isSuperAdmin, roles: userRoles } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
 
   const { data: permissions, isLoading } = useQuery({
     queryKey: ["current-user-permissions", user?.id],
@@ -213,40 +213,13 @@ export function useCurrentUserPermissions() {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Load direct user permissions + custom role assignments in parallel — independent queries
-      const [
-        { data: directPerms, error: directError },
-        { data: customRoleRows, error: customRolesError },
-      ] = await Promise.all([
-        supabase.from("user_permissions").select("permission").eq("user_id", user.id),
-        supabase.from("user_custom_roles").select("role_id, roles(slug)").eq("user_id", user.id),
-      ]);
-      if (directError) throw directError;
-      if (customRolesError) throw customRolesError;
-
-      // Collect all role slugs (system roles + custom roles)
-      const customSlugs = (customRoleRows || [])
-        .map((r: any) => r.roles?.slug)
-        .filter(Boolean) as string[];
-      const allRoleSlugs = [...(userRoles || []), ...customSlugs];
-
-      // Load permissions for each role
-      let rolePerms: UserPermission[] = [];
-      if (allRoleSlugs.length > 0) {
-        const { data: rolePerm, error: rolePermError } = await supabase
-          .from("role_permission_mappings")
-          .select("permission_key")
-          .in("role_slug", allRoleSlugs);
-        if (rolePermError) throw rolePermError;
-        rolePerms = (rolePerm || []).map(r => r.permission_key) as UserPermission[];
-      }
-
-      // Merge: union of role permissions + direct user permissions
-      const merged = Array.from(new Set([
-        ...rolePerms,
-        ...(directPerms?.map(p => p.permission) || []) as UserPermission[],
-      ]));
-      return merged;
+      // Single round-trip: merges direct user_permissions with role-derived
+      // permissions (system + custom roles) server-side.
+      const { data, error } = await supabase.rpc("get_current_user_permissions", {
+        p_user_id: user.id,
+      });
+      if (error) throw error;
+      return (data || []) as UserPermission[];
     },
     enabled: !!user?.id,
   });
