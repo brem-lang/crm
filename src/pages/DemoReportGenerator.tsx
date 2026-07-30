@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
@@ -35,24 +34,21 @@ interface DemoRow {
 
 const countries = Object.values(countryData).sort((a, b) => a.name.localeCompare(b.name));
 
-// Slight random variation so generated placeholder numbers don't look
-// artificially round — only applied at generation time, never to values
-// the user types in afterward.
+// Slight random variation so a newly added row's starter numbers don't
+// look artificially round — only applied when the row is created, never
+// to values the user types in afterward.
 function randomInRange(min: number, max: number): number {
   return Math.round(min + Math.random() * (max - min));
 }
 
-function generateRows(count: number): DemoRow[] {
-  return Array.from({ length: count }, (_, i) => {
-    const country = countries[Math.floor(Math.random() * countries.length)];
-    return {
-      id: crypto.randomUUID(),
-      advertiserLabel: `ADV-${i + 1}`,
-      countryCode: country.code,
-      leads: randomInRange(200, 3000),
-      crPercent: randomInRange(5, 35) + Math.random(),
-    };
-  });
+function makeRow(index: number): DemoRow {
+  return {
+    id: crypto.randomUUID(),
+    advertiserLabel: `ADV-${index}`,
+    countryCode: countries[0].code,
+    leads: randomInRange(200, 3000),
+    crPercent: randomInRange(5, 35) + Math.random(),
+  };
 }
 
 function computeDeposits(leads: number, crPercent: number): number {
@@ -64,8 +60,12 @@ export default function DemoReportGenerator() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
 
-  const [rows, setRows] = useState<DemoRow[]>(() => generateRows(6));
-  const [rowCount, setRowCount] = useState(6);
+  const nextIndexRef = useRef(1);
+  const [rows, setRows] = useState<DemoRow[]>(() => {
+    const initial = Array.from({ length: 3 }, (_, i) => makeRow(i + 1));
+    nextIndexRef.current = initial.length + 1;
+    return initial;
+  });
 
   const [datePreset, setDatePreset] = useState<DatePreset>("last7");
   const [countryFilter, setCountryFilter] = useState<string>("all");
@@ -92,12 +92,13 @@ export default function DemoReportGenerator() {
     return { totalLeads, totalDeposits, avgCr };
   }, [filteredRows]);
 
-  const handleGenerateRows = () => {
-    setRows(generateRows(Math.max(1, rowCount)));
-    setAdvertiserFilter("all");
+  const handleAddRow = () => {
+    const row = makeRow(nextIndexRef.current);
+    nextIndexRef.current += 1;
+    setRows((prev) => [...prev, row]);
   };
 
-  const updateRow = (id: string, patch: Partial<Pick<DemoRow, "leads" | "crPercent">>) => {
+  const updateRow = (id: string, patch: Partial<Pick<DemoRow, "leads" | "crPercent" | "countryCode">>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
@@ -139,19 +140,8 @@ export default function DemoReportGenerator() {
         </div>
 
         <Card>
-          <CardContent className="pt-6 flex flex-wrap items-end gap-3">
-            <div className="space-y-2">
-              <Label>Number of Advertisers</Label>
-              <Input
-                type="number"
-                min={1}
-                max={50}
-                value={rowCount}
-                onChange={(e) => setRowCount(Number(e.target.value) || 1)}
-                className="w-32"
-              />
-            </div>
-            <Button onClick={handleGenerateRows}>Generate</Button>
+          <CardContent className="pt-6 flex flex-wrap items-center gap-3">
+            <Button onClick={handleAddRow}>Add Row</Button>
             <Button variant="outline" onClick={handleGenerateScreenshot} disabled={capturing} className="ml-auto">
               <Camera className="h-4 w-4 mr-2" />
               {capturing ? "Generating..." : "Generate Screenshot"}
@@ -225,14 +215,29 @@ export default function DemoReportGenerator() {
                   </TableRow>
                 ) : (
                   filteredRows.map((row) => {
-                    const country = countryData[row.countryCode];
                     const deposits = computeDeposits(row.leads, row.crPercent);
                     return (
                       <TableRow key={row.id}>
                         <TableCell>
                           <span className="inline-block h-4 w-24 rounded-sm bg-foreground" />
                         </TableCell>
-                        <TableCell>{country ? `${country.name} (${country.code})` : row.countryCode}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.countryCode}
+                            onValueChange={(value) => updateRow(row.id, { countryCode: value })}
+                          >
+                            <SelectTrigger className="w-44">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              {countries.map((c) => (
+                                <SelectItem key={c.code} value={c.code}>
+                                  {c.name} ({c.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell className="text-right">
                           <Input
                             type="number"
