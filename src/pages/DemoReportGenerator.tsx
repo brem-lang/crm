@@ -506,7 +506,7 @@ export default function DemoReportGenerator() {
                   <TableHead className="text-right">Leads</TableHead>
                   <TableHead className="text-right">CR %</TableHead>
                   <TableHead className="text-right">Deposits</TableHead>
-                  <TableHead className="w-10" />
+                  {!capturing && <TableHead className="w-10" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -578,16 +578,18 @@ export default function DemoReportGenerator() {
                         <TableCell className="text-right font-medium">
                           {deposits.toLocaleString()}
                         </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeRow(row.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
+                        {!capturing && (
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeRow(row.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })
@@ -606,7 +608,7 @@ export default function DemoReportGenerator() {
                     <TableCell className="text-right">
                       {totals.totalDeposits.toLocaleString()}
                     </TableCell>
-                    <TableCell />
+                    {!capturing && <TableCell />}
                   </TableRow>
                 </TableBody>
               )}
