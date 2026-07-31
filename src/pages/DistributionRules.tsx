@@ -164,11 +164,16 @@ export default function DistributionRules() {
     return filteredRules.slice(start, start + pageSize);
   }, [filteredRules, currentPage, pageSize]);
 
-  const allSelected = paginatedRules.length > 0 && paginatedRules.every((r) => selectedIds.has(r.id));
-  const someSelected = paginatedRules.some((r) => selectedIds.has(r.id)) && !allSelected;
+  const selectablePaginatedRules = useMemo(
+    () => paginatedRules.filter((r) => r.advertiser_is_active !== false),
+    [paginatedRules]
+  );
+
+  const allSelected = selectablePaginatedRules.length > 0 && selectablePaginatedRules.every((r) => selectedIds.has(r.id));
+  const someSelected = selectablePaginatedRules.some((r) => selectedIds.has(r.id)) && !allSelected;
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(paginatedRules.map((r) => r.id)));
+    if (checked) setSelectedIds(new Set(selectablePaginatedRules.map((r) => r.id)));
     else setSelectedIds(new Set());
   };
 
@@ -457,6 +462,7 @@ export default function DistributionRules() {
                             <Checkbox
                               checked={selectedIds.has(rule.id)}
                               onCheckedChange={(c) => handleSelectOne(rule.id, !!c)}
+                              disabled={advertiserInactive}
                             />
                           </TableCell>
                           <TableCell>
