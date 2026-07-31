@@ -54,6 +54,7 @@ interface NavItem {
   roles?: string[];
   customRoles?: string[];
   children?: NavItem[];
+  external?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -111,7 +112,7 @@ const navItems: NavItem[] = [
 
     ]
   },
-  { title: "API Docs", href: "/api-docs", icon: FileText },
+  { title: "API Docs", href: "/api-docs", icon: FileText, external: true },
   {
     title: "Support Chat",
     href: "/agent/dashboard",
@@ -325,6 +326,8 @@ export function Sidebar() {
               to={item.href}
               onClick={() => setIsMobileOpen(false)}
               title={isCollapsed ? item.title : undefined}
+              target={item.external ? "_blank" : undefined}
+              rel={item.external ? "noopener noreferrer" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
