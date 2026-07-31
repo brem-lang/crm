@@ -60,7 +60,7 @@ import {
 import { BulkAddRuleDialog } from "@/components/distribution/BulkAddRuleDialog";
 import { usePageSizeState } from "@/hooks/usePageSizeState";
 import { countryData } from "@/components/advertisers/countryData";
-import { shortId } from "@/lib/utils";
+import { cn, shortId } from "@/lib/utils";
 import { AlertTriangle, GitMerge, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useState, useMemo } from "react";
 
@@ -86,6 +86,8 @@ export default function DistributionRules() {
   const [bulkPriorityEnabled, setBulkPriorityEnabled] = useState(false);
   const [bulkPriorityValue, setBulkPriorityValue] = useState(100);
   const [editingRule, setEditingRule] = useState<AffiliateDistributionRule | null>(null);
+  const [ruleToDelete, setRuleToDelete] = useState<AffiliateDistributionRule | null>(null);
+  const [inactiveAlertRule, setInactiveAlertRule] = useState<AffiliateDistributionRule | null>(null);
   const [editTier, setEditTier] = useState<"primary" | "fallback">("primary");
   const [editPriority, setEditPriority] = useState(100);
   const [editWeight, setEditWeight] = useState(100);
@@ -101,8 +103,9 @@ export default function DistributionRules() {
   const bulkUpdateRules = useBulkUpdateDistributionRules();
   const bulkDeleteRules = useBulkDeleteDistributionRules();
 
-  const handleDeleteRule = (id: string) => {
-    if (confirm('Delete this distribution rule?')) deleteRule.mutate(id);
+  const confirmDeleteRule = () => {
+    if (!ruleToDelete) return;
+    deleteRule.mutate(ruleToDelete.id, { onSuccess: () => setRuleToDelete(null) });
   };
 
   const affiliatesWithRules = useMemo(() => {
@@ -440,15 +443,17 @@ export default function DistributionRules() {
                       return (
                         <TableRow
                           key={rule.id}
-                          className={
+                          onClick={() => { if (advertiserInactive) setInactiveAlertRule(rule); }}
+                          className={cn(
                             selectedIds.has(rule.id)
                               ? "bg-muted/50"
                               : advertiserInactive
                               ? "opacity-60 bg-muted/30"
-                              : undefined
-                          }
+                              : undefined,
+                            advertiserInactive && "cursor-pointer"
+                          )}
                         >
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedIds.has(rule.id)}
                               onCheckedChange={(c) => handleSelectOne(rule.id, !!c)}
@@ -501,7 +506,7 @@ export default function DistributionRules() {
                               {rule.priority_type === "fallback" ? "Fallback" : "Primary"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right" title="Lower = tried first within its tier">
+                          <TableCell className="text-right" title="Lower = tried first within its tier" onClick={(e) => e.stopPropagation()}>
                             <Input
                               key={`${rule.id}-priority-${rule.priority}`}
                               type="number"
@@ -518,7 +523,7 @@ export default function DistributionRules() {
                               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                             />
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <Input
                               key={`${rule.id}-weight-${rule.weight}`}
                               type="number"
@@ -535,14 +540,22 @@ export default function DistributionRules() {
                               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                             />
                           </TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={advertiserInactive ? false : rule.is_active}
-                              onCheckedChange={(v) => updateRule.mutate({ id: rule.id, is_active: v })}
-                              disabled={advertiserInactive || updateRule.isPending}
-                            />
+                          <TableCell
+                            className={cn("text-center", advertiserInactive && "cursor-pointer")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (advertiserInactive) setInactiveAlertRule(rule);
+                            }}
+                          >
+                            <div className={cn("inline-flex", advertiserInactive && "pointer-events-none")}>
+                              <Switch
+                                checked={advertiserInactive ? false : rule.is_active}
+                                onCheckedChange={(v) => updateRule.mutate({ id: rule.id, is_active: v })}
+                                disabled={advertiserInactive || updateRule.isPending}
+                              />
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button size="sm" variant="ghost">
@@ -550,12 +563,14 @@ export default function DistributionRules() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditRule(rule)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
+                                {!advertiserInactive && (
+                                  <DropdownMenuItem onClick={() => openEditRule(rule)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
-                                  onClick={() => handleDeleteRule(rule.id)}
+                                  onClick={() => setRuleToDelete(rule)}
                                   disabled={deleteRule.isPending}
                                   className="text-destructive"
                                 >
@@ -720,6 +735,45 @@ export default function DistributionRules() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Single-row delete confirmation */}
+      <AlertDialog open={!!ruleToDelete} onOpenChange={(open) => !open && setRuleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Distribution Rule</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the rule for {ruleToDelete?.affiliate_name} — {ruleToDelete?.country_code} — {ruleToDelete?.advertiser_name}?
+              Leads matching this affiliate/country/advertiser combination will no longer route through it. This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteRule}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Inactive advertiser alert */}
+      <AlertDialog open={!!inactiveAlertRule} onOpenChange={(open) => !open && setInactiveAlertRule(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Advertiser is Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inactiveAlertRule?.advertiser_name} is currently inactive. Set the advertiser back to active before
+              editing this distribution rule.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setInactiveAlertRule(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
