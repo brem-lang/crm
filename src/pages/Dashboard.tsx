@@ -848,7 +848,7 @@ export default function Dashboard() {
         </div>
 
         {/* Conversion Charts by Country and Advertiser */}
-        <ConversionCharts fromDate={fromDate} toDate={toDate} />
+        <ConversionCharts fromDate={fromDate} toDate={toDate} showAllDates={showAllDates} />
       </div>
     </DashboardLayout>
   );

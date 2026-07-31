@@ -7,21 +7,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface ConversionChartsProps {
   fromDate: Date;
   toDate: Date;
+  showAllDates?: boolean;
 }
 
 const COLORS = ['hsl(var(--primary))', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
-export function ConversionCharts({ fromDate, toDate }: ConversionChartsProps) {
+export function ConversionCharts({ fromDate, toDate, showAllDates = false }: ConversionChartsProps) {
   // Fetch conversion by country
   const { data: countryData, isLoading: countryLoading } = useQuery({
-    queryKey: ['conversion-by-country', fromDate, toDate],
+    queryKey: ['conversion-by-country', showAllDates, fromDate, toDate],
     queryFn: async () => {
-      const { data: leads } = await supabase
+      let countryQuery = supabase
         .from('leads')
         .select('country_code, is_ftd')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString())
         .neq('status', 'rejected');
+      if (!showAllDates) {
+        countryQuery = countryQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
+      const { data: leads } = await countryQuery;
 
       if (!leads) return [];
 
@@ -51,9 +56,9 @@ export function ConversionCharts({ fromDate, toDate }: ConversionChartsProps) {
 
   // Fetch conversion by advertiser
   const { data: advertiserData, isLoading: advertiserLoading } = useQuery({
-    queryKey: ['conversion-by-advertiser', fromDate, toDate],
+    queryKey: ['conversion-by-advertiser', showAllDates, fromDate, toDate],
     queryFn: async () => {
-      const { data: distributions } = await supabase
+      let advertiserQuery = supabase
         .from('lead_distributions')
         .select(`
           status,
@@ -61,9 +66,13 @@ export function ConversionCharts({ fromDate, toDate }: ConversionChartsProps) {
           advertisers(name),
           leads!inner(is_ftd, created_at)
         `)
-        .eq('status', 'sent')
-        .gte('created_at', fromDate.toISOString())
-        .lte('created_at', toDate.toISOString());
+        .eq('status', 'sent');
+      if (!showAllDates) {
+        advertiserQuery = advertiserQuery
+          .gte('created_at', fromDate.toISOString())
+          .lte('created_at', toDate.toISOString());
+      }
+      const { data: distributions } = await advertiserQuery;
 
       if (!distributions) return [];
 
