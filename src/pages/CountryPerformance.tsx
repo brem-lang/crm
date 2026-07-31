@@ -182,8 +182,13 @@ export default function CountryPerformance() {
           : 0,
       }));
 
+      // Drop countries with no measurable activity (e.g. leads still pending distribution)
+      const nonEmptyResults = results.filter(
+        country => country.clicks > 0 || country.leads > 0 || country.conversions > 0
+      );
+
       // Sort by leads descending
-      return results.sort((a, b) => b.leads - a.leads);
+      return nonEmptyResults.sort((a, b) => b.leads - a.leads);
     },
   });
 
