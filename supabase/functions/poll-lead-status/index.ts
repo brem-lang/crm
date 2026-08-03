@@ -988,6 +988,315 @@ async function pollGSIInjectionLeads(
   return { updated, errors };
 }
 
+// Dr Tracker (DrMailer) status item from get_leads_status (act=get_leads_status)
+interface DrMailerStatusItem {
+  leadid: string;
+  clickid?: string;
+  email?: string;
+  status?: string;
+  registration_date?: string;
+}
+
+// Dr Tracker (DrMailer) deposit item from get_depositors (act=get_depositors)
+interface DrMailerDepositItem {
+  leadid: string;
+  clickid?: string;
+  email?: string;
+  date_deposited?: string;
+  amount?: string;
+}
+
+async function fetchDrMailerLeadsStatus(
+  apiKey: string,
+  apiPassword: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<DrMailerStatusItem[] | null> {
+  const params = new URLSearchParams();
+  params.append('ApiKey', apiKey);
+  params.append('ApiPassword', apiPassword);
+  params.append('DateFrom', formatDateYMDHMS(fromDate));
+  params.append('DateTo', formatDateYMDHMS(toDate));
+  params.append('Grouped', '0');
+
+  const response = await fetch(FORWARDER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Target-Url': 'https://tracker.doctor-mailer.com/repost.php?act=get_leads_status',
+      'X-Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    console.log(`DrMailer get_leads_status failed: ${response.status}`);
+    return null;
+  }
+
+  const text = await response.text();
+  try {
+    const data = JSON.parse(text);
+    if (data.ret_code !== '200' && data.ret_code !== 200) {
+      console.log(`DrMailer get_leads_status error: ${JSON.stringify(data.ret_message)}`);
+      return null;
+    }
+    const leads = data.ret_message?.leads;
+    return Array.isArray(leads) ? leads : [];
+  } catch {
+    console.log(`DrMailer get_leads_status returned non-JSON: ${text.substring(0, 200)}`);
+    return null;
+  }
+}
+
+async function fetchDrMailerDepositors(
+  apiKey: string,
+  apiPassword: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<DrMailerDepositItem[] | null> {
+  const params = new URLSearchParams();
+  params.append('ApiKey', apiKey);
+  params.append('ApiPassword', apiPassword);
+  params.append('DateFrom', formatDateYMDHMS(fromDate));
+  params.append('DateTo', formatDateYMDHMS(toDate));
+  params.append('Grouped', '0');
+
+  const response = await fetch(FORWARDER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Target-Url': 'https://tracker.doctor-mailer.com/repost.php?act=get_depositors',
+      'X-Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    console.log(`DrMailer get_depositors failed: ${response.status}`);
+    return null;
+  }
+
+  const text = await response.text();
+  try {
+    const data = JSON.parse(text);
+    if (data.ret_code !== '200' && data.ret_code !== 200) {
+      console.log(`DrMailer get_depositors error: ${JSON.stringify(data.ret_message)}`);
+      return null;
+    }
+    const deposits = data.ret_message?.deposits;
+    return Array.isArray(deposits) ? deposits : [];
+  } catch {
+    console.log(`DrMailer get_depositors returned non-JSON: ${text.substring(0, 200)}`);
+    return null;
+  }
+}
+
+// Poll Dr Tracker (DrMailer) using bulk get_leads_status + get_depositors (routed through VPS forwarder)
+// Docs: drtracker.md — both endpoints are date-range/bulk only, no per-lead lookup exists
+async function pollDrMailerLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const config = advertiser.config as Record<string, unknown> || {};
+  const apiKey = advertiser.api_key || String(config.apikey || '');
+  const apiPassword = String(config.pass || '');
+
+  if (!apiKey || !apiPassword) {
+    console.log(`DrMailer advertiser ${advertiser.name} missing ApiKey/ApiPassword in config`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date().toISOString();
+
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  try {
+    const [leads, deposits] = await Promise.all([
+      fetchDrMailerLeadsStatus(apiKey, apiPassword, fromDate, toDate),
+      fetchDrMailerDepositors(apiKey, apiPassword, fromDate, toDate),
+    ]);
+
+    if (!leads) {
+      return { updated: 0, errors: 1 };
+    }
+    console.log(`DrMailer returned ${leads.length} leads, ${deposits?.length ?? 0} depositors`);
+
+    const leadsByLeadId = new Map<string, DrMailerStatusItem>();
+    const leadsByEmail = new Map<string, DrMailerStatusItem>();
+    for (const item of leads) {
+      if (item.leadid) leadsByLeadId.set(item.leadid, item);
+      if (item.email) leadsByEmail.set(item.email.toLowerCase(), item);
+    }
+
+    const depositsByLeadId = new Map<string, DrMailerDepositItem>();
+    const depositsByEmail = new Map<string, DrMailerDepositItem>();
+    for (const item of deposits || []) {
+      if (item.leadid) depositsByLeadId.set(item.leadid, item);
+      if (item.email) depositsByEmail.set(item.email.toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      const email = (dist.leads as any)?.email?.toLowerCase();
+      const statusItem = (dist.external_lead_id ? leadsByLeadId.get(dist.external_lead_id) : undefined) ||
+                          (email ? leadsByEmail.get(email) : undefined);
+      const depositItem = (dist.external_lead_id ? depositsByLeadId.get(dist.external_lead_id) : undefined) ||
+                           (email ? depositsByEmail.get(email) : undefined);
+
+      if (!statusItem && !depositItem) continue;
+
+      const leadUpdates: Record<string, unknown> = {};
+      const oldSaleStatus = (dist.leads as any).sale_status;
+
+      if (statusItem?.status && statusItem.status !== oldSaleStatus) {
+        leadUpdates.sale_status = statusItem.status;
+        console.log(`Sale status updated for lead ${dist.lead_id}: ${statusItem.status}`);
+        collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, statusItem.status);
+      }
+
+      if (depositItem && !dist.leads.is_ftd) {
+        leadUpdates.is_ftd = true;
+        leadUpdates.ftd_date = depositItem.date_deposited || now;
+        leadUpdates.ftd_id = depositItem.leadid || dist.external_lead_id;
+        console.log(`FTD detected for lead ${dist.lead_id}`);
+        collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+        ftdCount++;
+      }
+
+      if (Object.keys(leadUpdates).length > 0) {
+        await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+        updated++;
+      }
+    }
+
+    const distIds = distributions.map(d => d.id);
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling DrMailer: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
+// Poll Dr Tracker (DrMailer) for injection_leads
+async function pollDrMailerInjectionLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: { id: string; name: string; api_key: string; url: string | null; status_endpoint: string | null; config?: Record<string, unknown> },
+  injectionLeads: { id: string; email: string; external_lead_id: string | null; is_ftd: boolean; sale_status: string | null }[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+
+  const config = advertiser.config || {};
+  const apiKey = advertiser.api_key || String(config.apikey || '');
+  const apiPassword = String(config.pass || '');
+
+  if (!apiKey || !apiPassword) {
+    console.log(`DrMailer advertiser ${advertiser.name} missing ApiKey/ApiPassword in config for injection polling`);
+    return { updated: 0, errors: 0 };
+  }
+
+  const toDate = new Date();
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date().toISOString();
+
+  try {
+    const [leads, deposits] = await Promise.all([
+      fetchDrMailerLeadsStatus(apiKey, apiPassword, fromDate, toDate),
+      fetchDrMailerDepositors(apiKey, apiPassword, fromDate, toDate),
+    ]);
+
+    if (!leads) {
+      return { updated: 0, errors: 1 };
+    }
+
+    const leadsByLeadId = new Map<string, DrMailerStatusItem>();
+    const leadsByEmail = new Map<string, DrMailerStatusItem>();
+    for (const item of leads) {
+      if (item.leadid) leadsByLeadId.set(item.leadid, item);
+      if (item.email) leadsByEmail.set(item.email.toLowerCase(), item);
+    }
+
+    const depositsByLeadId = new Map<string, DrMailerDepositItem>();
+    const depositsByEmail = new Map<string, DrMailerDepositItem>();
+    for (const item of deposits || []) {
+      if (item.leadid) depositsByLeadId.set(item.leadid, item);
+      if (item.email) depositsByEmail.set(item.email.toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+
+    for (const injLead of injectionLeads) {
+      const email = injLead.email?.toLowerCase();
+      const statusItem = (injLead.external_lead_id ? leadsByLeadId.get(injLead.external_lead_id) : undefined) ||
+                          (email ? leadsByEmail.get(email) : undefined);
+      const depositItem = (injLead.external_lead_id ? depositsByLeadId.get(injLead.external_lead_id) : undefined) ||
+                           (email ? depositsByEmail.get(email) : undefined);
+
+      if (!statusItem && !depositItem) continue;
+
+      const injectionLeadUpdates: Record<string, unknown> = {};
+      const leadsTableUpdates: Record<string, unknown> = {};
+
+      if (statusItem?.status && statusItem.status !== injLead.sale_status) {
+        injectionLeadUpdates.sale_status = statusItem.status;
+        leadsTableUpdates.sale_status = statusItem.status;
+        console.log(`Injection lead ${injLead.email} sale_status updated: ${statusItem.status}`);
+        collectHistory(historyBatch, null, injLead.id, 'sale_status', injLead.sale_status, statusItem.status);
+      }
+
+      if (depositItem && !injLead.is_ftd) {
+        injectionLeadUpdates.is_ftd = true;
+        injectionLeadUpdates.ftd_date = depositItem.date_deposited || now;
+        leadsTableUpdates.injection_ftd = true;
+        leadsTableUpdates.injection_ftd_date = depositItem.date_deposited || now;
+        console.log(`Injection lead ${injLead.email} FTD detected`);
+        collectHistory(historyBatch, null, injLead.id, 'is_ftd', 'false', 'true');
+      }
+
+      if (Object.keys(injectionLeadUpdates).length > 0) {
+        await supabase.from('injection_leads').update(injectionLeadUpdates).eq('id', injLead.id);
+        if (Object.keys(leadsTableUpdates).length > 0) {
+          await supabase.from('leads').update(leadsTableUpdates).eq('email', injLead.email);
+        }
+        updated++;
+      }
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling DrMailer for injections: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Format date for TrackBox API (YYYY-MM-DD HH:mm:ss) — same format as formatDateYMDHMS but kept for clarity
 function formatTrackBoxDate(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -2560,39 +2869,6 @@ const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<
     }
   },
 
-  // DrMailer / Dr Tracker status check
-  drmailer: async (distribution) => {
-    const advertiser = distribution.advertisers;
-    if (!advertiser.status_endpoint || !distribution.external_lead_id) return null;
-
-    const targetUrl = `${advertiser.status_endpoint}?lead_id=${distribution.external_lead_id}`;
-    console.log(`DrMailer status polling via forwarder: ${targetUrl}`);
-
-    const authHeaderName = String(advertiser.config?.auth_header_name || 'Api-Key');
-    const response = await fetch(FORWARDER_URL, {
-      method: 'GET',
-      headers: {
-        'X-Target-Url': targetUrl,
-        [authHeaderName]: advertiser.api_key,
-      },
-    });
-
-    if (!response.ok) return null;
-    
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      return {
-        status: data.lead_status,
-        is_ftd: data.has_deposited,
-        ftd_date: data.first_deposit_date,
-        ftd_id: distribution.external_lead_id ?? undefined,
-      };
-    } catch {
-      return null;
-    }
-  },
-
   // Getlinked status check
   getlinked: async (distribution) => {
     const advertiser = distribution.advertisers;
@@ -2996,6 +3272,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Dr Tracker (DrMailer) uses bulk get_leads_status + get_depositors API
+      if (advertiserType === 'drmailer') {
+        const result = await pollDrMailerLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
       // NoxWealth uses bulk GET /leads API
       if (advertiserType === 'noxwealth') {
         const result = await pollNoxWealthLeads(supabase, advertiser, advDistributions);
@@ -3221,6 +3505,21 @@ Deno.serve(async (req) => {
         } else if (adv.advertiser_type === 'trackbox') {
           console.log(`Polling ${advLeads.length} injection leads for TrackBox advertiser ${adv.name}`);
           const result = await pollTrackBoxInjectionLeads(
+            supabase,
+            { ...adv, config: adv.config || {} },
+            advLeads.map((l: any) => ({
+              id: l.id,
+              email: l.email,
+              external_lead_id: l.external_lead_id,
+              is_ftd: l.is_ftd,
+              sale_status: l.sale_status,
+            }))
+          );
+          totalUpdated += result.updated;
+          totalErrors += result.errors;
+        } else if (adv.advertiser_type === 'drmailer') {
+          console.log(`Polling ${advLeads.length} injection leads for DrMailer advertiser ${adv.name}`);
+          const result = await pollDrMailerInjectionLeads(
             supabase,
             { ...adv, config: adv.config || {} },
             advLeads.map((l: any) => ({

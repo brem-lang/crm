@@ -1248,6 +1248,7 @@ function extractExternalLeadId(responseText: string): string | null {
   try {
     const data = JSON.parse(responseText);
     if (data.details?.leadRequest?.ID) return String(data.details.leadRequest.ID);
+    if (data.leadid) return String(data.leadid);
     return String(data.lead_id || data.leadId || data.id || data.signupId || data.signupID ||
            data.data?.lead_id || data.data?.leadId || data.data?.id || 
            data.data?.signupId || data.data?.signupID || data.leadRequestID || '');
@@ -1565,17 +1566,17 @@ const advertiserAdapters: Record<string, (lead: InjectionLead, advertiser: Adver
   drmailer: async (lead, advertiser) => {
     const config = advertiser.config || {};
     const params = new URLSearchParams();
-    params.append('apikey', advertiser.api_key || String(config.apikey || ''));
-    params.append('pass', String(config.pass || ''));
-    params.append('campaign_id', String(config.campaign_id || ''));
-    params.append('fname', lead.firstname);
-    params.append('lname', lead.lastname);
-    params.append('email', lead.email);
-    params.append('phone', lead.mobile);
-    params.append('ip', lead.ip_address || generateGeoMatchedIP(lead.country_code));
-    if (lead.custom1) params.append('suid', lead.custom1);
-    if (lead.custom2) params.append('clickid', lead.custom2);
-    if (lead.offer_name) params.append('desc', lead.offer_name);
+    params.append('ApiKey', advertiser.api_key || String(config.apikey || ''));
+    params.append('ApiPassword', String(config.pass || ''));
+    params.append('CampaignID', String(config.campaign_id || ''));
+    params.append('FirstName', lead.firstname);
+    params.append('LastName', lead.lastname);
+    params.append('Email', lead.email);
+    params.append('PhoneNumber', lead.mobile);
+    params.append('IP', lead.ip_address || generateGeoMatchedIP(lead.country_code));
+    if (lead.custom1) params.append('SubSource', lead.custom1);
+    if (lead.custom2) params.append('ClickID', lead.custom2);
+    if (lead.offer_name) params.append('Description', lead.offer_name);
 
     const apiUrl = advertiser.url || 'https://tracker.doctor-mailer.com/repost.php?act=register';
 
@@ -1596,14 +1597,17 @@ const advertiserAdapters: Record<string, (lead: InjectionLead, advertiser: Adver
     });
 
     const text = await response.text();
+    // Success is ret_code 200/201 per Dr Tracker API spec; 4xx/5xx ret_code is a failure
     let isSuccess = response.ok;
     try {
       const json = JSON.parse(text);
-      if (json.status === 'error' || json.error) isSuccess = false;
+      if (json.ret_code !== undefined) {
+        isSuccess = json.ret_code === '200' || json.ret_code === '201' || json.ret_code === 200 || json.ret_code === 201;
+      }
     } catch {
-      if (text.toLowerCase().includes('error')) isSuccess = false;
+      isSuccess = false;
     }
-    
+
     return { success: isSuccess, response: text };
   },
 
