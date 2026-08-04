@@ -1,4 +1,5 @@
-in the distribution rules,
+in the advertiser page once the advertiser CRM is dr.tracker, the offer_name should be sent to the page parameter
 
-for the active rules we must display the rules of all affiliate
-so inshort adding rules now uses the per affiliate
+also in the distribution once the distribution CRM is dr.tracker, the offer_name should be sent to the page parameter
+
+check this dr tracker docs @dr.tracker

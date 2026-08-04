@@ -92,6 +92,7 @@ export default function DistributionRules() {
   const [editPriority, setEditPriority] = useState(100);
   const [editWeight, setEditWeight] = useState(100);
   const [editActive, setEditActive] = useState(true);
+  const [editAdvertiserId, setEditAdvertiserId] = useState<string>("");
 
   const { data: advertisers } = useAdvertisers();
   const { data: affiliates } = useAffiliates();
@@ -233,6 +234,7 @@ export default function DistributionRules() {
     setEditPriority(rule.priority);
     setEditWeight(rule.weight);
     setEditActive(rule.is_active);
+    setEditAdvertiserId(rule.advertiser_id);
   };
 
   const handleEditSave = () => {
@@ -240,6 +242,7 @@ export default function DistributionRules() {
     updateRule.mutate(
       {
         id: editingRule.id,
+        advertiser_id: editAdvertiserId,
         priority_type: editTier,
         priority: editPriority,
         weight: editWeight,
@@ -694,10 +697,23 @@ export default function DistributionRules() {
           <DialogHeader>
             <DialogTitle>Edit rule</DialogTitle>
             <DialogDescription>
-              {editingRule?.affiliate_name} — {editingRule?.country_code} — {editingRule?.advertiser_name}
+              {editingRule?.affiliate_name} — {editingRule?.country_code}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Advertiser</Label>
+              <Select value={editAdvertiserId} onValueChange={setEditAdvertiserId}>
+                <SelectTrigger><SelectValue placeholder="Select advertiser…" /></SelectTrigger>
+                <SelectContent>
+                  {(advertisers || []).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{!a.is_active && " (Inactive)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>Tier</Label>
               <Select value={editTier} onValueChange={(v) => setEditTier(v as "primary" | "fallback")}>

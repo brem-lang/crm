@@ -424,7 +424,7 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     params.append('IP', lead.ip_address || '0.0.0.0');
     if (lead.custom1) params.append('SubSource', lead.custom1);
     if (lead.custom2) params.append('ClickID', lead.custom2);
-    if (lead.offer_name) params.append('Description', lead.offer_name);
+    if (lead.offer_name) params.append('Page', lead.offer_name);
 
     const apiUrl = advertiser.url || 'https://tracker.doctor-mailer.com/repost.php?act=register';
 

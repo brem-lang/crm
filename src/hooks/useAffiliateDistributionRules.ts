@@ -168,6 +168,7 @@ export function useUpdateDistributionRule() {
       ...updates
     }: {
       id: string;
+      advertiser_id?: string;
       weight?: number;
       daily_cap?: number | null;
       hourly_cap?: number | null;
@@ -195,7 +196,11 @@ export function useUpdateDistributionRule() {
       toast.success("Rule updated");
     },
     onError: (error: any) => {
-      toast.error("Failed to update rule: " + error.message);
+      if (error.code === "23505") {
+        toast.error("A rule for this affiliate + country + advertiser already exists");
+      } else {
+        toast.error("Failed to update rule: " + error.message);
+      }
     },
   });
 }
