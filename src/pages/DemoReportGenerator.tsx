@@ -365,7 +365,11 @@ export default function DemoReportGenerator() {
       const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       const datePart = format(new Date(), "yyyy-MM-dd");
-      link.download = `demo-report-${datePart}.png`;
+      const crmName = (import.meta.env.VITE_CRM_NAME || "demo-report")
+        .trim()
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      link.download = `${crmName}-${datePart}.png`;
       link.href = dataUrl;
       link.click();
       toast.success("Screenshot downloaded");
