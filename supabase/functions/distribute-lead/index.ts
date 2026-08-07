@@ -93,6 +93,11 @@ interface DistributionResult {
 interface AdapterResult {
   success: boolean;
   response: string;
+  externalLeadId?: string;
+  // Extra columns an adapter wants written back onto the `leads` row on success
+  // (e.g. RecoveryChain's one-time initial_password). Merged into the same
+  // .update() call that records distributed_at/status — see call sites below.
+  extraLeadUpdates?: Record<string, unknown>;
   requestMetadata?: {
     url: string;
     headers: Record<string, string>;
@@ -1508,26 +1513,37 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
-  // RecoveryChain — Affiliate API. JSON POST /api/affiliate/leads, X-API-Key header.
-  // Success is HTTP 201 with { success: true, data: { lead_id, is_duplicate, tracking } }.
-  // 422 (validation), 401 (bad key), 403 (inactive/forbidden) all resolve to response.ok
-  // === false, which distribute-lead already treats as a failed/non-billable send.
-  // external_lead_id is picked up automatically by extractExternalLeadId() below (matches
-  // its data.lead_id fallback). No autologin URL in this API.
+  // RecoveryChain — Affiliate API. JSON POST /api/affiliate/clients, X-API-Key header.
+  // Registers the lead as a RecoveryChain client (not the /affiliate/leads endpoint —
+  // clients is the flow that actually onboards the end user and issues login creds).
+  // Required by that endpoint: first_name, last_name, email, phone — so unlike the old
+  // /leads integration these are validated up front instead of sent conditionally.
+  // Success is HTTP 201 with { success: true, data: { client_id, email, status,
+  // initial_password } }. 422 (validation), 401 (bad key), 403 (inactive/forbidden) all
+  // resolve to response.ok === false, which distribute-lead already treats as a
+  // failed/non-billable send. initial_password is returned only once, so it's captured
+  // here and written back onto the lead via extraLeadUpdates. No autologin URL in this API.
   recoverychain: async (lead, advertiser) => {
     const baseUrl = (advertiser.url || 'https://external.recoverychain1.com/api').replace(/\/$/, '');
-    const endpoint = `${baseUrl}/affiliate/leads`;
+    const endpoint = `${baseUrl}/affiliate/clients`;
+
+    if (!lead.email || !lead.mobile) {
+      return {
+        success: false,
+        response: 'RecoveryChain requires both email and phone to register a client',
+      };
+    }
 
     const payload: Record<string, unknown> = {
       first_name: lead.firstname,
       last_name: lead.lastname,
+      email: lead.email,
+      phone: lead.mobile,
     };
-    if (lead.email) payload.email = lead.email;
-    if (lead.mobile) payload.phone = lead.mobile;
-    if (lead.country_code) payload.country = lead.country_code;
+    if (lead.country_code) payload.country = lead.country_code.slice(0, 3);
+    if (lead.city) payload.city = lead.city;
     const tracking = lead.aff_sub || lead.comment;
     if (tracking) payload.tracking = tracking;
-    if (lead.city) payload.city = lead.city;
     if (lead.comment) payload.notes = lead.comment;
 
     const headers: Record<string, string> = {
@@ -1552,9 +1568,24 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
       isSuccess = false;
     }
 
+    let externalLeadId: string | undefined;
+    let extraLeadUpdates: Record<string, unknown> | undefined;
+    if (isSuccess) {
+      try {
+        const json = JSON.parse(responseText);
+        const data = json?.data as Record<string, unknown> | undefined;
+        if (data?.client_id != null) externalLeadId = String(data.client_id);
+        if (data?.initial_password) extraLeadUpdates = { password: String(data.initial_password) };
+      } catch {
+        // non-JSON success response — nothing to extract
+      }
+    }
+
     return {
       success: isSuccess,
       response: responseText,
+      externalLeadId,
+      extraLeadUpdates,
       requestMetadata: { url: endpoint, headers, payload: body },
     };
   },
@@ -2177,10 +2208,12 @@ async function distributeLead(
   try {
     console.log(`Distributing lead ${lead.id} to ${advertiser.name} (${advertiser.advertiser_type})`);
     
-    const { success, response, requestMetadata } = await adapter(lead, advertiserWithConfig);
-    
-    // Extract external lead ID and autologin URL from response
-    const externalLeadId = success ? extractExternalLeadId(response) : null;
+    const { success, response, requestMetadata, externalLeadId: adapterExternalLeadId, extraLeadUpdates } = await adapter(lead, advertiserWithConfig);
+
+    // Extract external lead ID and autologin URL from response — adapters that already
+    // know their own ID shape (e.g. RecoveryChain's client_id) return it directly;
+    // otherwise fall back to the generic pattern-matching extractor.
+    const externalLeadId = success ? (adapterExternalLeadId || extractExternalLeadId(response)) : null;
     const autologinUrl = success ? extractAutologinUrl(response) : null;
     
     if (externalLeadId) {
@@ -2209,7 +2242,11 @@ async function distributeLead(
       // Update lead status — always critical
       await supabase
         .from('leads')
-        .update({ distributed_at: new Date().toISOString(), status: 'contacted' })
+        .update({
+          distributed_at: new Date().toISOString(),
+          status: 'contacted',
+          ...(extraLeadUpdates || {}),
+        })
         .eq('id', lead.id);
 
       // Store raw advertiser URL for track-autologin redirect — best-effort, non-fatal
@@ -2528,10 +2565,10 @@ Deno.serve(async (req) => {
         console.log(`[TEST MODE] Sending test lead to ${typedAdvertiser.name}`);
         
         try {
-          const { success, response, requestMetadata } = await adapter(testLead, typedAdvertiser);
-          
+          const { success, response, requestMetadata, externalLeadId: adapterExternalLeadId, extraLeadUpdates } = await adapter(testLead, typedAdvertiser);
+
           let createdLeadId: string | null = null;
-          
+
           // If successful, create the lead and distribution records
           if (success) {
             // Create the lead in the database
@@ -2555,15 +2592,16 @@ Deno.serve(async (req) => {
                 comment: test_lead_data.aff_sub || null,
                 status: 'contacted',
                 distributed_at: new Date().toISOString(),
+                ...(extraLeadUpdates || {}),
               })
               .select('id')
               .single();
 
             if (!leadError && newLead) {
               createdLeadId = newLead.id;
-              
+
               // Extract external lead ID and autologin URL from response
-              const externalLeadId = extractExternalLeadId(response);
+              const externalLeadId = adapterExternalLeadId || extractExternalLeadId(response);
               const autologinUrl = extractAutologinUrl(response);
               
               if (externalLeadId) {
@@ -2781,7 +2819,7 @@ Deno.serve(async (req) => {
           
           try {
             console.log(`[DISTRIBUTION-FIRST] Trying ${advertiser.name}...`);
-            const { success, response, requestMetadata } = await adapter(mockLead, advertiser);
+            const { success, response, requestMetadata, externalLeadId: adapterExternalLeadId, extraLeadUpdates } = await adapter(mockLead, advertiser);
 
             if (success) {
               // Create the lead now that we have success
@@ -2802,6 +2840,7 @@ Deno.serve(async (req) => {
                   affiliate_id: test_lead_data.affiliate_id || null,
                   status: 'contacted',
                   distributed_at: new Date().toISOString(),
+                  ...(extraLeadUpdates || {}),
                 })
                 .select('id')
                 .single();
@@ -2815,7 +2854,7 @@ Deno.serve(async (req) => {
               }
 
               // Extract IDs and create distribution record
-              const externalLeadId = extractExternalLeadId(response);
+              const externalLeadId = adapterExternalLeadId || extractExternalLeadId(response);
               const autologinUrl = extractAutologinUrl(response);
 
               await supabase.from('lead_distributions').insert({
@@ -2831,7 +2870,7 @@ Deno.serve(async (req) => {
                 request_headers: requestMetadata?.headers || null,
                 request_payload: requestMetadata?.payload || null,
               });
-              
+
               // Update conversion stats
               const { data: existingConversion } = await supabase
                 .from('advertiser_conversions')
@@ -2891,7 +2930,7 @@ Deno.serve(async (req) => {
           
           try {
             console.log(`[DISTRIBUTION-FIRST] Trying fallback ${advertiser.name}...`);
-            const { success, response, requestMetadata } = await adapter(mockLead, advertiser);
+            const { success, response, requestMetadata, externalLeadId: adapterExternalLeadId, extraLeadUpdates } = await adapter(mockLead, advertiser);
 
             if (success) {
               // Create the lead now
@@ -2912,6 +2951,7 @@ Deno.serve(async (req) => {
                   affiliate_id: test_lead_data.affiliate_id || null,
                   status: 'contacted',
                   distributed_at: new Date().toISOString(),
+                  ...(extraLeadUpdates || {}),
                 })
                 .select('id')
                 .single();
@@ -2924,7 +2964,7 @@ Deno.serve(async (req) => {
                 );
               }
 
-              const externalLeadId = extractExternalLeadId(response);
+              const externalLeadId = adapterExternalLeadId || extractExternalLeadId(response);
               const autologinUrl = extractAutologinUrl(response);
 
               await supabase.from('lead_distributions').insert({

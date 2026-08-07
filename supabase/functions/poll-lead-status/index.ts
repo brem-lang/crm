@@ -2803,7 +2803,7 @@ async function pollRecoveryChainLeads(
     .maybeSingle();
 
   try {
-    const url = `${baseUrl}/affiliate/leads?limit=100`;
+    const url = `${baseUrl}/affiliate/clients`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -2820,7 +2820,17 @@ async function pollRecoveryChainLeads(
 
     const data = await response.json();
     const items: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
-    console.log(`RecoveryChain returned ${items.length} leads`);
+    console.log(`RecoveryChain returned ${items.length} clients`);
+
+    // reco.md documents no pagination contract for this endpoint (no limit/cursor/total
+    // fields) — if the response ever comes back suspiciously round, flag it loudly so a
+    // silent server-side truncation doesn't quietly cause missed status updates.
+    if (items.length > 0 && items.length % 100 === 0) {
+      console.warn(
+        `RecoveryChain /affiliate/clients returned a round number of results (${items.length}) ` +
+        `with no documented pagination — this may be a truncated page, not the full set.`
+      );
+    }
 
     const byEmail = new Map<string, Record<string, unknown>>();
     for (const item of items) {
@@ -2838,10 +2848,10 @@ async function pollRecoveryChainLeads(
       const item = email ? byEmail.get(email.toLowerCase()) : undefined;
       if (!item) continue;
 
-      // RecoveryChain lead statuses: new, contacted, qualified, converted, duplicate, junk.
-      // "converted" is the closest analog to an FTD event on the lead-level endpoint;
-      // there's no separate deposit field exposed here (client-level ftd status lives on
-      // the /clients endpoint, which this integration doesn't poll).
+      // RecoveryChain client statuses: new, ftd, potential, active, inactive, suspended,
+      // contacted, qualified, converted, duplicate, junk, appointment_set. "ftd" is a real
+      // status on this endpoint (unlike the old /leads endpoint, which had no deposit
+      // signal at all), so FTD detection below is an exact match, not a guess.
       const status = item.status as string | undefined;
       const leadUpdates: Record<string, unknown> = {};
 
@@ -2851,11 +2861,11 @@ async function pollRecoveryChainLeads(
         collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
       }
 
-      const hasFtd = status === 'converted' && !dist.leads.is_ftd;
+      const hasFtd = status === 'ftd' && !dist.leads.is_ftd;
       if (hasFtd) {
         leadUpdates.is_ftd = true;
         leadUpdates.ftd_date = now;
-        leadUpdates.ftd_id = item.lead_id != null ? String(item.lead_id) : null;
+        leadUpdates.ftd_id = item.client_id != null ? String(item.client_id) : null;
         collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
         ftdCount++;
       }
@@ -3427,7 +3437,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // RecoveryChain uses bulk GET /api/affiliate/leads (matched by email)
+      // RecoveryChain uses bulk GET /api/affiliate/clients (matched by email)
       if (advertiserType === 'recoverychain') {
         const result = await pollRecoveryChainLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
