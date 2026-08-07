@@ -118,6 +118,12 @@ const advertiserTypes = [
     description: "BackBone CRM — POST /api/capture with X-API-Key header, ref code routing, GET /api/affiliate/leads for status/FTD polling (matched by email)",
     fields: ["url", "api_key", "ref"],
   },
+  {
+    value: "recoverychain",
+    label: "RecoveryChain",
+    description: "RecoveryChain Affiliate API — JSON POST /api/affiliate/leads with X-API-Key header, GET /api/affiliate/leads for status polling (matched by email)",
+    fields: ["url", "api_key"],
+  },
 ];
 
 interface AdvertiserConfig {

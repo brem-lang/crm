@@ -96,6 +96,7 @@ export function AdvertiserFormDialog({
       webullup: "https://trading.we-bull-up.com/api/external",
       notion: "https://bo.team23822.xyz",
       wex: "https://andromeda.host",
+      recoverychain: "https://external.recoverychain1.com/api",
       custom: "",
     };
     
@@ -564,6 +565,21 @@ export function AdvertiserFormDialog({
                 </p>
               </div>
             </>
+          )}
+
+          {/* === RecoveryChain === */}
+          {formData.advertiser_type === 'recoverychain' && (
+            <div className="space-y-2">
+              <Label>API Key <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="aff_..."
+                value={formData.api_key}
+                onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Sent as the X-API-Key header
+              </p>
+            </div>
           )}
 
           {/* === NoxWealth === */}

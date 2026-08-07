@@ -63,7 +63,9 @@ Affiliate / External Source
 
 Each advertiser record has an `advertiser_type` field. This determines which API adapter fires when a lead is distributed to that advertiser. All requests are routed through a VPS forwarder (`https://crm.alphatradecrm.com/proxy/forward.php`) for IP whitelisting.
 
-### Complete List (11 Types)
+### Complete List (12 Types)
+
+> Note: this table predates several later additions (`saxo`, `noxwealth`, `affilio`, `capitaltrading`, `webullup`, `notion`, `wex`) — see the corresponding `add_<type>_advertiser_type.sql` migrations and their adapters in `distribute-lead`/`poll-lead-status` for those.
 
 | # | Value | Label | Auth Method | Content Type |
 |---|---|---|---|---|
@@ -76,8 +78,9 @@ Each advertiser record has an `advertiser_type` field. This determines which API
 | 7 | `elnopy` | ELNOPY (Mpower Traffic) | `api_token` in query string | JSON, E.164 phone |
 | 8 | `reacto` | Reacto Trading | `api_key` header | JSON, mTLS-secured |
 | 9 | `streamline11` | Streamline11 | `affid` + `funnel` slug in body | `application/x-www-form-urlencoded` |
-| 10 | `custom` | Custom | User-defined | User-defined |
-| 11 | `mock` | Mock (Testing) | No auth — test/dev only | N/A |
+| 10 | `recoverychain` | RecoveryChain | `X-API-Key` header, direct fetch (no forwarder) | JSON |
+| 11 | `custom` | Custom | User-defined | User-defined |
+| 12 | `mock` | Mock (Testing) | No auth — test/dev only | N/A |
 
 ---
 

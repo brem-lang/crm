@@ -1508,6 +1508,57 @@ const advertiserAdapters: Record<string, (lead: Lead, advertiser: Advertiser) =>
     };
   },
 
+  // RecoveryChain — Affiliate API. JSON POST /api/affiliate/leads, X-API-Key header.
+  // Success is HTTP 201 with { success: true, data: { lead_id, is_duplicate, tracking } }.
+  // 422 (validation), 401 (bad key), 403 (inactive/forbidden) all resolve to response.ok
+  // === false, which distribute-lead already treats as a failed/non-billable send.
+  // external_lead_id is picked up automatically by extractExternalLeadId() below (matches
+  // its data.lead_id fallback). No autologin URL in this API.
+  recoverychain: async (lead, advertiser) => {
+    const baseUrl = (advertiser.url || 'https://external.recoverychain1.com/api').replace(/\/$/, '');
+    const endpoint = `${baseUrl}/affiliate/leads`;
+
+    const payload: Record<string, unknown> = {
+      first_name: lead.firstname,
+      last_name: lead.lastname,
+    };
+    if (lead.email) payload.email = lead.email;
+    if (lead.mobile) payload.phone = lead.mobile;
+    if (lead.country_code) payload.country = lead.country_code;
+    const tracking = lead.aff_sub || lead.comment;
+    if (tracking) payload.tracking = tracking;
+    if (lead.city) payload.city = lead.city;
+    if (lead.comment) payload.notes = lead.comment;
+
+    const headers: Record<string, string> = {
+      'X-API-Key': advertiser.api_key || '',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    const body = JSON.stringify(payload);
+    console.log('RecoveryChain endpoint:', endpoint);
+    console.log('RecoveryChain payload:', body);
+
+    let responseText = '';
+    let isSuccess = false;
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers, body });
+      responseText = await response.text();
+      console.log('RecoveryChain raw response:', response.status, responseText);
+      isSuccess = response.ok;
+    } catch (err) {
+      console.error('RecoveryChain fetch error:', err);
+      responseText = String(err);
+      isSuccess = false;
+    }
+
+    return {
+      success: isSuccess,
+      response: responseText,
+      requestMetadata: { url: endpoint, headers, payload: body },
+    };
+  },
+
   // Mock advertiser - always succeeds, used for testing affiliate integrations
   mock: async (lead, _advertiser) => {
     console.log('Mock adapter invoked for testing - always returns success');

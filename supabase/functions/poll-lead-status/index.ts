@@ -2785,6 +2785,105 @@ async function pollWexLeads(
   return { updated, errors };
 }
 
+async function pollRecoveryChainLeads(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  advertiser: LeadDistribution['advertisers'],
+  distributions: LeadDistribution[]
+): Promise<{ updated: number; errors: number }> {
+  let updated = 0;
+  let errors = 0;
+  const baseUrl = (advertiser.url || 'https://external.recoverychain1.com/api').replace(/\/$/, '');
+  const now = new Date().toISOString();
+
+  const { data: convRecord } = await supabase
+    .from('advertiser_conversions')
+    .select('id, conversion')
+    .eq('advertiser_id', advertiser.id)
+    .maybeSingle();
+
+  try {
+    const url = `${baseUrl}/affiliate/leads?limit=100`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': advertiser.api_key || '',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`RecoveryChain status check failed: ${response.status}, body: ${errorText}`);
+      return { updated: 0, errors: 1 };
+    }
+
+    const data = await response.json();
+    const items: Record<string, unknown>[] = Array.isArray(data.data) ? data.data : [];
+    console.log(`RecoveryChain returned ${items.length} leads`);
+
+    const byEmail = new Map<string, Record<string, unknown>>();
+    for (const item of items) {
+      if (item.email) byEmail.set(String(item.email).toLowerCase(), item);
+    }
+
+    const historyBatch: HistoryEntry[] = [];
+    const distIds: string[] = [];
+    let ftdCount = 0;
+
+    for (const dist of distributions) {
+      distIds.push(dist.id);
+
+      const email = dist.leads?.email;
+      const item = email ? byEmail.get(email.toLowerCase()) : undefined;
+      if (!item) continue;
+
+      // RecoveryChain lead statuses: new, contacted, qualified, converted, duplicate, junk.
+      // "converted" is the closest analog to an FTD event on the lead-level endpoint;
+      // there's no separate deposit field exposed here (client-level ftd status lives on
+      // the /clients endpoint, which this integration doesn't poll).
+      const status = item.status as string | undefined;
+      const leadUpdates: Record<string, unknown> = {};
+
+      const oldSaleStatus = (dist.leads as any).sale_status;
+      if (status && status !== oldSaleStatus) {
+        leadUpdates.sale_status = status;
+        collectHistory(historyBatch, dist.lead_id, null, 'sale_status', oldSaleStatus, status);
+      }
+
+      const hasFtd = status === 'converted' && !dist.leads.is_ftd;
+      if (hasFtd) {
+        leadUpdates.is_ftd = true;
+        leadUpdates.ftd_date = now;
+        leadUpdates.ftd_id = item.lead_id != null ? String(item.lead_id) : null;
+        collectHistory(historyBatch, dist.lead_id, null, 'is_ftd', 'false', 'true');
+        ftdCount++;
+      }
+
+      if (Object.keys(leadUpdates).length > 0) {
+        await supabase.from('leads').update(leadUpdates).eq('id', dist.lead_id);
+        updated++;
+      }
+    }
+
+    if (distIds.length > 0) {
+      await supabase.from('lead_distributions').update({ last_polled_at: now }).in('id', distIds);
+    }
+
+    if (ftdCount > 0 && convRecord) {
+      const conv = convRecord as { id: string; conversion: number };
+      await supabase.from('advertiser_conversions').update({ conversion: conv.conversion + ftdCount }).eq('id', conv.id);
+    }
+
+    await flushHistory(supabase, historyBatch);
+  } catch (error) {
+    console.error(`Error polling RecoveryChain: ${error}`);
+    errors++;
+  }
+
+  return { updated, errors };
+}
+
 // Status polling adapters for each advertiser type (non-Enigma/EliteCRM) - ALL route through VPS forwarder
 const statusPollers: Record<string, (distribution: LeadDistribution) => Promise<StatusResponse | null>> = {
   
@@ -3323,6 +3422,14 @@ Deno.serve(async (req) => {
       // BackBone CRM (Wex) uses bulk GET /api/affiliate/leads (matched by email)
       if (advertiserType === 'wex') {
         const result = await pollWexLeads(supabase, advertiser, advDistributions);
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+        continue;
+      }
+
+      // RecoveryChain uses bulk GET /api/affiliate/leads (matched by email)
+      if (advertiserType === 'recoverychain') {
+        const result = await pollRecoveryChainLeads(supabase, advertiser, advDistributions);
         totalUpdated += result.updated;
         totalErrors += result.errors;
         continue;
